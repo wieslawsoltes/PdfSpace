@@ -48,3 +48,12 @@ The viewport is an independent control. It supports source-page painting, inline
 Browser recovery is stored in IndexedDB; desktop recovery uses an atomic temporary-file replacement. The workbench debounces saves and rechecks the snapshot while an asynchronous save is in flight. The current recovery slot holds the active workspace, not every open tab. Exporting a workspace is the durable backup mechanism.
 
 Browser acceptance tests use `?test=1` to enable read-only state and control-position diagnostics. They still perform real pointer/keyboard/file-picker interactions. Production sessions do not publish document diagnostics. No test-only mutation API is provided.
+
+
+## Native PDF workflows (0.2)
+
+`PdfSpace.Pdf` adds a PDFsharp-backed object writer alongside the existing Skia visual exporter. The default PDF export keeps native source page content and synchronizes supported annotation and AcroForm objects. Source-catalog retention is limited to original single-source page order. Appearance streams use Skia glyph outlines and explicit graphics state. Source text edits replace supported operands with encoding/identity guards, then rehydrate the preview source.
+
+`IPdfSecurityProvider` separates platform cryptography from document editing. The desktop provider uses .NET/PDFsharp; the browser provider marshals one request to a short-lived QPDF WASM worker with explicit owner authentication. It does not replace the Uno/Skia rendering engine. The worker and its exact runtime hashes are collected under `security/` in the published static root. No server receives document data.
+
+Logical field properties are synchronized across widgets in an editing transaction. Native widget deletion detaches both the page annotation and the field-tree reference, retaining siblings and pruning only empty ancestors. Form input commits before Tab traversal. Password-protected source data is represented as an explicitly sensitive in-memory working copy and is excluded from implicit recovery.

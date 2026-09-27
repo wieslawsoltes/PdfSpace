@@ -128,6 +128,7 @@ public sealed partial class PdfWorkbench
                 case "Find": BuildFind(content); break;
                 case "Properties": BuildProperties(content); break;
                 case "Form fields": BuildFormFields(content); break;
+                case "Field properties": BuildFieldProperties(content); break;
                 case "Original text": BuildOriginalText(content); break;
             }
             PdfTheme.Place(root, new ScrollViewer { Content = content, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled }, row: 1);

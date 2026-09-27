@@ -22,3 +22,8 @@ Drag in the page to create a shape or select text. Double-click a text annotatio
 In Organize pages, drag a thumbnail onto another position to reorder. Arrow keys move between thumbnails. Touch panning and pinch handling are implemented, but physical-device behavior is not part of the desktop Chromium acceptance suite.
 
 Browser-reserved shortcuts can vary by browser and operating system. The visible command buttons provide an alternative for every workflow described above.
+
+
+## Interactive forms (0.2)
+
+While using Fill form, Tab / Shift+Tab move through supported editable widgets in page/widget-array order. Traversal commits the current text. Space selects the focused check/radio button; Up/Down change a focused choice; Enter starts/commits single-line field editing and Escape cancels the current text input. The Prepare form panel also exposes Next field / Previous field and a property inspector. This does not implement every PDF `/Tabs` structure ordering mode.

@@ -15,6 +15,8 @@ public sealed partial class PdfWorkbench
         _leftPanel.Add("Add check box", PdfIconKind.Check, () => UseTool(PdfTool.FormCheckBox));
         _leftPanel.Add("Add dropdown", PdfIconKind.Down, () => UseTool(PdfTool.FormChoice));
         _leftPanel.Add("Show form fields", PdfIconKind.Grid, ShowFormFields);
+        _leftPanel.Add("Next field", PdfIconKind.Right, () => Viewport.NavigateField());
+        _leftPanel.Add("Previous field", PdfIconKind.Left, () => Viewport.NavigateField(true));
         _leftPanel.Add("Field properties", PdfIconKind.Settings, () => Run(EditFieldPropertiesAsync));
         _leftPanel.Add("Delete selected field", PdfIconKind.Trash, () => Safe(() => Session.DeleteField()));
         _leftPanel.Items.Children.Add(PdfTheme.Divider());
@@ -96,22 +98,23 @@ public sealed partial class PdfWorkbench
                 toggle.Select(field.IsChecked); card.Children.Add(toggle);
             }
             else card.Children.Add(Paragraph("This field is preserved but cannot be filled here."));
+            if (field.Kind is not (PdfFieldKind.Signature or PdfFieldKind.Unsupported))
+                card.Children.Add(new PdfCommandButton("Edit properties: " + field.Name, PdfIconKind.Settings, () =>
+                {
+                    context.Viewport.Navigate(index); context.Session.SelectField(field.Id); Run(EditFieldPropertiesAsync);
+                }) { HorizontalAlignment = HorizontalAlignment.Stretch, HorizontalContentAlignment = HorizontalAlignment.Left });
             content.Children.Add(new Border { Child = card, BorderBrush = PdfTheme.Brush("#DEDEDE"), BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(6) });
         }
         if (fields.Length == 0) content.Children.Add(Paragraph("No interactive fields yet. Use Prepare a form to draw fields, or open the interactive form example."));
     }
-    private async Task EditFieldPropertiesAsync()
+    private Task EditFieldPropertiesAsync()
     {
-        var context = _active; var field = context.Session.SelectedField;
-        if (field is null) { ShowStatus("Select a form field on the page or in the field list first."); return; }
-        var input = await _dialogs.PromptAsync("Field geometry", "Enter x, y, width, height in PDF points, relative to the unrotated workspace page.", $"{field.Bounds.X.ToString(CultureInfo.InvariantCulture)}, {field.Bounds.Y.ToString(CultureInfo.InvariantCulture)}, {field.Bounds.Width.ToString(CultureInfo.InvariantCulture)}, {field.Bounds.Height.ToString(CultureInfo.InvariantCulture)}");
-        if (input is null) return;
-        var numbers = input.Split(',', StringSplitOptions.TrimEntries).Select(part => double.Parse(part, CultureInfo.InvariantCulture)).ToArray();
-        if (numbers.Length != 4 || numbers.Any(value => !double.IsFinite(value))) throw new ArgumentException("Enter four finite numbers.");
-        var bounds = new RectD(numbers[0], numbers[1], numbers[2], numbers[3]);
-        if (bounds.Width < 8 || bounds.Height < 8 || bounds.X < 0 || bounds.Y < 0 || bounds.Right > context.Session.Page.Width || bounds.Bottom > context.Session.Page.Height) throw new ArgumentException("Field bounds must lie inside the page.");
-        context.Session.UpdateField(field.Id, current => current with { Bounds = bounds });
+        if (Session.SelectedField is null) { ShowFormFields(); ShowStatus("Select a field to edit its properties."); return Task.CompletedTask; }
+        Viewport.FinishText(true);
+        _right = "Field properties"; RefreshRight(); AdaptLayout();
+        return Task.CompletedTask;
     }
+
     private async Task ExportFormDataAsync()
     {
         var document = Session.Document;
@@ -152,9 +155,10 @@ public sealed partial class PdfWorkbench
         var owner = await _dialogs.SecretAsync("PDF owner password", "Choose a different password of at least eight characters. Keep it safe: PdfSpace requires it to edit a protected PDF.", "Encrypt PDF");
         if (owner is null) return;
         ShowStatus("Encrypting PDF…"); await Task.Delay(25);
-        var result = PdfDocumentEngine.Save(document, _typeface, new(user, owner, _permitPrint, _permitCopy, _permitEdit));
+        var result = PdfDocumentEngine.Save(document, _typeface);
+        var protectedBytes = await _security.EncryptAsync(result.Bytes, new(user, owner, _permitPrint, _permitCopy, _permitEdit));
         user = confirm = owner = null;
-        await _storage.SaveAsync(BaseName(document.Title) + "-protected.pdf", result.Bytes, "application/pdf");
+        await _storage.SaveAsync(BaseName(document.Title) + "-protected.pdf", protectedBytes, "application/pdf");
         ShowStatus("AES-256 encrypted PDF download started. Passwords were not saved.");
     }
     private void BuildRedactionTools()

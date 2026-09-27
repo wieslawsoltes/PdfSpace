@@ -1,19 +1,25 @@
 # Security and privacy
 
-PdfSpace is pre-release software. Do not use it as a security boundary, redaction product, signature trust service or compliance validator.
+PdfSpace is alpha software, not a certified security boundary, signature trust service or compliance validator.
 
-## Data handling
+## Local processing
 
-Documents are processed on the device. The application has no document-upload endpoint, account service or analytics integration. Loading the web application still downloads its application assets and dependencies from its hosting origin. Browser recovery uses IndexedDB and stores full original PDF bytes in the workspace; it is not encrypted. Browser origin isolation is origin-based, not path-based, so other applications on the same GitHub Pages origin are not a separate confidentiality boundary.
+PDFs are processed on the device. There is no document-upload service or analytics integration. The browser fetches application assets, including its hash-pinned QPDF WASM runtime, from the hosting origin. Each security operation uses a separate worker and private memory filesystem; inputs are not written to IndexedDB or uploaded. Workers terminate after completion, failure or timeout. JavaScript strings cannot be reliably zeroized.
 
-Desktop recovery is stored under the user's local application-data directory in `PdfSpace/recovery.pdfspace`. Printing creates a temporary PDF for the operating-system viewer. Downloaded and temporary files are the user's responsibility to protect or delete. The current recovery slot holds the active document only. Export a `.pdfspace` file to preserve edits permanently.
+AES-256 output uses separate opening and owner passwords. PdfSpace explicitly authenticates the owner password before creating an editable decrypted copy, because QPDF itself does not enforce PDF permission flags. The native provider uses PDFsharp Modify mode. Wrong passwords and unsupported algorithms do not cause an unencrypted fallback download. Permission flags depend on viewer enforcement and are not DRM.
 
-PDF JavaScript, launch actions and embedded executables are not executed by the application. This does not make native parsers or codecs immune to malicious input. Keep dependencies current and do not assume the configured file/page limits prevent every resource-exhaustion attack.
+## Recovery and exports
 
-## Important boundaries
+Ordinary recovery stores full original PDF bytes in unencrypted IndexedDB or an atomic desktop recovery file. Decrypted sources are marked sensitive and automatic recovery is disabled. Explicit exports may contain plaintext and must be protected by the user. Browser origin isolation is not path isolation: other applications on the same GitHub Pages origin are not a separate confidentiality boundary.
 
-Cropping, covering content, highlighting or adding a watermark is not secure redaction. Original source bytes are retained in a workspace. Visual signatures are not cryptographic signatures. PDF export is a new visual document and does not preserve or validate source signatures, forms, tags, protection or compliance status.
+Desktop recovery lives in `PdfSpace/recovery.pdfspace` below local application data. Printing creates a temporary visual PDF for the system viewer. Downloaded and temporary files remain the user's responsibility. Recovery currently covers the active document, not every open tab.
+
+## Redaction and signatures
+
+Crop, opaque marks, ordinary field/object deletion and pending redaction annotations do not securely remove confidential data. Workspaces always retain original source bytes. The raster-redaction command explicitly reconstructs every page as an image-only document with burned-in marks; the output contains no original text layer or copied original catalog, annotations or form objects. Inspect every page and every mark before sharing. This is not selective vector redaction or a claim of independent security certification.
+
+Drawn signatures are visual marks, not cryptographic signatures. Structured changes to signed/certified PDFs or XFA forms are blocked. Flattening is a separately labeled operation that loses those features. PDF JavaScript and launch actions are not executed by the UI, but native structured saves may preserve unsupported source objects; saving is not a general-purpose sanitizer.
 
 ## Reporting
 
-Report security-sensitive bugs through the repository's private vulnerability reporting facility when available. Do not attach confidential PDFs or credentials to a public issue. For public reproductions, provide a minimal synthetic PDF and describe the affected operation, browser/OS and build commit.
+Report security-sensitive issues through private vulnerability reporting when available. Do not post private PDFs, real passwords or credentials in public issues. Use minimal synthetic reproductions with the operation, browser/OS and build commit. Input limits and worker isolation reduce exposure but do not prove resistance to every malformed PDF or resource-exhaustion attack.

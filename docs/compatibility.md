@@ -1,40 +1,47 @@
-# Compatibility and release boundary
+# PDF compatibility and release boundary
 
-PdfSpace 0.1 is an independent PDF workspace, not an implementation of every Acrobat feature. UI familiarity does not imply data-format, security or visual parity.
+## 0.2.0-alpha.1
 
-## Supported operations
+PdfSpace is an independent Uno/Skia workspace. This release adds interoperable PDF workflows; it does not claim complete Acrobat feature or pixel parity.
 
-| Area | Implemented in this release |
-|---|---|
-| Reading | Local PDF import through PdfPig; Skia page rendering; multiple tabs; zoom/pan; page layouts; page navigation and thumbnails |
-| Text | Select/copy text available from the PDF; cross-page search; added-text annotations; plain-text export |
-| Review | Text highlight/underline/strikeout; notes/replies/resolution; ink, shapes, arrows, stamps; move/resize/recolor/delete; undo/redo |
-| Pages | Rotate, crop the visible region, duplicate, delete, reorder, insert blank, combine, extract ranges and split into a ZIP |
-| Fill & Sign | Added text, check marks, initials and drawn visual signatures |
-| Save | Editable workspace JSON, flattened visual PDF, single-page PNG and extracted text |
+| Area | Implemented | Remaining boundary |
+|---|---|---|
+| Native PDF save | Standard annotations and replies, field values/defaults/properties, new fields, widget deletion, safe links, original page content | A rewritten PDF, not an incremental or byte-for-byte save; signatures and XFA block structured changes |
+| Catalog preservation | Original catalog retained for one source with the original page sequence | Page assembly creates a new catalog; tags, attachments, named destinations and other document-level data are not guaranteed to survive |
+| Text editing | Replace supported top-level text-showing operands using characters already available in the font encoding | No arbitrary reflow, new font embedding, nested form-XObject editing, general image-object editing or complete typography engine |
+| Forms | Text, check boxes, imported radio groups, single-select choices; creation of text/check/dropdown widgets; tooltip, flags, defaults, font size, bounds, maximum length and options | No XFA, JavaScript calculations/validation, multi-select choices, push buttons, certificate fields, general hierarchy editing or complete PDF tab-order semantics |
+| Protection | AES-256 revision-6 output with separate opening/owner passwords and print/copy/edit flags; owner-authorized reopening | Permission flags rely on reader enforcement; not DRM. No certificate-based encryption or signing |
+| Redaction | Explicitly confirmed, separate image-only reconstruction with burned-in marks on all pages | Raster output loses text/search, forms, links and vectors. No selective vector/object redaction. Source documents and workspaces remain unredacted |
+| Rendering | PdfPig/Skia with bounded picture caches and independently editable overlays | Specialized codecs, fonts, colors and transparency need corpus testing; rendering errors are shown rather than ignored |
 
-## Not supported
+## Save operations are different
 
-Editing original PDF text/image content streams; a complete PDF object-preserving writer; AcroForm or XFA field interaction; importing/exporting all standard annotations; password workflows; encryption; permission enforcement; secure redaction; OCR; digital certificate signatures or their validation; tagged-PDF editing; PDF/A, PDF/X or PDF/UA certification; preflight; portfolios; embedded attachments; multimedia; JavaScript actions; cloud review; identity verification; Office conversion; plug-in compatibility; and the full Acrobat accessibility/keyboard/tool surface.
+**Export PDF** performs structured PDF writing. With one original source and unchanged page order it retains the source catalog and page content, then synchronizes supported annotations and form widgets. It does not promise preservation of every unsupported PDF feature. Changes to a signed/certified PDF or XFA form are blocked rather than silently invalidating them.
 
-Existing PDF annotations, links, outlines and form appearances may not render or may not be imported as editable objects. Workspace bookmarks are independent of the original PDF outline. Complex fonts, transparency, color spaces, JPEG 2000 and other specialized content require further compatibility testing; a native codec available on desktop may be unavailable in WebAssembly. Rendering errors are reported per page rather than pretending the content rendered successfully.
+**Export flattened visual PDF** is an explicitly named alternative that replays visuals into a new Skia PDF. The interactive and structural objects are not retained. It is not the default Save PDF operation and it does not securely redact hidden information.
 
-## Export contract
+**Save editable workspace** retains original source bytes and reversible editing state. Its JSON is unencrypted. Treat it as containing the entire original document, including data no longer visible after cropping, object deletion or pending redaction marks.
 
-PDF export replays page visuals into a new Skia PDF. Text generated by the engine can remain searchable, but this is not a guarantee that all original text semantics are preserved. Original interactive forms, links, tags, structure trees, attachments, bookmarks, signatures, encryption and metadata are not preserved as a lossless edit. Verify exported documents independently before distribution.
+## Browser cryptography
 
-The `.pdfspace` workspace keeps original bytes and edits, but is a PdfSpace-specific format. It is not a PDF file or a substitute for interoperable PDF annotations. It is unencrypted. Reopening it in PdfSpace restores the workspace rather than changing the original source file.
+The browser injects `IPdfSecurityProvider` using a self-hosted, hash-pinned QPDF 12.2.0 WebAssembly runtime. Each operation runs in a new worker with a private memory filesystem. Cryptographic randomness uses the browser's secure random generator. The worker is terminated after the result or a timeout; no document or password is sent to a server or persistent filesystem. JavaScript string zeroization is not guaranteed.
 
-**Crop does not securely remove content.** Hidden information may remain in the original source bytes, workspace and potentially exported document resources. Do not use crop, an opaque mark or a watermark to redact confidential material.
+QPDF itself does not enforce PDF permission flags. PdfSpace therefore checks `ownerpasswordmatched` before decrypting an encrypted working copy. An opening-only password is not accepted for editing, even when a low-level library could technically decrypt it. Wrong/unsupported operations fail without downloading a plaintext fallback. The native desktop provider uses PDFsharp and the platform .NET cryptography implementation.
 
-**Drawn signatures are visual marks only.** They do not establish identity, certificate trust, signing time, tamper protection or a legal audit trail. Never describe an exported copy as digitally signed on that basis.
+Decrypted documents are marked sensitive. Automatic recovery is disabled for them. Exporting an unencrypted workspace or structured PDF requires an explicit warning/confirmation; password protection is not implicitly retained when editing an unlocked copy.
 
-## Guardrails
+## Form editing behavior
 
-The current limits are 64 MB of combined source PDF data, a 128 MB recovery-file text limit, 1–4096 pages, eight open tabs, 50,000 annotations per workspace, 100,000 points per individual path, 100 history entries, and twelve cached pictures per default renderer. PNG export caps its longest side at 4096 pixels. Splitting is limited to 300 pages and a 256 MB archive.
+Field values, defaults and common properties are logical-field state shared across its widgets. Geometry belongs to the selected widget. Native saves update `/V`, `/DV`, `/Ff`, `/TU`, `/DA`, `/MaxLen`, `/Opt`, widget rectangles and appearance streams as appropriate. Deleting an imported widget removes its page annotation and field-tree entry, prunes empty ancestors and removes obsolete calculation-order references, without deleting sibling widgets. This is ordinary field deletion, not confidential-data erasure.
 
-These are input/memory guardrails, not proof against every decompression bomb or malformed PDF. Complex valid documents can still consume substantial memory or block the UI. The application is an alpha and should not be used as a security boundary.
+Tab and Shift+Tab navigate supported editable widgets in page/annotation-array order. Text is committed on traversal. Space activates a focused check/radio button; arrows change a focused choice. This is not complete `/Tabs` structure-tree ordering or document screen-reader semantics. Supported text appearances use the host font; subsequent third-party viewer editing may use the declared Helvetica fallback. Existing zero-size automatic text fitting uses an explicit 12-point viewer fallback.
 
-## Validation
+## Not implemented
 
-The engine suite exercises immutable editing, recovery serialization, coordinate transforms, actual PDF parsing/rendering, searchable text export, extraction and the picture cache. Browser acceptance tests exercise the real Uno application using pointer, keyboard, file-picker and download events. Screenshots and traces are retained in workflow artifacts. Desktop CI compiles the shared host; it does not constitute complete physical-device UI, touch, printer or accessibility validation.
+OCR; arbitrary PDF text/image layout editing; general font replacement and paragraph reflow; certificate signing/validation and trusted timestamping; complete PDF accessibility tagging; PDF/A, PDF/X or PDF/UA certification; professional print-production/preflight; complete Office conversion; portfolios/multimedia; cloud identity, audit trails, real-time review and Adobe plug-in compatibility. Visual drawn signatures are not cryptographic signatures.
+
+## Limits and verification
+
+The workspace limits source data to 64 MB, 1–4096 pages, eight open documents, 50,000 annotations, 100,000 points per path, two million total annotation points and 100 history entries. Browser security processing has a 60-second deadline, 64 MB working-copy limit and 128 MB encrypted-output limit. PNG and raster-export limits are enforced separately by their renderers. These limits are guardrails, not proof against every hostile PDF or decompression bomb.
+
+The tests exercise native PDF round trips, source text replacement, hierarchy-aware widget deletion, encryption authentication, redaction reconstruction, Uno pointer/keyboard interaction, file picking, download/reopen, and recovery. Browser-encrypted output is additionally reopened by the independent native PDFsharp backend. A passing test corpus does not establish universal PDF compatibility or independent security certification.

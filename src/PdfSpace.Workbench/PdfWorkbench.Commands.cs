@@ -17,14 +17,17 @@ public sealed partial class PdfWorkbench
         if (file.Name.EndsWith(".pdfspace", StringComparison.OrdinalIgnoreCase)) document = PdfDocumentEngine.PrepareWorkspace(WorkspaceJson.Load(Encoding.UTF8.GetString(file.Bytes)));
         else
         {
-            try { document = PdfDocumentEngine.Open(file.Bytes, file.Name); }
+            PdfUnlockResult unlocked;
+            try { unlocked = await _security.UnlockAsync(file.Bytes); }
             catch (PdfPasswordRequiredException)
             {
                 var password = await _dialogs.SecretAsync("Open protected PDF", "Enter the owner/editing password. Read-only password permissions are not bypassed. The unlocked working copy stays in memory; automatic recovery is disabled.", "Unlock");
                 if (password is null) return;
-                document = PdfDocumentEngine.Open(file.Bytes, file.Name, password);
+                unlocked = await _security.UnlockAsync(file.Bytes, password);
                 password = null;
             }
+            document = PdfDocumentEngine.Open(unlocked.Bytes, file.Name);
+            if (unlocked.WasEncrypted) document = document with { Sources = document.Sources.Select(source => source with { Sensitive = true }).ToArray() };
         }
         if (combine) { context.Session.Combine(document); RefreshData(); ShowStatus("PDF combined. Use Organize pages to reorder or extract pages."); }
         else

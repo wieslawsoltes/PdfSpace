@@ -28,10 +28,12 @@ public sealed partial class App : Application
             PdfTheme.Font = new FontFamily("ms-appx:///Assets/Fonts/NotoSans.ttf#Noto Sans");
 #if __WASM__
             IWorkspaceStorage storage = new BrowserWorkspaceStorage();
+            PdfSpace.Pdf.IPdfSecurityProvider security = new BrowserPdfSecurityProvider();
 #else
             IWorkspaceStorage storage = new DesktopWorkspaceStorage();
+            PdfSpace.Pdf.IPdfSecurityProvider security = new PdfSpace.Pdf.NativePdfSecurityProvider();
 #endif
-            var sample = SampleDocument.Create(_font); _workbench = new PdfWorkbench(sample, storage, _font); _window.Content = _workbench;
+            var sample = SampleDocument.Create(_font); _workbench = new PdfWorkbench(sample, storage, _font, security); _window.Content = _workbench;
 #if __WASM__
             var diagnostics = BrowserFiles.IsTestMode();
             void Publish()

@@ -167,6 +167,7 @@ public sealed partial class PdfViewport
     private void Keyboard(object sender, KeyRoutedEventArgs e)
     {
         if (IsEditingText) return;
+        if (HandleFormKey(e)) { e.Handled = true; return; }
         if (e.Key == VirtualKey.Escape) { CancelGesture(); Session.Select(null); Invalidate(); e.Handled = true; }
         else if (e.Key is VirtualKey.Delete or VirtualKey.Back) { if (Session.SelectedFieldId is not null) { try { Session.DeleteField(); } catch (InvalidOperationException ex) { StatusChanged?.Invoke(ex.Message); } } else Session.DeleteSelection(); e.Handled = true; }
         else if (e.Key is VirtualKey.PageDown or VirtualKey.PageUp) { Navigate(Session.CurrentPage + (e.Key == VirtualKey.PageDown ? 1 : -1)); e.Handled = true; }

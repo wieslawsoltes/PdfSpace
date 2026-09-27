@@ -8,6 +8,7 @@ public sealed partial class PdfWorkbench : UserControl, IDisposable
     private readonly List<DocumentContext> _documents = [];
     private DocumentContext _active = null!;
     private readonly IWorkspaceStorage _storage;
+    private readonly IPdfSecurityProvider _security;
     private readonly SKTypeface _typeface;
     private readonly DispatcherTimer _autosave = new() { Interval = TimeSpan.FromSeconds(1.2) };
     private bool _savingRecovery, _saveAgain, _disposed;
@@ -21,9 +22,9 @@ public sealed partial class PdfWorkbench : UserControl, IDisposable
     public string Status => _statusText;
     public int DocumentCount => _documents.Count;
     public event Action? StateChanged;
-    public PdfWorkbench(PdfWorkspace initial, IWorkspaceStorage storage, SKTypeface typeface)
+    public PdfWorkbench(PdfWorkspace initial, IWorkspaceStorage storage, SKTypeface typeface, IPdfSecurityProvider? security = null)
     {
-        _storage = storage; _typeface = typeface;
+        _storage = storage; _typeface = typeface; _security = security ?? new NativePdfSecurityProvider();
         HorizontalContentAlignment = HorizontalAlignment.Stretch; VerticalContentAlignment = VerticalAlignment.Stretch;
         BuildShell(); AddDocument(initial);
         _autosave.Tick += async (_, _) => { _autosave.Stop(); await SaveRecoveryAsync(); };

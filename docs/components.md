@@ -1,6 +1,6 @@
 # Embedding the reusable components
 
-All nine libraries are packable with `dotnet pack`; the application itself is not. The Uno UI libraries contain browser and desktop assets. Use the same Uno/Skia dependency versions as the host.
+All ten libraries are packable with `dotnet pack`; the application itself is not. The Uno UI libraries contain browser and desktop assets. Use the same Uno/Skia dependency versions as the host.
 
 ## Headless editing
 
@@ -69,3 +69,23 @@ The host owns the injected typeface. The workbench owns the viewports it creates
 `PdfResources.xaml` holds common command-button, text-field and flyout styles. `PdfTheme` supplies fonts, brushes and layout helpers. `PdfIconKind` identifies the original vector icons. Compose these independently of `PdfWorkbench`, or host only the viewer with an application-specific toolbar.
 
 This release intentionally uses a styled native Uno text field for text/IME input. It does not claim a complete custom implementation of every primitive, full screen-reader document semantics or binary/API compatibility with Adobe Acrobat.
+
+
+## Structured PDF editing and security
+
+```csharp
+using PdfSpace.Pdf;
+
+var document = PdfDocumentEngine.Open(File.ReadAllBytes("input.pdf"), "input.pdf");
+var result = PdfDocumentEngine.Save(document, typeface);
+File.WriteAllBytes("native-copy.pdf", result.Bytes);
+foreach (var warning in result.Warnings) Console.WriteLine(warning);
+
+IPdfSecurityProvider security = new NativePdfSecurityProvider();
+var protectedPdf = await security.EncryptAsync(result.Bytes,
+    new PdfProtectionOptions(openingPassword, ownerPassword, AllowCopy: false));
+```
+
+Inject a platform provider as the optional fourth `PdfWorkbench` constructor argument. The App project supplies `BrowserPdfSecurityProvider` on WebAssembly; a custom browser host must also ship its worker/runtime assets. The default provider is native .NET and must not be used for AES on browserwasm. `PdfUnlockResult.WasEncrypted` must propagate into source sensitivity so recovery cannot silently persist decrypted bytes.
+
+`EditorSession.UpdateField` applies logical properties across all widgets of a field while changing bounds only on the selected widget. `SetFieldValue` enforces type, choice and read-only rules. `DeleteField` supports imported widgets; native save prunes the corresponding field hierarchy. Neither ordinary deletion nor workspace serialization sanitizes confidential source data.

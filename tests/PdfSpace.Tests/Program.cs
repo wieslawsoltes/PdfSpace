@@ -5,6 +5,8 @@ using PdfSpace.Layout;
 using PdfSpace.Skia;
 using SkiaSharp;
 
+if (args is ["--verify-browser-security", var directory]) { BrowserSecurityVerification.Run(directory); return; }
+
 var passed = 0;
 void Check(bool condition, string name) { if (!condition) throw new Exception("FAILED: " + name); Console.WriteLine("PASS " + name); passed++; }
 void Reject(Action action, string name) { try { action(); } catch { Check(true, name); return; } throw new Exception("FAILED: " + name); }
@@ -80,4 +82,5 @@ Check(undoCount == 100, "undo history is bounded to one hundred transactions");
 
 Directory.CreateDirectory("artifacts/engine"); File.WriteAllBytes("artifacts/engine/sample.pdf", demo.Sources[0].Bytes); File.WriteAllBytes("artifacts/engine/sample.png", png); File.WriteAllBytes("artifacts/engine/edited.pdf", output);
 StructuredPdfTests.Run(Check, Reject);
+FormPersistenceTests.Run(Check, Reject);
 Console.WriteLine($"\n{passed} engine checks passed.");

@@ -151,7 +151,7 @@ public static class PdfDocumentEngine
             if (preserve) output = nativeSources[workspace.Sources[0].Id];
             else
             {
-                if (workspace.FieldCount > 0 || nativeSources.Values.Any(native => Inspect(native).FormWidgets > 0)) throw new NotSupportedException("Structured saving of reorganized or combined form documents is not supported. Save the original page order or use a flattened copy.");
+                if (workspace.Pages.Any(page => page.Fields.Any(field => field.SourceKey is not null)) || nativeSources.Values.Any(native => Inspect(native).FormWidgets > 0)) throw new NotSupportedException("Structured saving of reorganized or combined form documents is not supported. Save the original page order or use a flattened copy.");
                 output = new PdfDocument();
                 for (var i = 0; i < workspace.Pages.Length; i++)
                 {
@@ -177,7 +177,16 @@ public static class PdfDocumentEngine
                     {
                         var item = PdfObjects.Dictionary(original.Elements[index]); if (item is null) continue;
                         var key = $"{state.SourcePage}:{index}";
-                        if (PdfObjects.Text(item.Elements["/Subtype"]) == "Widget") fields[key] = item;
+                        if (PdfObjects.Text(item.Elements["/Subtype"]) == "Widget")
+                        {
+                            fields[key] = item;
+                            var importedField = NativeForms.Read(item, geometry, key);
+                            if (importedField is { Kind: not (PdfFieldKind.Signature or PdfFieldKind.Unsupported) } && !state.Fields.Any(field => field.SourceKey == key))
+                            {
+                                removals.Add(index);
+                                NativeForms.RemoveFromTree(output, item);
+                            }
+                        }
                         else if (NativeAnnotations.Read(output, item, geometry, key) is not null) { removals.Add(index); roots.Add(item); }
                     }
                     for (var index = 0; index < original.Elements.Count; index++)
@@ -198,8 +207,7 @@ public static class PdfDocumentEngine
             }
             if (protection is not null)
             {
-                if (protection.UserPassword.Length < 8 || protection.OwnerPassword.Length < 8) throw new ArgumentException("Use at least eight characters for both passwords.");
-                if (protection.UserPassword == protection.OwnerPassword) throw new ArgumentException("Use different opening and owner passwords.");
+                protection.Validate();
                 output.SecuritySettings.UserPassword = protection.UserPassword; output.SecuritySettings.OwnerPassword = protection.OwnerPassword;
                 output.SecurityHandler.SetEncryptionToV5();
                 output.SecuritySettings.PermitPrint = protection.AllowPrint; output.SecuritySettings.PermitFullQualityPrint = protection.AllowPrint;

@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.2.0-alpha.1 — 2026-09-27
+
+- Native PDF annotation/reply/link saving and import; catalog retention for original single-source page order.
+- Actual supported text-operand replacement with stale-edit and unavailable-glyph rejection.
+- AcroForm creation, filling, property/default persistence, imported-widget deletion with hierarchy pruning, and keyboard traversal.
+- Browser AES-256 output and owner-authorized opening via an isolated hash-pinned QPDF WASM worker; independent native-backend verification.
+- Sensitive-document recovery protection and explicit plaintext-export warnings.
+- Separate all-page image-only redaction export with a clear destructive-output contract.
+- Ten reusable packages, expanded engine/browser tests and updated capability/security documentation.
+
+Full Acrobat parity, OCR, certificate signatures, XFA/scripts, general content reflow, tagging/compliance and cloud services remain outside this release.
+
 ## 0.1.0-alpha.1 — 2026-09-27
 
 Initial independent Uno Platform / SkiaSharp PDF workspace.
