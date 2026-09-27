@@ -12,7 +12,7 @@ var session = new EditorSession(new PdfWorkspace());
 Check(!session.IsDirty, "new session is clean");
 var note = new Annotation { Kind = AnnotationKind.Note, Text = "Review the material choice", Bounds = new(100, 100, 24, 24) };
 session.AddAnnotation(note); Check(session.Document.AnnotationCount == 1 && session.IsDirty, "add annotation transaction");
-session.MarkSaved(); session.UpdateAnnotation(note.Id, a => a with { Text = "Updated" });
+session.MarkSaved(); session.UpdateAnnotation(note.Id, annotation => annotation with { Text = "Updated" });
 Check(session.IsDirty, "edit after save is dirty"); session.Undo(); Check(!session.IsDirty && session.SelectedAnnotation?.Text == note.Text, "undo to saved identity");
 session.Redo(); Check(session.SelectedAnnotation?.Text == "Updated", "redo mutation");
 session.Reply(note.Id, "Agreed"); Check(session.SelectedAnnotation?.Replies.Length == 1, "thread reply");
@@ -47,5 +47,36 @@ var extract = renderer.ExportPdf(demo, [2, 0]); Check(PdfReader.Open(extract, "e
 edit.RotatePage(); edit.CropPage(new(20, 30, 500, 700));
 var rotated = PdfReader.Open(renderer.ExportPdf(edit.Document, [0]), "rotated.pdf"); Check(Math.Abs(rotated.Pages[0].Width - 700) < 1 && Math.Abs(rotated.Pages[0].Height - 500) < 1, "crop and rotation exported dimensions");
 Check(renderer.CachedPictureCount <= 2, "bounded picture cache");
+
+Check(PageRange.Parse("1, 3-5, 3", 6).SequenceEqual([0, 2, 3, 4]), "page ranges preserve order and remove duplicates");
+Check(PageRange.Parse("all", 6).Length == 6, "all-pages range");
+Reject(() => PageRange.Parse("0", 6), "zero page rejected");
+Reject(() => PageRange.Parse("6-2", 6), "descending range rejected");
+Reject(() => PageRange.Parse("3-8", 6), "out-of-range page rejected");
+Reject(() => WorkspaceJson.Load("{\"Pages\":null}"), "null page collection rejected");
+Reject(() => WorkspaceJson.Validate(new PdfWorkspace { Pages = [new PdfPageState { Annotations = null! }] }), "null annotation collection rejected");
+Reject(() => WorkspaceJson.Validate(new PdfWorkspace { Pages = [new PdfPageState { Annotations = [new Annotation { Kind = (AnnotationKind)999 }] }] }), "unknown annotation kind rejected");
+Reject(() => WorkspaceJson.Validate(new PdfWorkspace { Pages = [new PdfPageState { Annotations = [note, note] }] }), "duplicate annotation identity rejected");
+Reject(() => WorkspaceJson.Validate(new PdfWorkspace { Pages = [new PdfPageState { Annotations = [note with { Points = [new(double.PositiveInfinity, 0)] }] }] }), "nonfinite ink point rejected");
+Reject(() => WorkspaceJson.Validate(new PdfWorkspace { Pages = [new PdfPageState { Crop = new(-1, 0, 100, 100) }] }), "crop outside source rejected");
+Reject(() => session.RotatePage(45), "editing rejects non-quarter rotation");
+var stable = new EditorSession(new PdfWorkspace()); stable.MarkSaved(); stable.RotatePage(360); stable.CropPage(null); stable.DeleteSelection();
+Check(!stable.IsDirty && !stable.CanUndo, "no-op commands do not dirty history");
+stable.AddAnnotation(note); stable.MarkSaved(); stable.UpdateAnnotation(note.Id, annotation => annotation);
+Check(!stable.IsDirty, "no-op annotation update stays clean");
+Reject(() => stable.UpdateAnnotation(note.Id, annotation => annotation with { Id = Guid.NewGuid() }), "annotation update preserves identity");
+var combined = new EditorSession(demo); combined.Combine(demo);
+Check(combined.Document.Pages.Length == 12 && combined.Document.Sources.Length == 2, "same document can be combined twice");
+Check(combined.Document.Pages.Select(page => page.Id).Distinct().Count() == 12, "combined page identifiers are unique");
+Check(combined.Document.Pages[6].SourceId != combined.Document.Pages[0].SourceId, "combined source references remapped");
+Check(ReferenceEquals(combined.Document.Sources[0].Bytes, combined.Document.Sources[1].Bytes), "combination shares immutable original bytes");
+combined.Undo(); Check(combined.Document.Pages.Length == 6, "combination is one undo transaction");
+Check(PdfReader.Find(demo, "GOOD IDEAS", true).Count() == 0 && PdfReader.Find(demo, "GOOD IDEAS", false).Any(), "case-sensitive search option");
+using (var textReader = new PdfTextReader(demo)) Check(ReferenceEquals(textReader.Words(demo.Pages[0]), textReader.Words(demo.Pages[0])), "text index reuses parsed page words");
+var history = new EditorSession(new PdfWorkspace());
+for (var i = 0; i < 110; i++) history.BookmarkPage("Bookmark " + i);
+var undoCount = 0; while (history.CanUndo) { history.Undo(); undoCount++; }
+Check(undoCount == 100, "undo history is bounded to one hundred transactions");
+
 Directory.CreateDirectory("artifacts/engine"); File.WriteAllBytes("artifacts/engine/sample.pdf", demo.Sources[0].Bytes); File.WriteAllBytes("artifacts/engine/sample.png", png); File.WriteAllBytes("artifacts/engine/edited.pdf", output);
 Console.WriteLine($"\n{passed} engine checks passed.");

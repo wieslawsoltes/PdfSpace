@@ -25,7 +25,11 @@ public sealed class EditorSession
     public Annotation? SelectedAnnotation => Page.Annotations.FirstOrDefault(a => a.Id == SelectedAnnotationId);
     public EditorSession(PdfWorkspace document) { WorkspaceJson.Validate(document); Document = _saved = document; }
     public void MarkSaved() { _saved = Document; ViewChanged?.Invoke(this, EventArgs.Empty); }
-    public void SetTool(PdfTool tool) { Tool = tool; SelectedAnnotationId = null; ViewChanged?.Invoke(this, EventArgs.Empty); }
+    public void SetTool(PdfTool tool)
+    {
+        if (!Enum.IsDefined(tool)) throw new ArgumentOutOfRangeException(nameof(tool));
+        Tool = tool; SelectedAnnotationId = null; ViewChanged?.Invoke(this, EventArgs.Empty);
+    }
     public void Navigate(int index) { CurrentPage = Math.Clamp(index, 0, Document.Pages.Length - 1); SelectedAnnotationId = null; ViewChanged?.Invoke(this, EventArgs.Empty); }
     public void Select(Guid? id) { SelectedAnnotationId = id; ViewChanged?.Invoke(this, EventArgs.Empty); }
     public void Execute(string label, Func<PdfWorkspace, PdfWorkspace> command)
@@ -41,54 +45,66 @@ public sealed class EditorSession
         if (!Page.Annotations.Any(a => a.Id == SelectedAnnotationId)) SelectedAnnotationId = null;
         Revision++; Changed?.Invoke(this, EventArgs.Empty);
     }
-    public void Undo() { if (!CanUndo) return; var e = _undo[^1]; _undo.RemoveAt(_undo.Count - 1); _redo.Add(e); Document = e.Before; Notify(); }
-    public void Redo() { if (!CanRedo) return; var e = _redo[^1]; _redo.RemoveAt(_redo.Count - 1); _undo.Add(e); Document = e.After; Notify(); }
+    public void Undo() { if (!CanUndo) return; var entry = _undo[^1]; _undo.RemoveAt(_undo.Count - 1); _redo.Add(entry); Document = entry.Before; Notify(); }
+    public void Redo() { if (!CanRedo) return; var entry = _redo[^1]; _redo.RemoveAt(_redo.Count - 1); _undo.Add(entry); Document = entry.After; Notify(); }
     public void AddAnnotation(Annotation annotation, int? pageIndex = null)
     {
-        var page = Document.Pages[pageIndex ?? CurrentPage];
-        Execute("Add " + annotation.Kind.ToString().ToLowerInvariant(), d => d.UpdatePage(page.Id, p => p with { Annotations = [..p.Annotations, annotation] }));
-        SelectedAnnotationId = annotation.Id; ViewChanged?.Invoke(this, EventArgs.Empty);
+        var index = pageIndex ?? CurrentPage;
+        if (index < 0 || index >= Document.Pages.Length) throw new ArgumentOutOfRangeException(nameof(pageIndex));
+        var page = Document.Pages[index];
+        Execute("Add " + annotation.Kind.ToString().ToLowerInvariant(), document => document.UpdatePage(page.Id, state => state with { Annotations = [..state.Annotations, annotation] }));
+        if (index == CurrentPage) SelectedAnnotationId = annotation.Id;
+        ViewChanged?.Invoke(this, EventArgs.Empty);
     }
     public void UpdateAnnotation(Guid id, Func<Annotation, Annotation> update, string label = "Edit annotation")
-    { var page = Page; Execute(label, d => d.UpdatePage(page.Id, p => p with { Annotations = p.Annotations.Select(a => a.Id == id ? update(a) : a).ToArray() })); }
+    {
+        var page = Page; var existing = page.Annotations.FirstOrDefault(annotation => annotation.Id == id);
+        if (existing is null) return;
+        var replacement = update(existing); if (replacement == existing) return;
+        if (replacement.Id != id) throw new InvalidOperationException("An annotation update cannot change its identity.");
+        Execute(label, document => document.UpdatePage(page.Id, state => state with { Annotations = state.Annotations.Select(annotation => annotation.Id == id ? replacement : annotation).ToArray() }));
+    }
     public void DeleteSelection()
     {
-        if (SelectedAnnotationId is not { } id) return; var page = Page;
-        Execute("Delete annotation", d => d.UpdatePage(page.Id, p => p with { Annotations = p.Annotations.Where(a => a.Id != id).ToArray() }));
+        if (SelectedAnnotationId is not { } id || !Page.Annotations.Any(annotation => annotation.Id == id)) return;
+        var page = Page;
+        Execute("Delete annotation", document => document.UpdatePage(page.Id, state => state with { Annotations = state.Annotations.Where(annotation => annotation.Id != id).ToArray() }));
     }
     public void RotatePage(int degrees = 90)
-    { var page = Page; Execute("Rotate page", d => d.UpdatePage(page.Id, p => p with { Rotation = ((p.Rotation + degrees) % 360 + 360) % 360 })); }
+    {
+        if (degrees % 90 != 0) throw new ArgumentOutOfRangeException(nameof(degrees), "Rotation must be a multiple of 90 degrees.");
+        var page = Page; var rotation = (int)(((long)page.Rotation + degrees) % 360 + 360) % 360;
+        if (rotation == page.Rotation) return;
+        Execute("Rotate page", document => document.UpdatePage(page.Id, state => state with { Rotation = rotation }));
+    }
     public void CropPage(RectD? crop)
-    { var page = Page; Execute(crop is null ? "Reset crop" : "Crop page", d => d.UpdatePage(page.Id, p => p with { Crop = crop })); }
+    { var page = Page; if (crop == page.Crop) return; Execute(crop is null ? "Reset crop" : "Crop page", document => document.UpdatePage(page.Id, state => state with { Crop = crop })); }
     public void BookmarkPage(string name)
-    { var page = Page; Execute("Edit bookmark", d => d.UpdatePage(page.Id, p => p with { Bookmark = name })); }
+    { var page = Page; if (name == page.Bookmark) return; Execute("Edit bookmark", document => document.UpdatePage(page.Id, state => state with { Bookmark = name })); }
     public void InsertBlank()
     {
-        var i = CurrentPage + 1; Execute("Insert blank page", d => d with { Pages = [..d.Pages.Take(i), new PdfPageState(), ..d.Pages.Skip(i)] }); Navigate(i);
+        var index = CurrentPage + 1; Execute("Insert blank page", document => document with { Pages = [..document.Pages.Take(index), new PdfPageState(), ..document.Pages.Skip(index)] }); Navigate(index);
     }
     public void DuplicatePage()
     {
-        var i = CurrentPage; var copy = Page with { Id = Guid.NewGuid(), Annotations = Page.Annotations.Select(a => a with { Id = Guid.NewGuid() }).ToArray() };
-        Execute("Duplicate page", d => d with { Pages = [..d.Pages.Take(i + 1), copy, ..d.Pages.Skip(i + 1)] }); Navigate(i + 1);
+        var index = CurrentPage;
+        var copy = Page with { Id = Guid.NewGuid(), Annotations = Page.Annotations.Select(annotation => annotation with { Id = Guid.NewGuid(), Replies = annotation.Replies.Select(reply => reply with { Id = Guid.NewGuid() }).ToArray() }).ToArray() };
+        Execute("Duplicate page", document => document with { Pages = [..document.Pages.Take(index + 1), copy, ..document.Pages.Skip(index + 1)] }); Navigate(index + 1);
     }
     public void DeletePage()
     {
         if (Document.Pages.Length == 1) throw new InvalidOperationException("Keep at least one page in the document.");
-        var id = Page.Id; Execute("Delete page", d => d with { Pages = d.Pages.Where(p => p.Id != id).ToArray() });
+        var id = Page.Id; Execute("Delete page", document => document with { Pages = document.Pages.Where(page => page.Id != id).ToArray() });
     }
     public void MovePage(int target)
     {
         target = Math.Clamp(target, 0, Document.Pages.Length - 1); var source = CurrentPage; if (source == target) return;
-        Execute("Reorder pages", d => { var pages = d.Pages.ToList(); var page = pages[source]; pages.RemoveAt(source); pages.Insert(target, page); return d with { Pages = pages.ToArray() }; }); Navigate(target);
+        Execute("Reorder pages", document => { var pages = document.Pages.ToList(); var page = pages[source]; pages.RemoveAt(source); pages.Insert(target, page); return document with { Pages = pages.ToArray() }; }); Navigate(target);
     }
-    public void Combine(PdfWorkspace other)
-    {
-        WorkspaceJson.Validate(other);
-        Execute("Combine PDFs", d => d with { Sources = [..d.Sources, ..other.Sources], Pages = [..d.Pages, ..other.Pages] });
-    }
+    public void Combine(PdfWorkspace other) => Execute("Combine PDFs", document => WorkspaceComposition.Append(document, other));
     public void Reply(Guid id, string text)
     {
         if (string.IsNullOrWhiteSpace(text)) return;
-        UpdateAnnotation(id, a => a with { Replies = [..a.Replies, new CommentReply(Guid.NewGuid(), "You", text.Trim(), DateTimeOffset.UtcNow)] }, "Reply to comment");
+        UpdateAnnotation(id, annotation => annotation with { Replies = [..annotation.Replies, new CommentReply(Guid.NewGuid(), "You", text.Trim(), DateTimeOffset.UtcNow)] }, "Reply to comment");
     }
 }

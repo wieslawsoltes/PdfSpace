@@ -39,11 +39,18 @@ public sealed partial class App : Application
                 BrowserFiles.SetDirty(_workbench.HasUnsavedChanges);
                 if (diagnostics && _workbench.XamlRoot is not null)
                 {
-                    try { BrowserFiles.PublishDiagnostics(_workbench.GetDiagnosticsJson()); } catch { /* Layout may not yet be attached during the first frame. */ }
+                    try { BrowserFiles.PublishDiagnostics(_workbench.GetDiagnosticsJson()); }
+                    catch (InvalidOperationException) { /* A just-detached visual is absent from the next layout snapshot. */ }
                 }
             }
             _workbench.StateChanged += Publish;
             _workbench.Loaded += (_, _) => Publish();
+            if (diagnostics)
+            {
+                // Panel construction changes desired size before controls receive arranged bounds.
+                // Publish geometry after layout, not just when the underlying document state changes.
+                _workbench.LayoutUpdated += (_, _) => Publish();
+            }
 #endif
             _window.Closed += (_, _) => { _workbench.Dispose(); _font?.Dispose(); };
             await _workbench.OfferRecoveryAsync();

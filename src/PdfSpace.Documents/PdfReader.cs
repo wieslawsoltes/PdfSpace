@@ -24,30 +24,31 @@ public static class PdfReader
         WorkspaceJson.Validate(result); return result;
     }
     public static PdfWord[] Words(PdfWorkspace document, PdfPageState page)
-    {
-        if (page.SourceId is null) return [];
-        var source = document.Sources.First(s => s.Id == page.SourceId);
-        using var pdf = PdfDocument.Open(source.Bytes);
-        return pdf.GetPage(page.SourcePage).GetWords().Select(w => new PdfWord(w.Text, new(w.BoundingBox.Left, page.Height - w.BoundingBox.Top, w.BoundingBox.Width, w.BoundingBox.Height))).ToArray();
-    }
+    { using var reader = new PdfTextReader(document); return reader.Words(page); }
     public static IEnumerable<SearchResult> Find(PdfWorkspace document, string query, bool matchCase = false)
     {
         if (string.IsNullOrWhiteSpace(query)) yield break;
+        using var reader = new PdfTextReader(document);
         var comparison = matchCase ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase;
         for (var i = 0; i < document.Pages.Length; i++)
         {
-            var words = Words(document, document.Pages[i]);
-            var text = string.Join(" ", words.Select(w => w.Text));
-            var offset = 0; var locations = words.Select(w => { var start = offset; offset += w.Text.Length + 1; return start; }).ToArray();
+            var words = reader.Words(document.Pages[i]);
+            var text = string.Join(" ", words.Select(word => word.Text));
+            var offset = 0;
+            var locations = words.Select(word => { var start = offset; offset += word.Text.Length + 1; return start; }).ToArray();
             for (var start = 0; start < text.Length;)
             {
                 var index = text.IndexOf(query, start, comparison); if (index < 0) break;
-                var matches = words.Where((w, wi) => locations[wi] < index + query.Length && locations[wi] + w.Text.Length > index).ToArray();
-                if (matches.Length > 0) yield return new(i, text.Substring(Math.Max(0, index - 28), Math.Min(text.Length - Math.Max(0, index - 28), query.Length + 75)), matches.Select(w => w.Bounds).Aggregate(RectD.Union));
+                var matches = words.Where((word, wi) => locations[wi] < index + query.Length && locations[wi] + word.Text.Length > index).ToArray();
+                if (matches.Length > 0) yield return new(i, text.Substring(Math.Max(0, index - 28), Math.Min(text.Length - Math.Max(0, index - 28), query.Length + 75)), matches.Select(word => word.Bounds).Aggregate(RectD.Union));
                 start = index + Math.Max(1, query.Length);
             }
-            foreach (var annotation in document.Pages[i].Annotations.Where(a => a.Text.Contains(query, comparison))) yield return new(i, annotation.Text, annotation.Bounds);
+            foreach (var annotation in document.Pages[i].Annotations.Where(annotation => annotation.Text.Contains(query, comparison))) yield return new(i, annotation.Text, annotation.Bounds);
         }
     }
-    public static string ExtractText(PdfWorkspace document) => string.Join("\n\n", document.Pages.Select((p, i) => $"Page {i + 1}\n" + string.Join(" ", Words(document, p).Select(w => w.Text)) + "\n" + string.Join("\n", p.Annotations.Where(a => a.Kind is AnnotationKind.Text or AnnotationKind.Note).Select(a => a.Text))));
+    public static string ExtractText(PdfWorkspace document)
+    {
+        using var reader = new PdfTextReader(document);
+        return string.Join("\n\n", document.Pages.Select((page, index) => $"Page {index + 1}\n" + string.Join(" ", reader.Words(page).Select(word => word.Text)) + "\n" + string.Join("\n", page.Annotations.Where(annotation => annotation.Kind is AnnotationKind.Text or AnnotationKind.Note).Select(annotation => annotation.Text))));
+    }
 }

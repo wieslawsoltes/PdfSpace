@@ -1,0 +1,101 @@
+name: Pages
+on:
+  workflow_run:
+    workflows: [Build]
+    branches: [main]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      build_run_id:
+        description: Successful main-branch Build run to deploy; empty selects the latest
+        required: false
+        type: string
+  push:
+    branches: [main]
+    paths: ['.github/workflows/pages.yml']
+permissions:
+  contents: read
+  actions: read
+  pages: write
+  id-token: write
+concurrency:
+  group: pages-main-deployment
+  cancel-in-progress: false
+jobs:
+  deploy:
+    if: github.event_name != 'workflow_run' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main' && github.event.workflow_run.event != 'pull_request')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Resolve and validate successful main-branch build
+        id: build
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          REQUESTED_RUN: ${{ inputs.build_run_id || github.event.workflow_run.id }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          RUN="$REQUESTED_RUN"
+          if [ -z "$RUN" ]; then
+            RUN=$(gh api "repos/$REPOSITORY/actions/workflows/build.yml/runs?branch=main&status=success&per_page=20" --jq '[.workflow_runs[] | select(.event != "pull_request")][0].id')
+          fi
+          if ! [[ "$RUN" =~ ^[0-9]+$ ]]; then echo 'No successful main-branch Build is available.' >&2; exit 1; fi
+          gh api "repos/$REPOSITORY/actions/runs/$RUN" > /tmp/verified-build.json
+          jq -e '.conclusion == "success" and .head_branch == "main" and .event != "pull_request" and .path == ".github/workflows/build.yml"' /tmp/verified-build.json
+          SHA=$(jq -r .head_sha /tmp/verified-build.json)
+          echo "run_id=$RUN" >> "$GITHUB_OUTPUT"
+          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.build.outputs.sha }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: PdfSpace-browser
+          run-id: ${{ steps.build.outputs.run_id }}
+          github-token: ${{ github.token }}
+          path: site
+      - name: Verify artifact commit identity
+        env:
+          EXPECTED_SHA: ${{ steps.build.outputs.sha }}
+        run: jq -e --arg sha "$EXPECTED_SHA" '.commit == $sha and .host == "Uno WebAssembly"' site/build-info.json
+      - uses: actions/configure-pages@v5
+        with:
+          enablement: true
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+      - id: deployment
+        uses: actions/deploy-pages@v4
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+      - uses: actions/download-artifact@v4
+        with:
+          name: PdfSpace-engine-validation
+          run-id: ${{ steps.build.outputs.run_id }}
+          github-token: ${{ github.token }}
+          path: artifacts/fixtures
+      - name: Verify public deployment
+        env:
+          PDFSPACE_URL: ${{ steps.deployment.outputs.page_url }}
+          EXPECTED_SHA: ${{ steps.build.outputs.sha }}
+        run: |
+          curl --fail --retry 8 --retry-all-errors --retry-delay 5 "${PDFSPACE_URL}build-info.json" -o /tmp/live-build.json
+          jq -e --arg sha "$EXPECTED_SHA" '.commit == $sha' /tmp/live-build.json
+          npm install --ignore-scripts
+          npx playwright install --with-deps chromium
+          npm run test:browser
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: PdfSpace-public-validation
+          path: |
+            artifacts/screenshots
+            artifacts/playwright-report
+            artifacts/test-results
+            artifacts/browser-results.xml
+          if-no-files-found: ignore
