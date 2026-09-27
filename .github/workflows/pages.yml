@@ -10,9 +10,6 @@ on:
         description: Successful main-branch Build run to deploy; empty selects the latest
         required: false
         type: string
-  push:
-    branches: [main]
-    paths: ['.github/workflows/pages.yml']
 permissions:
   contents: read
   actions: read
@@ -84,8 +81,16 @@ jobs:
           PDFSPACE_URL: ${{ steps.deployment.outputs.page_url }}
           EXPECTED_SHA: ${{ steps.build.outputs.sha }}
         run: |
-          curl --fail --retry 8 --retry-all-errors --retry-delay 5 "${PDFSPACE_URL}build-info.json" -o /tmp/live-build.json
-          jq -e --arg sha "$EXPECTED_SHA" '.commit == $sha' /tmp/live-build.json
+          set -euo pipefail
+          verified=false
+          for attempt in $(seq 1 12); do
+            if curl --fail --silent --show-error --max-time 20 "${PDFSPACE_URL}build-info.json?expected=${EXPECTED_SHA}&attempt=${attempt}" -o /tmp/live-build.json && jq -e --arg sha "$EXPECTED_SHA" '.commit == $sha' /tmp/live-build.json; then
+              verified=true
+              break
+            fi
+            sleep 5
+          done
+          if [ "$verified" != true ]; then echo 'Public deployment does not match the validated commit.' >&2; exit 1; fi
           npm ci --ignore-scripts
           npx playwright install --with-deps chromium
           npm run test:browser
