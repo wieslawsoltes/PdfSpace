@@ -1,0 +1,40 @@
+name: Apply reviewed form navigation sources
+on:
+  push:
+    branches: [build/form-navigation-transfer]
+    paths: ['.github/workflows/apply-form-navigation.yml']
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/form-data-navigation-0.2.1
+          fetch-depth: 0
+      - name: Verify source patch and apply without overwriting newer work
+        env:
+          PATCH_COMMIT: ${{ github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = '25b08bd520eed546995b85442b52d862fc83b3ee'
+          git fetch origin "$PATCH_COMMIT"
+          python3 - <<'PY'
+          import subprocess, base64, lzma, hashlib, pathlib, os
+          chunks = [subprocess.check_output(['git', 'show', f'{os.environ["PATCH_COMMIT"]}:tools/reviewed-021/{i}.b64']).decode().strip() for i in range(3)]
+          patch = lzma.decompress(base64.b64decode(''.join(chunks), validate=True))
+          assert len(patch) == 122773
+          assert hashlib.sha256(patch).hexdigest() == '9247b445464ee703254e3ebb0f9aacf8ee4126b887e70da9b7bae96e895eb9f2'
+          pathlib.Path('/tmp/pdfspace-021.patch').write_bytes(patch)
+          PY
+          git apply --check /tmp/pdfspace-021.patch
+          git apply /tmp/pdfspace-021.patch
+          git diff --check
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'feat: atomic XFDF form data, native navigation and one-shot editor focus'
+          git push origin HEAD:feat/form-data-navigation-0.2.1
