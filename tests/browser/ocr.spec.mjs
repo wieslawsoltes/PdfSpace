@@ -27,6 +27,7 @@ async function download(page, name) {
 test('real local OCR, correction, undo and searchable PDF roundtrip', async ({ page }) => {
   await start(page); await click(page, 'Scan & OCR'); await click(page, 'Open scanned example');
   expect((await state(page)).ocrWords).toBe(0);
+  await expect.poll(async () => (await state(page)).zoom).toBeGreaterThan(.5);
   fs.mkdirSync('artifacts/browser-exports', { recursive: true });
   fs.writeFileSync('artifacts/browser-exports/ocr-input.pdf', await download(page, 'Export searchable PDF'));
   const external = [];

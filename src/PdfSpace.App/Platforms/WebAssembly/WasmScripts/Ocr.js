@@ -45,8 +45,16 @@
         await worker.setParameters({ tessedit_pageseg_mode: '3', user_defined_dpi: String(dpi) });
         const result = await worker.recognize('data:image/png;base64,' + png, {}, { text: false, tsv: true });
         if (current !== request) return;
-        const tsv = result.data.tsv;
+        let tsv = result.data.tsv;
         if (typeof tsv !== 'string' || tsv.length > 8 * 1024 * 1024) throw new Error('OCR response exceeds its limit.');
+        // The native CLI's TSV renderer writes a header; TessBaseAPI.GetTSVText
+        // (used by Tesseract.js) returns only rows. Normalize the provider boundary
+        // while keeping the shared C# parser's column contract strict.
+        const header = 'level\tpage_num\tblock_num\tpar_num\tline_num\tword_num\tleft\ttop\twidth\theight\tconf\ttext';
+        if (!tsv.startsWith(header + '\n') && !tsv.startsWith(header + '\r\n')) {
+          if (tsv.length && !/^[1-5]\t/.test(tsv)) throw new Error('Unrecognized OCR TSV dialect.');
+          tsv = header + '\n' + tsv;
+        }
         current = null; clearTimeout(request.timer); resolve(tsv);
       })().catch(fail);
     }),

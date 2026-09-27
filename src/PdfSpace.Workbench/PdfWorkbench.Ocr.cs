@@ -41,16 +41,29 @@ public sealed partial class PdfWorkbench
         {
             var file = await _storage.OpenImageAsync(); if (file is null) return;
             AddDocument(PdfDocumentEngine.PrepareWorkspace(PdfImageImporter.Open(file.Bytes, file.Name)));
-            Viewport.FitPage(); ShowStatus("Image imported at 150 DPI. Run Recognize current page to add searchable text.");
+            FitOcrPageWhenReady(Viewport); ShowStatus("Image imported at 150 DPI. Run Recognize current page to add searchable text.");
         }));
         _leftPanel.Add("Open scanned example", PdfIconKind.File, () =>
         {
-            AddDocument(PdfImageImporter.CreateScanExample(_typeface)); Viewport.FitPage();
+            AddDocument(PdfImageImporter.CreateScanExample(_typeface)); FitOcrPageWhenReady(Viewport);
             ShowStatus("This synthetic scan contains no PDF text. Run recognition to make it searchable.");
         });
         _leftPanel.Add("Export searchable PDF", PdfIconKind.Export, () => Run(() => ExportPdfAsync()));
         _leftPanel.Add("Export recognized text", PdfIconKind.Text, () => Run(ExportTextAsync));
         _leftPanel.Description("Review recognition before sharing. PDF export embeds an invisible Unicode text layer; it does not alter the scanned image or certify accessibility.");
+    }
+    private static void FitOcrPageWhenReady(PdfViewport viewport)
+    {
+        // Newly attached tabs have no arranged size yet. Wait for real geometry,
+        // rather than calculating a fit from the viewport's zero-size fallback.
+        if (viewport.ActualWidth > 0 && viewport.ActualHeight > 0) { viewport.FitPage(); return; }
+        void Fit(object sender, SizeChangedEventArgs args)
+        {
+            if (viewport.ActualWidth <= 0 || viewport.ActualHeight <= 0) return;
+            viewport.SizeChanged -= Fit;
+            viewport.FitPage();
+        }
+        viewport.SizeChanged += Fit;
     }
     private async Task RecognizeAsync(int[] indices)
     {
