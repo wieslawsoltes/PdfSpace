@@ -50,7 +50,7 @@ public sealed partial class PdfWorkbench
         Viewport.FinishText(true); var context = _active; var document = context.Session.Document;
         if (document.IsSensitive && !await _dialogs.ConfirmAsync("Export unencrypted PDF?", "The unlocked source is not automatically re-encrypted. Use Protect a PDF to set new passwords, or explicitly continue with an unencrypted copy.", "Export unencrypted")) return;
         ShowStatus("Preparing structured PDF…"); await Task.Delay(25);
-        if (pages is not null) document = document with { Pages = pages.Select(index => document.Pages[index]).ToArray() };
+        if (pages is not null) document = WorkspacePages.Select(document, pages);
         var result = PdfDocumentEngine.Save(document, _typeface);
         await _storage.SaveAsync(BaseName(document.Title) + (pages is null ? "-reviewed.pdf" : "-extracted.pdf"), result.Bytes, "application/pdf");
         ShowStatus(result.PreservedSourceCatalog ? "PDF saved with native annotations/forms and original page content. Source catalog retained; no signature preservation claim." : "PDF pages assembled with native content. Original document-level structures may change.");
@@ -81,7 +81,7 @@ public sealed partial class PdfWorkbench
     }
     private async Task ExtractPagesAsync()
     {
-        var value = await _dialogs.PromptAsync("Extract pages", "Enter page numbers and ranges, for example 1, 3-5. Extraction creates a new visual PDF.", (Session.CurrentPage + 1).ToString(CultureInfo.InvariantCulture), acceptLabel: "Extract");
+        var value = await _dialogs.PromptAsync("Extract pages", "Enter page numbers and ranges, for example 1, 3-5. Extraction keeps supported native page content. Links to excluded pages are removed.", (Session.CurrentPage + 1).ToString(CultureInfo.InvariantCulture), acceptLabel: "Extract");
         if (value is not null) await ExportPdfAsync(PageRange.Parse(value, Session.Document.Pages.Length));
     }
     private async Task SplitAsync()
@@ -115,7 +115,7 @@ public sealed partial class PdfWorkbench
     }
     private async Task BookmarkAsync()
     {
-        var name = await _dialogs.PromptAsync("Bookmark page", "Bookmarks are stored in the editable workspace.", Session.Page.Bookmark.Length > 0 ? Session.Page.Bookmark : "Page " + (Session.CurrentPage + 1));
+        var name = await _dialogs.PromptAsync("Bookmark page", "Bookmarks are retained in editable workspaces and supported native PDF exports.", Session.Page.Bookmark.Length > 0 ? Session.Page.Bookmark : "Page " + (Session.CurrentPage + 1));
         if (name is not null) Session.BookmarkPage(name.Trim());
     }
     private async Task EditSelectedAsync()

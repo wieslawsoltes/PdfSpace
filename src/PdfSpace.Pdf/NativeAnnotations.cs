@@ -11,7 +11,7 @@ internal static class NativeAnnotations
         ["Ink"] = AnnotationKind.Ink, ["Square"] = AnnotationKind.Rectangle, ["Circle"] = AnnotationKind.Ellipse,
         ["Line"] = AnnotationKind.Line, ["FreeText"] = AnnotationKind.Text, ["Text"] = AnnotationKind.Note, ["Stamp"] = AnnotationKind.Stamp, ["Link"] = AnnotationKind.Link
     };
-    public static Annotation? Read(PdfDocument document, PdfDictionary item, SourceGeometry geometry, string key)
+    public static Annotation? Read(PdfDocument document, PdfDictionary item, SourceGeometry geometry, string key, PdfDestinationResolver? resolver = null)
     {
         if (!Kinds.TryGetValue(PdfObjects.Text(item.Elements["/Subtype"]), out var kind) || item.Elements.ContainsKey("/IRT")) return null;
         var bounds = geometry.ToLogical(PdfObjects.Rectangle(item.Elements["/Rect"]));
@@ -45,10 +45,7 @@ internal static class NativeAnnotations
             }
             else
             {
-                var destination = PdfObjects.Array(item.Elements["/Dest"] ?? action?.Elements["/D"]);
-                if (destination is not { Elements.Count: > 0 }) return null;
-                var destinationPage = PdfObjects.Dictionary(destination.Elements[0]);
-                for (var i = 0; i < document.PageCount; i++) if (ReferenceEquals(document.Pages[i], destinationPage) || document.Pages[i].Reference == destinationPage?.Reference) { target = i; break; }
+                target = (resolver ?? new PdfDestinationResolver(document)).FromAction(item);
                 if (target is null) return null;
             }
         }

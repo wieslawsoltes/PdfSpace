@@ -9,12 +9,18 @@ internal sealed class DesktopWorkspaceStorage : IWorkspaceStorage
 {
     private static string RecoveryDirectory => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "PdfSpace");
     private static string RecoveryPath => Path.Combine(RecoveryDirectory, "recovery.pdfspace");
-    public async Task<WorkspaceFile?> OpenAsync()
+    public Task<WorkspaceFile?> OpenAsync() => OpenCoreAsync([".pdf", ".pdfspace"], 128 * 1024 * 1024);
+    public Task<WorkspaceFile?> OpenFormDataAsync() => OpenCoreAsync([".xfdf", ".json"], 4 * 1024 * 1024);
+    private static async Task<WorkspaceFile?> OpenCoreAsync(string[] extensions, int maximumBytes)
     {
-        var picker = new FileOpenPicker { SuggestedStartLocation = PickerLocationId.DocumentsLibrary }; picker.FileTypeFilter.Add(".pdf"); picker.FileTypeFilter.Add(".pdfspace");
+        var picker = new FileOpenPicker { SuggestedStartLocation = PickerLocationId.DocumentsLibrary };
+        foreach (var extension in extensions) picker.FileTypeFilter.Add(extension);
         var file = await picker.PickSingleFileAsync(); if (file is null) return null;
-        using var input = await file.OpenStreamForReadAsync(); if (input.Length > 128 * 1024 * 1024) throw new InvalidDataException("The file exceeds the 128 MB limit.");
-        using var output = new MemoryStream(); await input.CopyToAsync(output); return new(file.Name, output.ToArray());
+        using var input = await file.OpenStreamForReadAsync();
+        if (input.Length > maximumBytes) throw new InvalidDataException($"The file exceeds the {maximumBytes / 1024 / 1024} MB limit.");
+        using var output = new MemoryStream(); await input.CopyToAsync(output);
+        if (output.Length > maximumBytes) throw new InvalidDataException("The file grew beyond the size limit while opening.");
+        return new(file.Name, output.ToArray());
     }
     public async Task SaveAsync(string name, byte[] bytes, string contentType)
     {

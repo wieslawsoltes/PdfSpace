@@ -43,6 +43,7 @@ public sealed partial class EditorSession
     {
         CurrentPage = Math.Clamp(CurrentPage, 0, Document.Pages.Length - 1);
         if (!Page.Annotations.Any(a => a.Id == SelectedAnnotationId)) SelectedAnnotationId = null;
+        if (!Page.Fields.Any(field => field.Id == SelectedFieldId)) SelectedFieldId = null;
         Revision++; Changed?.Invoke(this, EventArgs.Empty);
     }
     public void Undo() { if (!CanUndo) return; var entry = _undo[^1]; _undo.RemoveAt(_undo.Count - 1); _redo.Add(entry); Document = entry.Before; Notify(); }
@@ -83,24 +84,24 @@ public sealed partial class EditorSession
     { var page = Page; if (name == page.Bookmark) return; Execute("Edit bookmark", document => document.UpdatePage(page.Id, state => state with { Bookmark = name })); }
     public void InsertBlank()
     {
-        var index = CurrentPage + 1; Execute("Insert blank page", document => document with { Pages = [..document.Pages.Take(index), new PdfPageState(), ..document.Pages.Skip(index)] }); Navigate(index);
+        var index = CurrentPage + 1; Execute("Insert blank page", document => WorkspacePages.WithPages(document, [..document.Pages.Take(index), new PdfPageState(), ..document.Pages.Skip(index)])); Navigate(index);
     }
     public void DuplicatePage()
     {
         var index = CurrentPage;
         if (Page.Fields.Length > 0) throw new InvalidOperationException("Duplicating interactive form pages is not supported; flatten a copy first.");
         var copy = Page with { Id = Guid.NewGuid(), Annotations = Page.Annotations.Select(annotation => annotation with { Id = Guid.NewGuid(), Replies = annotation.Replies.Select(reply => reply with { Id = Guid.NewGuid() }).ToArray() }).ToArray() };
-        Execute("Duplicate page", document => document with { Pages = [..document.Pages.Take(index + 1), copy, ..document.Pages.Skip(index + 1)] }); Navigate(index + 1);
+        Execute("Duplicate page", document => WorkspacePages.WithPages(document, [..document.Pages.Take(index + 1), copy, ..document.Pages.Skip(index + 1)])); Navigate(index + 1);
     }
     public void DeletePage()
     {
         if (Document.Pages.Length == 1) throw new InvalidOperationException("Keep at least one page in the document.");
-        var id = Page.Id; Execute("Delete page", document => document with { Pages = document.Pages.Where(page => page.Id != id).ToArray() });
+        var id = Page.Id; Execute("Delete page", document => WorkspacePages.WithPages(document, document.Pages.Where(page => page.Id != id).ToArray()));
     }
     public void MovePage(int target)
     {
         target = Math.Clamp(target, 0, Document.Pages.Length - 1); var source = CurrentPage; if (source == target) return;
-        Execute("Reorder pages", document => { var pages = document.Pages.ToList(); var page = pages[source]; pages.RemoveAt(source); pages.Insert(target, page); return document with { Pages = pages.ToArray() }; }); Navigate(target);
+        Execute("Reorder pages", document => { var pages = document.Pages.ToList(); var page = pages[source]; pages.RemoveAt(source); pages.Insert(target, page); return WorkspacePages.WithPages(document, pages.ToArray()); }); Navigate(target);
     }
     public void Combine(PdfWorkspace other) => Execute("Combine PDFs", document => WorkspaceComposition.Append(document, other));
     public void Reply(Guid id, string text)

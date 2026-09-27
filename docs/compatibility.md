@@ -1,6 +1,6 @@
 # PDF compatibility and release boundary
 
-## 0.2.0-alpha.1
+## 0.2.1-alpha.1
 
 PdfSpace is an independent Uno/Skia workspace. This release adds interoperable PDF workflows; it does not claim complete Acrobat feature or pixel parity.
 
@@ -45,3 +45,9 @@ OCR; arbitrary PDF text/image layout editing; general font replacement and parag
 The workspace limits source data to 64 MB, 1–4096 pages, eight open documents, 50,000 annotations, 100,000 points per path, two million total annotation points and 100 history entries. Browser security processing has a 60-second deadline, 64 MB working-copy limit and 128 MB encrypted-output limit. PNG and raster-export limits are enforced separately by their renderers. These limits are guardrails, not proof against every hostile PDF or decompression bomb.
 
 The tests exercise native PDF round trips, source text replacement, hierarchy-aware widget deletion, encryption authentication, redaction reconstruction, Uno pointer/keyboard interaction, file picking, download/reopen, and recovery. Browser-encrypted output is additionally reopened by the independent native PDFsharp backend. A passing test corpus does not establish universal PDF compatibility or independent security certification.
+
+## Form data and navigation (0.2.1)
+
+Plain-field XFDF and versioned/legacy JSON import/export are implemented with complete-batch validation, explicit unmatched-name reporting and one undo operation. Required-field checks cover supported plain values, not script/XFA/certificate rules. DTD/entity processing is disabled; form-data input is limited to 4 MiB.
+
+The viewer exposes original source outline navigation and resolves local legacy/name-tree destinations. Supported internal links follow retained page identities during page operations; removed destinations remove their links. Native save rewrites these links to page-fit destinations. Source-only outlines/named metadata are not promised during page reassembly. Managed workspace bookmarks round-trip separately from source outlines. See [form data and navigation](form-data-and-navigation.md).

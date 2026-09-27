@@ -13,11 +13,11 @@
 
 PdfSpace is an independent, local-first PDF application built in **C# with Uno Platform and SkiaSharp**. The browser runs a real Uno WebAssembly application with the same document, editing and rendering libraries as the desktop host. An Acrobat-inspired shell brings together document tabs, floating quick tools, comments, form preparation, original-text editing, protection, redaction and page organization.
 
-> **0.2.0-alpha.1:** functional PDF workflows, not complete or pixel-identical Adobe Acrobat compatibility. PdfSpace has original branding and icons and is not affiliated with Adobe. Review the [save and security boundaries](docs/compatibility.md) before processing important documents.
+> **0.2.1-alpha.1:** functional PDF workflows, not complete or pixel-identical Adobe Acrobat compatibility. PdfSpace has original branding and icons and is not affiliated with Adobe. Review the [save and security boundaries](docs/compatibility.md) before processing important documents.
 
 ## What you can do
 
-**Read and navigate.** Open PDFs and workspaces, use multiple tabs, search and copy text, zoom/pan, switch continuous/single/two-page layouts, browse virtualized thumbnails and create workspace bookmarks.
+**Read and navigate.** Open PDFs and workspaces, use multiple tabs, search and copy text, zoom/pan, switch continuous/single/two-page layouts, browse virtualized thumbnails, navigate original PDF outlines and create workspace bookmarks. Local named destinations and internal links are supported.
 
 **Review without flattening everything.** Add text, highlights, underlines, strikethrough, notes, replies, ink, shapes, arrows, stamps and links. Move, resize and recolor annotations; resolve comments; undo and redo changes. Structured PDF export writes supported annotations and replies as native PDF objects.
 
@@ -43,6 +43,14 @@ The included six-page **Circular futures** report and interactive review form ar
 
 **Cropping is not redaction. Field/object deletion is not confidential-data erasure. A drawn signature is not a certificate signature.** OCR, XFA, form scripts/calculations, certificate signatures, full tagging/compliance, Office conversion and cloud collaboration remain unimplemented.
 
+## Form data and navigation
+
+**Prepare a form → Import form data** accepts plain field values from XFDF or JSON. The complete batch is validated, unmatched names are reported, and confirmation applies one undoable transaction. Export either interoperable XFDF or versioned JSON. **Check required fields** takes you to the first missing supported value. Read-only changes, invalid choices, unsupported multi-values and overlong input reject the whole import.
+
+The **Bookmarks** panel separates original PDF outlines from editable workspace bookmarks. Supported internal links follow destination page identities through insertion, duplication, reordering, extraction and combination. Links to removed destinations are removed rather than redirected.
+
+Form-data files are unencrypted. Document URLs and scripts are never followed or executed. See the [form-data and navigation guide](docs/form-data-and-navigation.md) for formats, defensive limits and embedding examples.
+
 ## Ten reusable libraries
 
 | Package | Responsibility |
@@ -50,7 +58,7 @@ The included six-page **Circular futures** report and interactive review form ar
 | `PdfSpace.Core` | Workspace, page, annotation, field and geometry models; validated JSON |
 | `PdfSpace.Layout` | Crop/rotation transforms and viewport/page layouts |
 | `PdfSpace.Editing` | Transactional editing, shared field state and bounded undo/redo |
-| `PdfSpace.Documents` | PdfPig import, word extraction, search and page ranges |
+| `PdfSpace.Documents` | PdfPig import, search, page ranges and XFDF/JSON form data |
 | `PdfSpace.Skia` | Cached rendering, overlays, visual export and raster redaction |
 | `PdfSpace.Pdf` | PDFsharp native annotation/form writer, source-text editing, inspection and security-provider contract |
 | `PdfSpace.Controls` | Custom Uno icons, command buttons, tabs, panels, palettes and dialogs |
@@ -93,7 +101,7 @@ Open `http://127.0.0.1:4173/PdfSpace/`. The asset scripts verify upstream font/r
 
 ```bash
 mkdir -p artifacts/fixtures
-cp artifacts/engine/sample.pdf artifacts/fixtures/sample.pdf
+cp artifacts/engine/*.pdf artifacts/fixtures/
 npm ci --ignore-scripts
 npx playwright install chromium
 npm run test:browser

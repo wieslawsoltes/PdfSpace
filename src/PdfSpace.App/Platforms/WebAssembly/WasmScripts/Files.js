@@ -42,22 +42,27 @@
     let text = ''; for (let i = 0; i < data.length; i += 32768) text += String.fromCharCode(...data.subarray(i, i + 32768));
     return btoa(text);
   }
-  globalThis.pdfSpaceFiles = {
-    open: () => new Promise((resolve, reject) => {
-      const input = document.createElement('input'); input.type = 'file'; input.accept = '.pdf,.pdfspace,application/pdf'; input.style.display = 'none'; document.body.append(input);
+  function pickFile(accept, sizeLimit) {
+    return new Promise((resolve, reject) => {
+      const input = document.createElement('input'); input.type = 'file'; input.accept = accept;
+      input.style.display = 'none'; document.body.append(input);
       let finished = false;
       const done = value => { if (!finished) { finished = true; input.remove(); resolve(value); } };
       input.addEventListener('cancel', () => done(''), { once: true });
       input.addEventListener('change', async () => {
         try {
           const file = input.files?.[0]; if (!file) return done('');
-          const limit = file.name.toLowerCase().endsWith('.pdfspace') ? 128 * 1024 * 1024 : 64 * 1024 * 1024;
+          const limit = sizeLimit ?? (file.name.toLowerCase().endsWith('.pdfspace') ? 128 * 1024 * 1024 : 64 * 1024 * 1024);
           if (file.size > limit) throw new Error(`File exceeds the ${limit / 1024 / 1024} MB limit.`);
           done(JSON.stringify({ name: file.name, base64: base64(new Uint8Array(await file.arrayBuffer())) }));
-        } catch (error) { input.remove(); reject(error); }
+        } catch (error) { finished = true; input.remove(); reject(error); }
       }, { once: true });
-      input.click();
-    }),
+      try { input.click(); } catch (error) { input.remove(); reject(error); }
+    });
+  }
+  globalThis.pdfSpaceFiles = {
+    open: () => pickFile('.pdf,.pdfspace,application/pdf'),
+    openFormData: () => pickFile('.xfdf,.json,application/vnd.adobe.xfdf,application/json', 4 * 1024 * 1024),
     download: async (name, data, type) => {
       const url = URL.createObjectURL(new Blob([bytes(data)], { type })); const link = document.createElement('a'); link.href = url; link.download = name; document.body.append(link); link.click(); link.remove(); setTimeout(() => URL.revokeObjectURL(url), 60000); return 'download-started';
     },

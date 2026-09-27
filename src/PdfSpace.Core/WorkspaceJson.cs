@@ -61,6 +61,11 @@ public static class WorkspaceJson
             {
                 if (annotation is null || !annotationIds.Add(annotation.Id) || !Enum.IsDefined(annotation.Kind)) throw new InvalidDataException("Invalid or duplicate annotation.");
                 if (!annotation.Bounds.IsFinite || annotation.Bounds.Width < 0 || annotation.Bounds.Height < 0 || annotation.Text is null || annotation.Text.Length > 100000 || annotation.Author is null || annotation.Author.Length > 4096 || !double.IsFinite(annotation.StrokeWidth) || annotation.StrokeWidth is <= 0 or > 100 || !double.IsFinite(annotation.FontSize) || annotation.FontSize is < 1 or > 1000 || annotation.Points is null || annotation.Points.Length > 100000) throw new InvalidDataException("Invalid annotation geometry or appearance.");
+                if (annotation.Kind == AnnotationKind.Link)
+                {
+                    if (annotation.TargetPage is { } target && (target < 0 || target >= document.Pages.Length || annotation.Uri is not null)) throw new InvalidDataException("Invalid internal link destination.");
+                    if (annotation.TargetPage is null && (annotation.Uri is null || annotation.Uri.Length > 8192 || !Uri.TryCreate(annotation.Uri, UriKind.Absolute, out var address) || address.Scheme is not ("https" or "http" or "mailto"))) throw new InvalidDataException("Invalid or unsafe external link destination.");
+                }
                 pointCount += annotation.Points.Length;
                 if (pointCount > 2000000 || annotation.Points.Any(p => !double.IsFinite(p.X) || !double.IsFinite(p.Y))) throw new InvalidDataException("Invalid or excessive annotation path data.");
                 if (annotation.Replies is null || annotation.Replies.Length > 1000 || annotation.Replies.Any(r => r is null || r.Author is null || r.Author.Length > 4096 || r.Text is null || r.Text.Length > 100000)) throw new InvalidDataException("Invalid comment replies.");

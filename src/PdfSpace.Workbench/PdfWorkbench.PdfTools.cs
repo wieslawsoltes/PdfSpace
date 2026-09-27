@@ -25,7 +25,10 @@ public sealed partial class PdfWorkbench
             var context = _active;
             if (await _dialogs.ConfirmAsync("Reset form values?", "Restores field defaults. This change can be undone.", "Reset")) context.Session.ResetForm();
         }));
-        _leftPanel.Add("Export form data", PdfIconKind.Export, () => Run(ExportFormDataAsync));
+        _leftPanel.Add("Import form data", PdfIconKind.File, () => Run(ImportFormDataAsync));
+        _leftPanel.Add("Export XFDF form data", PdfIconKind.Export, () => Run(() => ExportFormDataAsync(true)));
+        _leftPanel.Add("Export form data", PdfIconKind.Export, () => Run(() => ExportFormDataAsync(false)));
+        _leftPanel.Add("Check required fields", PdfIconKind.Check, CheckRequiredFields);
         _leftPanel.Add("Save filled PDF", PdfIconKind.Save, () => Run(() => ExportPdfAsync()));
         _leftPanel.Add("Open form example", PdfIconKind.File, () => Safe(() =>
         {
@@ -68,7 +71,7 @@ public sealed partial class PdfWorkbench
     {
         var context = _active;
         var fields = Session.Document.Pages.SelectMany((page, index) => page.Fields.Select(field => (Index: index, Field: field))).ToArray();
-        content.Children.Add(Paragraph($"{fields.Length} interactive fields · {fields.Count(item => item.Field.Required && string.IsNullOrWhiteSpace(item.Field.Value))} empty required text values", 11));
+        content.Children.Add(Paragraph($"{fields.Length} interactive fields · {fields.Count(item => MissingRequiredValue(item.Field))} missing required values", 11));
         content.Children.Add(new PdfCommandButton("Fill form on page", PdfIconKind.Select, () => UseTool(PdfTool.FillForm)));
         foreach (var (index, field) in fields.OrderBy(item => item.Field.Id == Session.SelectedFieldId ? 0 : 1).ThenBy(item => item.Index == Session.CurrentPage ? 0 : 1).Take(200))
         {
@@ -115,20 +118,6 @@ public sealed partial class PdfWorkbench
         return Task.CompletedTask;
     }
 
-    private async Task ExportFormDataAsync()
-    {
-        var document = Session.Document;
-        using var stream = new MemoryStream();
-        using (var json = new Utf8JsonWriter(stream, new JsonWriterOptions { Indented = true }))
-        {
-            json.WriteStartObject(); json.WriteString("document", document.Title); json.WriteStartArray("fields");
-            foreach (var group in document.Pages.SelectMany(page => page.Fields).GroupBy(field => field.GroupName))
-            { var field = group.First(); json.WriteStartObject(); json.WriteString("name", field.GroupName); json.WriteString("value", field.Value); json.WriteString("type", field.Kind.ToString()); json.WriteEndObject(); }
-            json.WriteEndArray(); json.WriteEndObject();
-        }
-        await _storage.SaveAsync(BaseName(document.Title) + "-form-data.json", stream.ToArray(), "application/json");
-        ShowStatus("Unencrypted form data downloaded. Protect the exported data as document content.");
-    }
     private void BuildProtectionTools()
     {
         _leftPanel.Description("Create an encrypted PDF with separate opening and owner/editing passwords. Passwords are masked, kept in memory and never saved in a workspace.");
