@@ -1,0 +1,1 @@
+<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><TargetFramework>net10.0</TargetFramework><Description>PDF import, metadata, text extraction and search powered by PdfPig.</Description></PropertyGroup><ItemGroup><ProjectReference Include="../PdfSpace.Core/PdfSpace.Core.csproj" /><PackageReference Include="PdfPig" Version="0.1.16" /></ItemGroup></Project>
