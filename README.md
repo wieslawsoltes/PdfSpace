@@ -13,7 +13,11 @@
 
 PdfSpace is an independent, local-first PDF application built in **C# with Uno Platform and SkiaSharp**. The browser runs a real Uno WebAssembly application with the same document, editing and rendering libraries as the desktop host. An Acrobat-inspired shell brings together document tabs, floating quick tools, comments, form preparation, original-text editing, protection, redaction and page organization.
 
-> **0.2.1-alpha.1:** functional PDF workflows, not complete or pixel-identical Adobe Acrobat compatibility. PdfSpace has original branding and icons and is not affiliated with Adobe. Review the [save and security boundaries](docs/compatibility.md) before processing important documents.
+> **0.3.0-alpha.1:** functional PDF workflows, not complete or pixel-identical Adobe Acrobat compatibility. PdfSpace has original branding and icons and is not affiliated with Adobe. Review the [save and security boundaries](docs/compatibility.md) before processing important documents.
+
+## Scan & OCR in 0.3
+
+Recognize image-only PDFs locally in **English, Polish or German**, review and correct words against the original scan, and export a real searchable PDF with an invisible Unicode text layer. Import PNG/JPEG scans, select page ranges, cancel a batch without partial edits, and undo recognition or corrections. The browser self-hosts its pinned Tesseract.js/WASM/model assets; native hosts use an installed Tesseract 5 executable. No document is sent to an OCR service. [OCR workflow, integration and limitations](docs/ocr.md).
 
 ## What you can do
 
@@ -41,7 +45,7 @@ The included six-page **Circular futures** report and interactive review form ar
 | **Protect a PDF** | encrypted `.pdf` | AES-256 revision 6 with explicitly chosen passwords and permission flags. |
 | **Apply raster redactions** | image-only `.pdf` | Separately rebuilt pages. Loses searchability, forms, links, vectors and original document-level objects. |
 
-**Cropping is not redaction. Field/object deletion is not confidential-data erasure. A drawn signature is not a certificate signature.** OCR, XFA, form scripts/calculations, certificate signatures, full tagging/compliance, Office conversion and cloud collaboration remain unimplemented.
+**Cropping is not redaction. Field/object deletion is not confidential-data erasure. A drawn signature is not a certificate signature.** XFA, form scripts/calculations, certificate signatures, full tagging/compliance, Office conversion and cloud collaboration remain unimplemented.
 
 ## Form data and navigation
 
@@ -51,7 +55,7 @@ The **Bookmarks** panel separates original PDF outlines from editable workspace 
 
 Form-data files are unencrypted. Document URLs and scripts are never followed or executed. See the [form-data and navigation guide](docs/form-data-and-navigation.md) for formats, defensive limits and embedding examples.
 
-## Ten reusable libraries
+## Eleven reusable libraries
 
 | Package | Responsibility |
 |---|---|
@@ -61,12 +65,13 @@ Form-data files are unencrypted. Document URLs and scripts are never followed or
 | `PdfSpace.Documents` | PdfPig import, search, page ranges and XFDF/JSON form data |
 | `PdfSpace.Skia` | Cached rendering, overlays, visual export and raster redaction |
 | `PdfSpace.Pdf` | PDFsharp native annotation/form writer, source-text editing, inspection and security-provider contract |
+| `PdfSpace.Ocr` | Local recognition contracts, raster preparation, bounded TSV decoding, snapshot batches and native process adapter |
 | `PdfSpace.Controls` | Custom Uno icons, command buttons, tabs, panels, palettes and dialogs |
 | `PdfSpace.Viewer` | Embeddable document viewport, form input and thumbnails |
 | `PdfSpace.Storage` | File, recovery, clipboard and print contracts |
 | `PdfSpace.Workbench` | Complete multi-document shell and PDF workflows |
 
-The application is a thin browser/desktop host. All ten libraries are packable; CI produces NuGet artifacts. This does not mean they have been published to nuget.org. See [embedding examples](docs/components.md).
+The application is a thin browser/desktop host. All eleven libraries are packable; CI produces NuGet artifacts. This does not mean they have been published to nuget.org. See [embedding examples](docs/components.md).
 
 ## Toolchain
 
@@ -101,12 +106,14 @@ Open `http://127.0.0.1:4173/PdfSpace/`. The asset scripts verify upstream font/r
 
 ```bash
 mkdir -p artifacts/fixtures
-cp artifacts/engine/*.pdf artifacts/fixtures/
+cp artifacts/engine/*.pdf artifacts/engine/scanned.png artifacts/fixtures/
 npm ci --ignore-scripts
 npx playwright install chromium
 npm run test:browser
 dotnet run --project tests/PdfSpace.Tests -c Release -- \
   --verify-browser-security artifacts/browser-exports
+dotnet run --project tests/PdfSpace.Tests -c Release -- \
+  --verify-browser-ocr artifacts/browser-exports
 ```
 
 UI tests use real pointer, keyboard, file-picker and download/reopen interactions. `?test=1` enables read-only diagnostics, not a document-mutation API. The security-provider contract also has dedicated boundary tests. CI retains screenshots, reports and failure traces.

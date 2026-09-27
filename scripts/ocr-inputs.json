@@ -1,0 +1,26 @@
+[
+  {
+    "url": "https://registry.npmjs.org/tesseract.js/-/tesseract.js-7.0.0.tgz",
+    "sha256": "9a93bf51c3387f945d10a24bf8b3a4bf2e45c7c7161b8242aafbaf9d3c4b606a"
+  },
+  {
+    "url": "https://registry.npmjs.org/tesseract.js-core/-/tesseract.js-core-7.0.0.tgz",
+    "sha256": "ba584355515eaff877552022853c0e71f2cb70466e759d1d6940484929718ee0"
+  },
+  {
+    "url": "https://raw.githubusercontent.com/tesseract-ocr/tessdata_fast/4.1.0/eng.traineddata",
+    "sha256": "7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2"
+  },
+  {
+    "url": "https://raw.githubusercontent.com/tesseract-ocr/tessdata_fast/4.1.0/pol.traineddata",
+    "sha256": "c4476cdbc0e33d898d32345122b7be1cbf85ace15f920f06c7714756e1ef79b2"
+  },
+  {
+    "url": "https://raw.githubusercontent.com/tesseract-ocr/tessdata_fast/4.1.0/deu.traineddata",
+    "sha256": "19d219bbb6672c869d20a9636c6816a81eb9a71796cb93ebe0cb1530e2cdb22d"
+  },
+  {
+    "url": "https://raw.githubusercontent.com/tesseract-ocr/tessdata_fast/4.1.0/LICENSE",
+    "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+  }
+]

@@ -33,10 +33,10 @@ public sealed partial class PdfWorkbench
                 _leftPanel.Heading("ADVANCED TOOLS");
                 _leftPanel.Add("Protect a PDF", PdfIconKind.Lock, () => SetMode("Protect a PDF"), 0xFF52768E);
                 _leftPanel.Add("Redact a PDF", PdfIconKind.Redact, () => SetMode("Redact a PDF"), 0xFFBA2B35);
-                foreach (var (name, icon) in new[] { ("Scan & OCR", PdfIconKind.Image) })
-                { var disabled = _leftPanel.Add(name, icon, () => { }); disabled.IsEnabled = false; ToolTipService.SetToolTip(disabled, "Not supported in this release. No simulated security operation is performed."); }
+                _leftPanel.Add("Scan & OCR", PdfIconKind.Image, () => SetMode("Scan & OCR"), 0xFF1473E6);
                 _leftPanel.Description("Local-first PDF tools. No account, upload or subscription required.");
                 break;
+            case "Scan & OCR": BuildOcrTools(); break;
             case "Edit":
                 _leftPanel.Description("Edit supported original text operands or add text, shapes and annotations. Changes remain undoable in the workspace.");
                 _leftPanel.Add("Edit original text", PdfIconKind.Edit, () => Run(ShowOriginalTextAsync));
@@ -123,6 +123,7 @@ public sealed partial class PdfWorkbench
             var content = PdfTheme.Column(10); content.Margin = new Thickness(15, 5, 15, 24);
             switch (_right)
             {
+                case "Recognized text": BuildOcrReview(content); break;
                 case "Comments": BuildComments(content); break;
                 case "Bookmarks": BuildBookmarks(content); break;
                 case "Find": BuildFind(content); break;

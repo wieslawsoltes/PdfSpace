@@ -27,6 +27,13 @@ public sealed partial class PdfWorkbench
             if (XamlRoot is not null && FocusManager.GetFocusedElement(XamlRoot) is DependencyObject focused) json.WriteString("focusedControl", AutomationProperties.GetName(focused));
             var origin = Viewport.TransformToVisual(this).TransformPoint(new Point(0, 0)); var pageBounds = Viewport.PageScreenBounds(Session.CurrentPage);
             json.WriteStartObject("pageBounds"); json.WriteNumber("x", origin.X + pageBounds.X); json.WriteNumber("y", origin.Y + pageBounds.Y); json.WriteNumber("width", pageBounds.Width); json.WriteNumber("height", pageBounds.Height); json.WriteEndObject();
+            json.WriteBoolean("ocrBusy", _ocrCancellation is not null);
+            json.WriteNumber("ocrWords", Session.Document.Pages.Sum(page => page.Ocr?.Words.Length ?? 0));
+            json.WriteNumber("ocrReviewed", Session.Document.Pages.Sum(page => page.Ocr?.Words.Count(word => word.Reviewed) ?? 0));
+            json.WriteString("ocrLanguage", _ocrLanguage);
+            json.WriteStartArray("ocrText");
+            foreach (var text in Session.Document.Pages.SelectMany(page => page.Ocr?.Words ?? []).Take(500)) json.WriteStringValue(text.Text);
+            json.WriteEndArray();
             json.WriteStartArray("controls");
             void Visit(DependencyObject node, bool visible)
             {

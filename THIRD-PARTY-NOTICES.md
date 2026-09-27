@@ -19,3 +19,7 @@ This is a direct-dependency overview, not a replacement for transitive package l
 - Bundled **zlib** and **libjpeg-turbo** retain their upstream license/notice documents, fetched from the exact commits used by the WASM build. See `scripts/fetch-security-assets.py` and the published `security/runtime-manifest.json`.
 
 Security assets are self-hosted. Original input PDFs and passwords are not sent to package registries; registry access happens at build time only.
+
+## OCR (0.3)
+
+Tesseract.js 7.0.0, Tesseract.js-core 7.0.0 and `tessdata_fast` 4.1.0 language models are Apache-2.0-licensed upstream components. Runtime/native subcomponents retain their own notices. Build-time acquisition is pinned by `scripts/ocr-inputs.json` and `scripts/ocr-assets.json`. License files are copied into the self-hosted OCR asset folders. Tesseract.js source: https://github.com/naptha/tesseract.js; engine: https://github.com/tesseract-ocr/tesseract; models: https://github.com/tesseract-ocr/tessdata_fast. Native distributors remain responsible for packaging the CLI and transitive license notices.

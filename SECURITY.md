@@ -27,3 +27,7 @@ Report security-sensitive issues through private vulnerability reporting when av
 ## Form interchange
 
 XFDF and JSON imports are plain field-value operations, not document/script execution. XML DTDs and external resolvers are disabled; nesting, fields, values and total input size are bounded. Duplicate/ambiguous properties fail instead of being overwritten. A validated snapshot-bound plan applies atomically, rejecting stale state and invalid/read-only changes. Document URLs in data files are not fetched. Form-data exports are unencrypted; unlocked-source exports require confirmation.
+
+## OCR data
+
+Recognition uses local Tesseract: a self-hosted browser worker or an installed native executable. Browser model caching is disabled and workers end at batch completion/cancellation. Native image/TSV data is piped through process streams without document temp files. OCR text and confidence metadata are sensitive document data and are included in explicit workspace/searchable PDF exports. Recognition and correction are not redaction, and cannot guarantee factual accuracy. Raster-redacted output never carries this text layer.

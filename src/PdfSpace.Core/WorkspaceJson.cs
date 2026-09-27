@@ -35,6 +35,7 @@ public static class WorkspaceJson
         var pageIds = new HashSet<Guid>();
         var annotationIds = new HashSet<Guid>();
         var annotationCount = 0;
+        long ocrWordCount = 0;
         var fieldIds = new HashSet<Guid>();
         var fieldCount = 0;
         long pointCount = 0;
@@ -53,6 +54,12 @@ public static class WorkspaceJson
             foreach (var field in page.Fields)
             {
                 if (field is null || !fieldIds.Add(field.Id) || field.Label is null || field.Label.Length > 4096 || field.ExportValue is null || field.ExportValue.Length > 1024 || field.DefaultValue is { Length: > 100000 } || !Enum.IsDefined(field.Kind) || field.Name is null || field.Name.Length > 1024 || field.GroupName is null || field.GroupName.Length > 4096 || field.Value is null || field.Value.Length > 100000 || field.DefaultValue is null || field.Options is null || field.Options.Length > 10000 || field.Options.Any(o => o is null || o.Value is null || o.Value.Length > 4096 || o.Label is null || o.Label.Length > 4096) || !field.Bounds.IsFinite || field.Bounds.Width <= 0 || field.Bounds.Height <= 0 || !double.IsFinite(field.FontSize) || field.FontSize is < 1 or > 1000 || field.MaxLength is < 0 or > 1000000) throw new InvalidDataException("Invalid form field.");
+            }
+            if (page.Ocr is { } ocr)
+            {
+                PdfOcrLayer.Validate(ocr, page.Width, page.Height);
+                ocrWordCount += ocr.Words.Length;
+                if (ocrWordCount > 250000) throw new InvalidDataException("OCR layers exceed 250,000 words per workspace.");
             }
             if (page.Annotations is null) throw new InvalidDataException("Invalid annotation collection.");
             annotationCount += page.Annotations.Length;

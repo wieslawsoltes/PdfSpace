@@ -72,7 +72,7 @@ public sealed partial class PdfWorkbench
     private async Task ExportTextAsync()
     {
         ShowStatus("Extracting selectable text…"); await Task.Delay(25);
-        await _storage.SaveAsync(BaseName(Session.Document.Title) + ".txt", Encoding.UTF8.GetBytes(PdfReader.ExtractText(Session.Document)), "text/plain;charset=utf-8"); ShowStatus("Text download started. Scanned text requires OCR, which is not included.");
+        await _storage.SaveAsync(BaseName(Session.Document.Title) + ".txt", Encoding.UTF8.GetBytes(PdfReader.ExtractText(Session.Document)), "text/plain;charset=utf-8"); ShowStatus("Text download started. Unrecognized scans need Scan & OCR first.");
     }
     private async Task PrintAsync()
     {

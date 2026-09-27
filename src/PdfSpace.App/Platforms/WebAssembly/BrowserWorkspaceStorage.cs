@@ -5,6 +5,7 @@ namespace PdfSpace.App;
 
 internal sealed class BrowserWorkspaceStorage : IWorkspaceStorage
 {
+    public async Task<WorkspaceFile?> OpenImageAsync() => Decode(await BrowserFiles.OpenImage());
     public async Task<WorkspaceFile?> OpenAsync() => Decode(await BrowserFiles.Open());
     public async Task<WorkspaceFile?> OpenFormDataAsync() => Decode(await BrowserFiles.OpenFormData());
     private static WorkspaceFile? Decode(string result)
@@ -22,6 +23,7 @@ internal sealed class BrowserWorkspaceStorage : IWorkspaceStorage
 }
 internal static partial class BrowserFiles
 {
+    [JSImport("globalThis.pdfSpaceFiles.openImage")][return: JSMarshalAs<JSType.Promise<JSType.String>>] internal static partial Task<string> OpenImage();
     [JSImport("globalThis.pdfSpaceFiles.open")][return: JSMarshalAs<JSType.Promise<JSType.String>>] internal static partial Task<string> Open();
     [JSImport("globalThis.pdfSpaceFiles.openFormData")][return: JSMarshalAs<JSType.Promise<JSType.String>>] internal static partial Task<string> OpenFormData();
     [JSImport("globalThis.pdfSpaceFiles.download")][return: JSMarshalAs<JSType.Promise<JSType.String>>] internal static partial Task<string> Download(string name, string base64, string type);

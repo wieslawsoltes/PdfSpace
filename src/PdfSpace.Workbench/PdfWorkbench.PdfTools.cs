@@ -174,6 +174,7 @@ public sealed partial class PdfWorkbench
     }
     private async Task ShowOriginalTextAsync()
     {
+        if (Session.Page.Ocr is not null) { ShowOcrReview(); ShowStatus("Use Correct recognized text to edit this scan’s OCR layer."); return; }
         Viewport.FinishText(true); var context = _active; var document = context.Session.Document; var page = context.Session.CurrentPage;
         ShowStatus("Reading original text operands…"); await Task.Delay(25);
         var runs = PdfTextEditor.Read(document, page);

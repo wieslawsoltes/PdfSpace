@@ -1,5 +1,6 @@
 <Solution>
   <Folder Name="/src/">
+    <Project Path="src/PdfSpace.Ocr/PdfSpace.Ocr.csproj"/>
     <Project Path="src/PdfSpace.Core/PdfSpace.Core.csproj"/>
     <Project Path="src/PdfSpace.Layout/PdfSpace.Layout.csproj"/>
     <Project Path="src/PdfSpace.Editing/PdfSpace.Editing.csproj"/>

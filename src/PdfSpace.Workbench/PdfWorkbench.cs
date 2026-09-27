@@ -10,6 +10,7 @@ public sealed partial class PdfWorkbench : UserControl, IDisposable
     private readonly IWorkspaceStorage _storage;
     private readonly IPdfSecurityProvider _security;
     private readonly SKTypeface _typeface;
+    private readonly PdfSpace.Ocr.IOcrEngine _ocr;
     private readonly DispatcherTimer _autosave = new() { Interval = TimeSpan.FromSeconds(1.2) };
     private bool _savingRecovery, _saveAgain, _disposed;
     private string _mode = "All tools", _right = "", _statusText = "All files stay on your device.";
@@ -22,9 +23,9 @@ public sealed partial class PdfWorkbench : UserControl, IDisposable
     public string Status => _statusText;
     public int DocumentCount => _documents.Count;
     public event Action? StateChanged;
-    public PdfWorkbench(PdfWorkspace initial, IWorkspaceStorage storage, SKTypeface typeface, IPdfSecurityProvider? security = null)
+    public PdfWorkbench(PdfWorkspace initial, IWorkspaceStorage storage, SKTypeface typeface, IPdfSecurityProvider? security = null, PdfSpace.Ocr.IOcrEngine? ocr = null)
     {
-        _storage = storage; _typeface = typeface; _security = security ?? new NativePdfSecurityProvider();
+        _storage = storage; _typeface = typeface; _security = security ?? new NativePdfSecurityProvider(); _ocr = ocr ?? new PdfSpace.Ocr.UnavailableOcrEngine();
         HorizontalContentAlignment = HorizontalAlignment.Stretch; VerticalContentAlignment = VerticalAlignment.Stretch;
         BuildShell(); AddDocument(initial);
         _autosave.Tick += async (_, _) => { _autosave.Stop(); await SaveRecoveryAsync(); };
@@ -77,6 +78,7 @@ public sealed partial class PdfWorkbench : UserControl, IDisposable
     private async Task CloseAsync(DocumentContext context)
     {
         if (context.Session.IsDirty && !await _dialogs.ConfirmAsync("Close document?", "Unsaved workspace changes will be closed. Export an editable .pdfspace workspace to keep them permanently.", "Close document")) return;
+        if (_ocrContext == context) _ocrCancellation?.Cancel();
         context.Viewport.Dispose(); _documents.Remove(context); _tabs.Children.Remove(context.Tab);
         if (_documents.Count == 0) AddDocument(new PdfWorkspace());
         else if (_active == context) Activate(_documents[^1]);
@@ -150,5 +152,5 @@ public sealed partial class PdfWorkbench : UserControl, IDisposable
         }
         catch (Exception ex) { ShowStatus("Recovery is unavailable: " + ex.Message, true); }
     }
-    public void Dispose() { if (_disposed) return; _disposed = true; _autosave.Stop(); foreach (var d in _documents) d.Viewport.Dispose(); _documents.Clear(); }
+    public void Dispose() { if (_disposed) return; _disposed = true; _ocrCancellation?.Cancel(); _autosave.Stop(); foreach (var d in _documents) d.Viewport.Dispose(); _documents.Clear(); }
 }
