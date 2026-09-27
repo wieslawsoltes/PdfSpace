@@ -1,0 +1,39 @@
+name: Apply reviewed OCR implementation
+on:
+  push:
+    branches: [build/ocr-transfer]
+    paths: ['.github/workflows/apply-ocr.yml']
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/scan-ocr-0.3
+          fetch-depth: 0
+      - name: Verify exact patch and preserve concurrent work
+        env:
+          PATCH_COMMIT: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = 'aba7e0b0b0e863cb8a2fc35d844b4cb9863a6f90'
+          git fetch origin "$PATCH_COMMIT"
+          python3 - <<'PY'
+          import subprocess,base64,lzma,hashlib,pathlib,os
+          chunks=[subprocess.check_output(['git','show',f'{os.environ["PATCH_COMMIT"]}:tools/ocr-transfer/{i}.b64']).decode().strip() for i in range(3)]
+          patch=lzma.decompress(base64.b64decode(''.join(chunks),validate=True))
+          assert len(patch)==122940
+          assert hashlib.sha256(patch).hexdigest()=='d70eda003ecee1c1288813ed01e0ff2862d44b786cc1a668f651ec853d6383cf'
+          pathlib.Path('/tmp/pdfspace-ocr.patch').write_bytes(patch)
+          PY
+          git apply --check --exclude='.github/workflows/*' /tmp/pdfspace-ocr.patch
+          git apply --exclude='.github/workflows/*' /tmp/pdfspace-ocr.patch
+          git diff --check
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'feat: local scan recognition, word correction and invisible Unicode PDF text layers'
+          git push origin HEAD:feat/scan-ocr-0.3
