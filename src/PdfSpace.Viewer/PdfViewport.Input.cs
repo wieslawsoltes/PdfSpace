@@ -19,7 +19,7 @@ public sealed partial class PdfViewport
     private void Pressed(object sender, PointerRoutedEventArgs e)
     {
         var point = e.GetCurrentPoint(_canvas); var screen = new PointD(point.Position.X, point.Position.Y);
-        if (e.Pointer.PointerDeviceType == Windows.Devices.Input.PointerDeviceType.Touch)
+        if (e.Pointer.PointerDeviceType == Microsoft.UI.Input.PointerDeviceType.Touch)
         {
             _touches[e.Pointer.PointerId] = screen;
             if (_touches.Count == 2)
@@ -44,7 +44,7 @@ public sealed partial class PdfViewport
             Session.Select(annotation?.Id); _original = annotation; _preview = annotation; _gesture = annotation is null ? Gesture.SelectText : Gesture.Move;
         }
         else if (Session.Tool == PdfTool.Text)
-        { CancelGesture(); BeginText(new Annotation { Kind = AnnotationKind.Text, Bounds = new(_start.X, _start.Y, Math.Min(280, page.Width - _start.X), 65), FontSize = Session.FontSize, Color = Session.Color }); }
+        { CancelGesture(); BeginText(new Annotation { Kind = AnnotationKind.Text, Bounds = new(_start.X, _start.Y, Math.Max(20, Math.Min(280, page.Width - _start.X)), 65), FontSize = Session.FontSize, Color = Session.Color }); }
         else if (Session.Tool == PdfTool.Note)
         { CancelGesture(); NoteRequested?.Invoke(_dragPage, _start); }
         else if (Session.Tool is PdfTool.Check or PdfTool.Stamp)
@@ -119,7 +119,7 @@ public sealed partial class PdfViewport
                 }
                 else Session.AddAnnotation(preview, index);
             }
-            else if (gesture is Gesture.Move or Gesture.Resize && preview is not null) Session.UpdateAnnotation(preview.Id, _ => preview, gesture == Gesture.Move ? "Move annotation" : "Resize annotation");
+            else if (gesture is Gesture.Move or Gesture.Resize && preview is not null && preview != _original) Session.UpdateAnnotation(preview.Id, _ => preview, gesture == Gesture.Move ? "Move annotation" : "Resize annotation");
             else if (gesture == Gesture.Crop && marquee is { Width: >= 10, Height: >= 10 } crop) Session.CropPage(crop);
             else if (gesture == Gesture.SelectText && marquee is { } selection)
             {
@@ -143,7 +143,7 @@ public sealed partial class PdfViewport
         else ScrollBy(-delta * .7);
         e.Handled = true;
     }
-    private void DoubleTapped(object sender, DoubleTappedRoutedEventArgs e)
+    private new void DoubleTapped(object sender, DoubleTappedRoutedEventArgs e)
     {
         var position = e.GetPosition(_canvas); var screen = new PointD(position.X, position.Y); var hit = Arrange().Where(p => p.Bounds.Contains(screen)).ToArray(); if (hit.Length == 0) return;
         var page = Session.Document.Pages[hit[0].Index]; var point = hit[0].ToPage(page, screen, Zoom);
