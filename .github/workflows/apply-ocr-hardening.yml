@@ -1,0 +1,33 @@
+name: Apply reviewed OCR boundary fixes
+on:
+  push:
+    branches: [build/ocr-hardening]
+    paths: ['.github/workflows/apply-ocr-hardening.yml']
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/scan-ocr-0.3
+          fetch-depth: 0
+      - name: Apply bounded source correction without overwriting concurrent work
+        env:
+          PATCH_COMMIT: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = '02389d6980ddfeb475090c1feb5870b81695bf05'
+          git fetch origin "$PATCH_COMMIT"
+          git show "$PATCH_COMMIT:tools/ocr-transfer/hardening.patch" > /tmp/hardening.patch
+          echo 'ac8abfba13a0de0b25bbae1701e048f3645dd4978ff0c0ab5895e85fb212ee8b  /tmp/hardening.patch' | sha256sum --check
+          git apply --check /tmp/hardening.patch
+          git apply /tmp/hardening.patch
+          git diff --check
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'fix: bound OCR metadata, honor pre-cancellation and update in-app help'
+          git push origin HEAD:feat/scan-ocr-0.3

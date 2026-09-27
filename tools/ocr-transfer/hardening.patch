@@ -1,0 +1,75 @@
+diff --git a/src/PdfSpace.Ocr/OcrBatch.cs b/src/PdfSpace.Ocr/OcrBatch.cs
+index bf82d9b..0af45bd 100644
+--- a/src/PdfSpace.Ocr/OcrBatch.cs
++++ b/src/PdfSpace.Ocr/OcrBatch.cs
+@@ -41,6 +41,7 @@ public sealed class OcrBatch
+                 // Render only the original source visuals in the displayed crop/orientation.
+                 progress?.Report(new(i, indices.Length, index, "Rendering scan"));
+                 await Task.Yield();
++                cancellationToken.ThrowIfCancellationRequested();
+                 var image = Raster(snapshot, page, renderer, dpi);
+                 progress?.Report(new(i, indices.Length, index, "Recognizing text"));
+                 var tsv = await engine.RecognizeTsvAsync(image, language, cancellationToken);
+diff --git a/src/PdfSpace.Ocr/TesseractProcessEngine.cs b/src/PdfSpace.Ocr/TesseractProcessEngine.cs
+index 48f3eb9..efbf919 100644
+--- a/src/PdfSpace.Ocr/TesseractProcessEngine.cs
++++ b/src/PdfSpace.Ocr/TesseractProcessEngine.cs
+@@ -10,6 +10,7 @@ public sealed class TesseractProcessEngine(string executable = "tesseract") : IO
+     public string Name => "Tesseract native";
+     public async Task<string> RecognizeTsvAsync(OcrImage image, string language, CancellationToken cancellationToken)
+     {
++        cancellationToken.ThrowIfCancellationRequested();
+         if (language is not ("eng" or "pol" or "deu")) throw new ArgumentException("Unsupported OCR language.", nameof(language));
+         if (image.Png.Length > 32 * 1024 * 1024) throw new InvalidDataException("OCR input exceeds 32 MB.");
+         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken); deadline.CancelAfter(TimeSpan.FromSeconds(90));
+diff --git a/src/PdfSpace.Pdf/NativeOcr.cs b/src/PdfSpace.Pdf/NativeOcr.cs
+index 57a1cf4..5cc304a 100644
+--- a/src/PdfSpace.Pdf/NativeOcr.cs
++++ b/src/PdfSpace.Pdf/NativeOcr.cs
+@@ -67,7 +67,9 @@ internal static class NativeOcr
+             Words = words.Select(word => word with { Bounds = PageGeometry.DisplayBounds(state, word.Bounds) }).ToArray()
+         };
+         PdfOcrLayer.Validate(normalized, state.DisplayWidth, state.DisplayHeight);
++        var bytes = JsonSerializer.SerializeToUtf8Bytes(normalized, PdfOcrJsonContext.Default.PdfOcrLayer);
++        if (bytes.Length > 8 * 1024 * 1024) throw new InvalidDataException("OCR correction metadata exceeds 8 MB for this page. Shorten excessive corrections before exporting.");
+         var metadata = new PdfDictionary(document); document.Internals.AddObject(metadata);
+-        metadata.CreateStream(JsonSerializer.SerializeToUtf8Bytes(normalized, PdfOcrJsonContext.Default.PdfOcrLayer)); page.Elements[Key] = metadata.Reference!;
++        metadata.CreateStream(bytes); page.Elements[Key] = metadata.Reference!;
+     }
+ }
+diff --git a/src/PdfSpace.Workbench/PdfWorkbench.Commands.cs b/src/PdfSpace.Workbench/PdfWorkbench.Commands.cs
+index 9333ab9..b4e7410 100644
+--- a/src/PdfSpace.Workbench/PdfWorkbench.Commands.cs
++++ b/src/PdfSpace.Workbench/PdfWorkbench.Commands.cs
+@@ -156,7 +156,7 @@ public sealed partial class PdfWorkbench
+     private async Task ShowHelpAsync()
+     {
+         var version = typeof(PdfWorkbench).Assembly.GetName().Version?.ToString(3) ?? "development";
+-        await _dialogs.PromptAsync($"PdfSpace · {version} alpha", "Ctrl/Cmd+O — open PDF or workspace\nCtrl/Cmd+S — save editable workspace\nCtrl/Cmd+Shift+S — export PDF\nCtrl/Cmd+F — find text\nCtrl/Cmd+Z / Shift+Z — undo / redo\nCtrl/Cmd+C — copy selected text\nPage Up / Page Down — navigate pages\nV — select · H — hand · T — add text · D — draw\nEscape — cancel · Delete — delete annotation\nCtrl+wheel — zoom around pointer\n\nPdfSpace is an independent Uno Platform / SkiaSharp app, not Adobe Acrobat. Structured PDF export supports native annotations and AcroForms. Original text editing uses existing font glyphs without paragraph reflow. Redaction rebuilds all pages as raster images. Password export uses AES-256. XFA, OCR, certificate signing/trust, full accessibility/compliance and cloud services remain unsupported.", acceptLabel: "Close", input: false);
++        await _dialogs.PromptAsync($"PdfSpace · {version} alpha", "Ctrl/Cmd+O — open PDF or workspace\nCtrl/Cmd+S — save editable workspace\nCtrl/Cmd+Shift+S — export PDF\nCtrl/Cmd+F — find text\nCtrl/Cmd+Z / Shift+Z — undo / redo\nCtrl/Cmd+C — copy selected text\nPage Up / Page Down — navigate pages\nV — select · H — hand · T — add text · D — draw\nEscape — cancel · Delete — delete annotation\nCtrl+wheel — zoom around pointer\n\nPdfSpace is an independent Uno Platform / SkiaSharp app, not Adobe Acrobat. Structured PDF export supports native annotations and AcroForms. Original text editing uses existing font glyphs without paragraph reflow. Redaction rebuilds all pages as raster images. Password export uses AES-256. Scan & OCR recognizes English, Polish and German scans locally and exports corrected searchable text. Native OCR requires Tesseract installed. XFA, certificate signing/trust, full accessibility/compliance and cloud services remain unsupported.", acceptLabel: "Close", input: false);
+     }
+     private void ShowFileMenu()
+     {
+diff --git a/tests/PdfSpace.Tests/OcrTests.cs b/tests/PdfSpace.Tests/OcrTests.cs
+index 6ee5172..3c52861 100644
+--- a/tests/PdfSpace.Tests/OcrTests.cs
++++ b/tests/PdfSpace.Tests/OcrTests.cs
+@@ -14,8 +14,18 @@ internal static class OcrTests
+     private const string Row = "5\t1\t1\t1\t1\t1\t100\t100\t180\t32\t92.5\tCircular\n";
+     public static async Task Run(Action<bool, string> check, Action<Action, string> reject)
+     {
++        using (var preCancelled = new CancellationTokenSource())
++        {
++            preCancelled.Cancel();
++            var didCancel = false;
++            try { await new TesseractProcessEngine("pdfspace-nonexistent-engine").RecognizeTsvAsync(new([], 1, 1, 200), "eng", preCancelled.Token); }
++            catch (OperationCanceledException) { didCancel = true; }
++            check(didCancel, "pre-cancelled native OCR does not launch an executable");
++        }
+         var scan = PdfImageImporter.CreateScanExample(SKTypeface.Default);
+         check(PdfReader.Words(scan, scan.Pages[0]).Length == 0, "scan example contains pixels and no selectable source text");
++        var oversized = scan with { Pages = [scan.Pages[0] with { Ocr = new PdfOcrLayer { Words = Enumerable.Range(0, 3000).Select(_ => new PdfOcrWord { Text = new string('é', 512), Bounds = new(10, 10, 100, 20), Confidence = 90 }).ToArray() } }] };
++        reject(() => PdfDocumentEngine.Save(oversized, SKTypeface.Default), "oversized OCR metadata cannot produce a PDF that PdfSpace cannot reopen");
+         var engine = new TestEngine(Header + Row);
+         using var renderer = new PdfRenderer();
+         var batch = await OcrBatch.RecognizeAsync(scan, renderer, engine, [0]);
