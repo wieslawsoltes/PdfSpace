@@ -70,3 +70,20 @@ test('a reused worker routes an error to the active page, not its completed crea
   assert.equal(worker.terminations, 1);
   api.release();
 });
+
+test('cancelling during parameter setup cannot send an obsolete image to a replacement worker', async () => {
+  const parameters = deferred(); const recognition = deferred();
+  const oldWorker = fakeWorker(); oldWorker.setParameters = () => parameters.promise;
+  const nextWorker = fakeWorker(); const images = [];
+  nextWorker.recognize = image => { images.push(image); return recognition.promise; };
+  let created = 0;
+  const api = await bridge(async () => ++created === 1 ? oldWorker : nextWorker);
+  const oldRequest = api.recognize('old-page', 'old-image', 'eng', 200);
+  await tick();
+  const cancelled = assert.rejects(oldRequest, /cancelled/); api.cancel('old-page'); await cancelled;
+  const nextRequest = api.recognize('next-page', 'new-image', 'eng', 200);
+  await tick(); parameters.resolve(); await tick();
+  recognition.resolve({ data: { tsv: row } }); await nextRequest;
+  assert.deepEqual(images, ['data:image/png;base64,new-image']);
+  api.release();
+});

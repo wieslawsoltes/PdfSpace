@@ -44,8 +44,10 @@
           worker = created; workerLanguage = language;
         }
         if (current !== request) return;
-        await worker.setParameters({ tessedit_pageseg_mode: '3', user_defined_dpi: String(dpi) });
-        const result = await worker.recognize('data:image/png;base64,' + png, {}, { text: false, tsv: true });
+        const requestWorker = worker;
+        await requestWorker.setParameters({ tessedit_pageseg_mode: '3', user_defined_dpi: String(dpi) });
+        if (current !== request || worker !== requestWorker) return;
+        const result = await requestWorker.recognize('data:image/png;base64,' + png, {}, { text: false, tsv: true });
         if (current !== request) return;
         let tsv = result.data.tsv;
         if (typeof tsv !== 'string' || tsv.length > 8 * 1024 * 1024) throw new Error('OCR response exceeds its limit.');
