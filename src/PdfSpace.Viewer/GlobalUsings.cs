@@ -1,0 +1,11 @@
+global using Microsoft.UI.Xaml;
+global using Microsoft.UI.Xaml.Controls;
+global using Microsoft.UI.Xaml.Input;
+global using Windows.Foundation;
+global using Windows.System;
+global using PdfSpace.Core;
+global using PdfSpace.Controls;
+global using PdfSpace.Editing;
+global using PdfSpace.Layout;
+global using PdfSpace.Skia;
+global using SkiaSharp;

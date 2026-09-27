@@ -25,3 +25,72 @@ jobs:
           name: PdfSpace-engine-validation
           path: artifacts/engine
           if-no-files-found: ignore
+  browser:
+    needs: engine
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+      - uses: actions/download-artifact@v4
+        with:
+          name: PdfSpace-engine-validation
+          path: artifacts/fixtures
+      - name: Install browser toolchain and licensed font
+        run: |
+          dotnet workload install wasm-tools --skip-manifest-update
+          python3 scripts/fetch-assets.py
+      - name: Publish real Uno WebAssembly app
+        run: |
+          dotnet publish src/PdfSpace.App -f net10.0-browserwasm -c Release -o artifacts/publish -p:WasmShellWebAppBasePath=/PdfSpace/
+          python3 scripts/collect-site.py artifacts/publish artifacts/site
+      - name: Browser interaction tests
+        run: |
+          npm install --ignore-scripts
+          npx playwright install --with-deps chromium
+          python3 scripts/serve-site.py --directory artifacts/site --port 4173 > artifacts/server.log 2>&1 &
+          npm run test:browser
+      - name: Package reusable libraries
+        run: |
+          for project in src/*/*.csproj; do
+            case "$project" in */PdfSpace.App/*) continue;; esac
+            dotnet pack "$project" -c Release -o artifacts/packages
+          done
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: PdfSpace-browser
+          path: artifacts/site
+          include-hidden-files: true
+          if-no-files-found: ignore
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: PdfSpace-browser-validation
+          path: |
+            artifacts/screenshots
+            artifacts/playwright-report
+            artifacts/test-results
+            artifacts/browser-results.xml
+            artifacts/server.log
+            package-lock.json
+          if-no-files-found: ignore
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: PdfSpace-packages
+          path: artifacts/packages
+          if-no-files-found: ignore
+      - name: Source snapshot
+        if: always()
+        run: git archive --format=zip --output=/tmp/PdfSpace-source.zip HEAD
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: PdfSpace-source
+          path: /tmp/PdfSpace-source.zip
