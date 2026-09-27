@@ -10,6 +10,7 @@ public sealed class TesseractProcessEngine(string executable = "tesseract") : IO
     public string Name => "Tesseract native";
     public async Task<string> RecognizeTsvAsync(OcrImage image, string language, CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         if (language is not ("eng" or "pol" or "deu")) throw new ArgumentException("Unsupported OCR language.", nameof(language));
         if (image.Png.Length > 32 * 1024 * 1024) throw new InvalidDataException("OCR input exceeds 32 MB.");
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken); deadline.CancelAfter(TimeSpan.FromSeconds(90));

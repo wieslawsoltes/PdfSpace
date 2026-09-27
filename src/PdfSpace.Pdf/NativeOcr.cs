@@ -67,7 +67,9 @@ internal static class NativeOcr
             Words = words.Select(word => word with { Bounds = PageGeometry.DisplayBounds(state, word.Bounds) }).ToArray()
         };
         PdfOcrLayer.Validate(normalized, state.DisplayWidth, state.DisplayHeight);
+        var bytes = JsonSerializer.SerializeToUtf8Bytes(normalized, PdfOcrJsonContext.Default.PdfOcrLayer);
+        if (bytes.Length > 8 * 1024 * 1024) throw new InvalidDataException("OCR correction metadata exceeds 8 MB for this page. Shorten excessive corrections before exporting.");
         var metadata = new PdfDictionary(document); document.Internals.AddObject(metadata);
-        metadata.CreateStream(JsonSerializer.SerializeToUtf8Bytes(normalized, PdfOcrJsonContext.Default.PdfOcrLayer)); page.Elements[Key] = metadata.Reference!;
+        metadata.CreateStream(bytes); page.Elements[Key] = metadata.Reference!;
     }
 }

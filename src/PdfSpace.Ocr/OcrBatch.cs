@@ -41,6 +41,7 @@ public sealed class OcrBatch
                 // Render only the original source visuals in the displayed crop/orientation.
                 progress?.Report(new(i, indices.Length, index, "Rendering scan"));
                 await Task.Yield();
+                cancellationToken.ThrowIfCancellationRequested();
                 var image = Raster(snapshot, page, renderer, dpi);
                 progress?.Report(new(i, indices.Length, index, "Recognizing text"));
                 var tsv = await engine.RecognizeTsvAsync(image, language, cancellationToken);

@@ -14,8 +14,18 @@ internal static class OcrTests
     private const string Row = "5\t1\t1\t1\t1\t1\t100\t100\t180\t32\t92.5\tCircular\n";
     public static async Task Run(Action<bool, string> check, Action<Action, string> reject)
     {
+        using (var preCancelled = new CancellationTokenSource())
+        {
+            preCancelled.Cancel();
+            var didCancel = false;
+            try { await new TesseractProcessEngine("pdfspace-nonexistent-engine").RecognizeTsvAsync(new([], 1, 1, 200), "eng", preCancelled.Token); }
+            catch (OperationCanceledException) { didCancel = true; }
+            check(didCancel, "pre-cancelled native OCR does not launch an executable");
+        }
         var scan = PdfImageImporter.CreateScanExample(SKTypeface.Default);
         check(PdfReader.Words(scan, scan.Pages[0]).Length == 0, "scan example contains pixels and no selectable source text");
+        var oversized = scan with { Pages = [scan.Pages[0] with { Ocr = new PdfOcrLayer { Words = Enumerable.Range(0, 3000).Select(_ => new PdfOcrWord { Text = new string('é', 512), Bounds = new(10, 10, 100, 20), Confidence = 90 }).ToArray() } }] };
+        reject(() => PdfDocumentEngine.Save(oversized, SKTypeface.Default), "oversized OCR metadata cannot produce a PDF that PdfSpace cannot reopen");
         var engine = new TestEngine(Header + Row);
         using var renderer = new PdfRenderer();
         var batch = await OcrBatch.RecognizeAsync(scan, renderer, engine, [0]);
