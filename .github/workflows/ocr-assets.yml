@@ -1,0 +1,45 @@
+name: Verify OCR assets
+on:
+  push:
+    branches: [build/ocr-assets]
+    paths: ['.github/workflows/ocr-assets.yml']
+permissions:
+  contents: read
+jobs:
+  assets:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Collect exact upstream runtime and model artifacts
+        run: |
+          mkdir -p /tmp/ocr-assets
+          python3 - <<'PY'
+          import urllib.request,tarfile,io,pathlib,hashlib,json
+          root=pathlib.Path('/tmp/ocr-assets')
+          inputs=[]
+          for package in ['tesseract.js','tesseract.js-core']:
+              url=f'https://registry.npmjs.org/{package}/-/{package}-7.0.0.tgz'
+              data=urllib.request.urlopen(url,timeout=45).read()
+              inputs.append({'url':url,'sha256':hashlib.sha256(data).hexdigest()})
+              with tarfile.open(fileobj=io.BytesIO(data),mode='r:gz') as archive:
+                  for item in archive.getmembers():
+                      name=pathlib.PurePosixPath(item.name).name
+                      keep=(package=='tesseract.js' and item.name in ['package/dist/tesseract.esm.min.js','package/dist/worker.min.js','package/LICENSE.md']) or (package=='tesseract.js-core' and (name.endswith('.wasm') or name.endswith('.wasm.js') or name in ['LICENSE','LICENSE.md']))
+                      if keep and item.isfile():
+                          destination=root/('core' if package.endswith('-core') else 'runtime')/name
+                          destination.parent.mkdir(parents=True,exist_ok=True)
+                          destination.write_bytes(archive.extractfile(item).read())
+          for name in ['eng.traineddata','pol.traineddata','deu.traineddata','LICENSE']:
+              url='https://raw.githubusercontent.com/tesseract-ocr/tessdata_fast/4.1.0/'+name
+              data=urllib.request.urlopen(url,timeout=45).read()
+              inputs.append({'url':url,'sha256':hashlib.sha256(data).hexdigest()})
+              destination=root/'lang'/name;destination.parent.mkdir(exist_ok=True);destination.write_bytes(data)
+          (root/'inputs.json').write_text(json.dumps(inputs,indent=2))
+          manifest={str(p.relative_to(root)):hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(root.rglob('*')) if p.is_file()}
+          (root/'SHA256.json').write_text(json.dumps(manifest,indent=2))
+          print(json.dumps(inputs,indent=2));print(json.dumps(manifest,indent=2))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PdfSpace-ocr-assets
+          path: /tmp/ocr-assets
