@@ -24,7 +24,7 @@ jobs:
               with tarfile.open(fileobj=io.BytesIO(data),mode='r:gz') as archive:
                   for item in archive.getmembers():
                       name=pathlib.PurePosixPath(item.name).name
-                      keep=(package=='tesseract.js' and item.name in ['package/dist/tesseract.esm.min.js','package/dist/worker.min.js','package/LICENSE.md']) or (package=='tesseract.js-core' and (name.endswith('.wasm') or name.endswith('.wasm.js') or name in ['LICENSE','LICENSE.md']))
+                      keep=(package=='tesseract.js' and (item.name in ['package/dist/tesseract.esm.min.js','package/dist/worker.min.js','package/LICENSE.md'] or name.endswith('.LICENSE.txt'))) or (package=='tesseract.js-core' and (name.endswith('.wasm') or name.endswith('.wasm.js') or name in ['LICENSE','LICENSE.md']))
                       if keep and item.isfile():
                           destination=root/('core' if package.endswith('-core') else 'runtime')/name
                           destination.parent.mkdir(parents=True,exist_ok=True)
