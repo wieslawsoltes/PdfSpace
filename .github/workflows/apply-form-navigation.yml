@@ -14,7 +14,7 @@ jobs:
         with:
           ref: feat/form-data-navigation-0.2.1
           fetch-depth: 0
-      - name: Verify source patch and apply without overwriting newer work
+      - name: Verify source patch and apply application files only
         env:
           PATCH_COMMIT: ${{ github.sha }}
         shell: bash
@@ -30,8 +30,10 @@ jobs:
           assert hashlib.sha256(patch).hexdigest() == '9247b445464ee703254e3ebb0f9aacf8ee4126b887e70da9b7bae96e895eb9f2'
           pathlib.Path('/tmp/pdfspace-021.patch').write_bytes(patch)
           PY
-          git apply --check /tmp/pdfspace-021.patch
-          git apply /tmp/pdfspace-021.patch
+          # The Actions token writes application sources only. Workflow changes
+          # are applied separately through the authorized repository connector.
+          git apply --check --exclude='.github/workflows/*' /tmp/pdfspace-021.patch
+          git apply --exclude='.github/workflows/*' /tmp/pdfspace-021.patch
           git diff --check
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
