@@ -17,6 +17,7 @@ public static class WorkspaceComposition
             Annotations = page.Annotations.Select(annotation => annotation with
             {
                 Id = Guid.NewGuid(),
+                TargetPage = annotation.TargetPage is { } target ? current.Pages.Length + target : null,
                 Replies = annotation.Replies.Select(reply => reply with { Id = Guid.NewGuid() }).ToArray()
             }).ToArray()
         }).ToArray();

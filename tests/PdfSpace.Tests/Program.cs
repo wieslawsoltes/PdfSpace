@@ -83,4 +83,6 @@ Check(undoCount == 100, "undo history is bounded to one hundred transactions");
 Directory.CreateDirectory("artifacts/engine"); File.WriteAllBytes("artifacts/engine/sample.pdf", demo.Sources[0].Bytes); File.WriteAllBytes("artifacts/engine/sample.png", png); File.WriteAllBytes("artifacts/engine/edited.pdf", output);
 StructuredPdfTests.Run(Check, Reject);
 FormPersistenceTests.Run(Check, Reject);
+FormDataTests.Run(Check, Reject);
+NavigationTests.Run(Check, Reject);
 Console.WriteLine($"\n{passed} engine checks passed.");

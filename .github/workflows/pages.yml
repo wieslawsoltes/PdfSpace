@@ -86,7 +86,7 @@ jobs:
         run: |
           curl --fail --retry 8 --retry-all-errors --retry-delay 5 "${PDFSPACE_URL}build-info.json" -o /tmp/live-build.json
           jq -e --arg sha "$EXPECTED_SHA" '.commit == $sha' /tmp/live-build.json
-          npm install --ignore-scripts
+          npm ci --ignore-scripts
           npx playwright install --with-deps chromium
           npm run test:browser
       - uses: actions/upload-artifact@v4
@@ -98,4 +98,5 @@ jobs:
             artifacts/playwright-report
             artifacts/test-results
             artifacts/browser-results.xml
+            artifacts/browser-exports
           if-no-files-found: ignore

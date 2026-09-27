@@ -21,8 +21,7 @@ public sealed partial class PdfViewport
         };
         _fieldEditor = input;
         Canvas.SetLeft(input, placement.Bounds.X + bounds.X * Zoom); Canvas.SetTop(input, placement.Bounds.Y + bounds.Y * Zoom);
-        void FocusInput() { if (_fieldEditor == input) { input.Focus(FocusState.Programmatic); input.SelectAll(); } }
-        input.Loaded += (_, _) => FocusInput();
+        PdfInputFocus.ActivateWhenLoaded(input, () => _fieldEditor == input);
         input.LostFocus += (_, _) => { if (_fieldEditor == input) FinishField(true); };
         input.KeyDown += (_, args) =>
         {
@@ -30,7 +29,7 @@ public sealed partial class PdfViewport
             if (args.Key == VirtualKey.Escape) { FinishField(false); Focus(FocusState.Programmatic); args.Handled = true; }
             else if (args.Key == VirtualKey.Enter && !field.Multiline) { FinishField(true); Focus(FocusState.Programmatic); args.Handled = true; }
         };
-        _overlay.Children.Add(input); DispatcherQueue.TryEnqueue(FocusInput); Invalidate();
+        _overlay.Children.Add(input); Invalidate();
     }
     private bool _fieldNavigationPending;
     private bool HandleFormTab(KeyRoutedEventArgs args)

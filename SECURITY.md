@@ -23,3 +23,7 @@ Drawn signatures are visual marks, not cryptographic signatures. Structured chan
 ## Reporting
 
 Report security-sensitive issues through private vulnerability reporting when available. Do not post private PDFs, real passwords or credentials in public issues. Use minimal synthetic reproductions with the operation, browser/OS and build commit. Input limits and worker isolation reduce exposure but do not prove resistance to every malformed PDF or resource-exhaustion attack.
+
+## Form interchange
+
+XFDF and JSON imports are plain field-value operations, not document/script execution. XML DTDs and external resolvers are disabled; nesting, fields, values and total input size are bounded. Duplicate/ambiguous properties fail instead of being overwritten. A validated snapshot-bound plan applies atomically, rejecting stale state and invalid/read-only changes. Document URLs in data files are not fetched. Form-data exports are unencrypted; unlocked-source exports require confirmation.

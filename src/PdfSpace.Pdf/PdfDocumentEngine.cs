@@ -47,6 +47,8 @@ public static class PdfDocumentEngine
         {
             using var native = OpenNative(source.Bytes);
             var inspection = Inspect(native);
+            var resolver = new PdfDestinationResolver(native);
+            var managedBookmarks = importObjects ? PdfNavigation.ReadOutlines(native).Where(entry => entry.Managed && !entry.ManagedRoot && entry.PageIndex is not null).GroupBy(entry => entry.PageIndex!.Value + 1).ToDictionary(group => group.Key, group => group.First().Title) : new Dictionary<int, string>();
             var fieldsByPage = new Dictionary<int, PdfFormFieldState[]>(); var annotationsByPage = new Dictionary<int, Annotation[]>();
             var managedByPage = new Dictionary<int, HashSet<int>>();
             for (var number = 0; number < native.PageCount; number++)
@@ -72,7 +74,7 @@ public static class PdfDocumentEngine
                         }
                         else
                         {
-                            var annotation = NativeAnnotations.Read(native, item, geometry, key);
+                            var annotation = NativeAnnotations.Read(native, item, geometry, key, resolver);
                             if (annotation is not null) { annotations.Add(annotation); roots.Add(item, annotation); managed.Add(index); }
                         }
                     }
@@ -92,7 +94,7 @@ public static class PdfDocumentEngine
             {
                 for (var i = 0; i < pages.Length; i++)
                     if (pages[i].SourceId == source.Id)
-                        pages[i] = pages[i] with { Annotations = annotationsByPage[pages[i].SourcePage], Fields = fieldsByPage[pages[i].SourcePage] };
+                        pages[i] = pages[i] with { Annotations = annotationsByPage[pages[i].SourcePage], Fields = fieldsByPage[pages[i].SourcePage], Bookmark = managedBookmarks.GetValueOrDefault(pages[i].SourcePage, pages[i].Bookmark) };
             }
             foreach (var page in pages.Where(page => page.SourceId == source.Id))
                 if (page.SourcePage > native.PageCount) throw new InvalidDataException("A workspace refers to a nonexistent source page.");
@@ -147,6 +149,23 @@ public static class PdfDocumentEngine
                 if (inspection.SignatureFields > 0) throw new NotSupportedException("This PDF contains signature fields or certification. Structured changes are blocked to avoid silently invalidating signatures. A separately labeled flattened copy remains available.");
                 if (inspection.HasXfa) throw new NotSupportedException("XFA documents are not supported by structured saving. No PDF has been written.");
             }
+            var managedIndices = new Dictionary<(Guid Source, int Page), HashSet<int>>();
+            foreach (var (id, native) in nativeSources)
+            {
+                var resolver = new PdfDestinationResolver(native);
+                for (var number = 0; number < native.PageCount; number++)
+                {
+                    var indices = new HashSet<int>(); managedIndices[(id, number + 1)] = indices;
+                    if (PdfObjects.Array(native.Pages[number].Elements["/Annots"]) is not { } annotations) continue;
+                    var geometry = new SourceGeometry(native.Pages[number]);
+                    var roots = new HashSet<PdfDictionary>(ReferenceEqualityComparer.Instance);
+                    for (var index = 0; index < annotations.Elements.Count; index++)
+                        if (PdfObjects.Dictionary(annotations.Elements[index]) is { } item && NativeAnnotations.Read(native, item, geometry, $"{number + 1}:{index}", resolver) is not null)
+                        { indices.Add(index); roots.Add(item); }
+                    for (var index = 0; index < annotations.Elements.Count; index++)
+                        if (PdfObjects.Dictionary(PdfObjects.Dictionary(annotations.Elements[index])?.Elements["/IRT"]) is { } parent && roots.Contains(parent)) indices.Add(index);
+                }
+            }
             var preserve = workspace.Sources.Length == 1 && workspace.Pages.Length == nativeSources[workspace.Sources[0].Id].PageCount && workspace.Pages.Select((page, i) => page.SourceId == workspace.Sources[0].Id && page.SourcePage == i + 1).All(match => match);
             if (preserve) output = nativeSources[workspace.Sources[0].Id];
             else
@@ -187,7 +206,7 @@ public static class PdfDocumentEngine
                                 NativeForms.RemoveFromTree(output, item);
                             }
                         }
-                        else if (NativeAnnotations.Read(output, item, geometry, key) is not null) { removals.Add(index); roots.Add(item); }
+                        else if (state.SourceId is { } sourceId && managedIndices.TryGetValue((sourceId, state.SourcePage), out var managed) && managed.Contains(index)) { removals.Add(index); roots.Add(item); }
                     }
                     for (var index = 0; index < original.Elements.Count; index++)
                         if (PdfObjects.Dictionary(PdfObjects.Dictionary(original.Elements[index])?.Elements["/IRT"]) is { } parent && roots.Contains(parent)) removals.Add(index);
@@ -199,12 +218,16 @@ public static class PdfDocumentEngine
                 page.Rotate = (geometry.Rotation + state.Rotation) % 360;
             }
             var bookmarks = workspace.Pages.Select((page, i) => (page, i)).Where(item => item.page.Bookmark.Length > 0).ToArray();
+            var outlinesChanged = false;
+            for (var i = output.Outlines.Count - 1; i >= 0; i--)
+                if (output.Outlines[i].Elements.GetBoolean(PdfNavigation.ManagedOutlineKey)) { output.Outlines.RemoveAt(i); outlinesChanged = true; }
             if (bookmarks.Length > 0)
             {
-                for (var i = output.Outlines.Count - 1; i >= 0; i--) if (output.Outlines[i].Title == "PdfSpace bookmarks") output.Outlines.RemoveAt(i);
                 var root = output.Outlines.Add("PdfSpace bookmarks", output.Pages[bookmarks[0].i], true);
+                root.Elements.SetBoolean(PdfNavigation.ManagedOutlineKey, true); outlinesChanged = true;
                 foreach (var item in bookmarks) root.Outlines.Add(item.page.Bookmark, output.Pages[item.i]);
             }
+            if (outlinesChanged) PdfNavigation.RepairOutlineLinks(output);
             if (protection is not null)
             {
                 protection.Validate();

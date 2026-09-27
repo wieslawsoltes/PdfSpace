@@ -43,13 +43,12 @@ public sealed class PdfDialogHost : Grid
         Control inputControl = password is null ? field : password;
         string InputValue() => password is null ? field.Text : password.Password;
         if (input) { content.Children.Add(inputControl); _focusTargets.Add(inputControl); }
-        inputControl.Loaded += (_, _) => { if (IsOpen) inputControl.Focus(FocusState.Programmatic); };
         var buttons = PdfTheme.Row(8); buttons.HorizontalAlignment = HorizontalAlignment.Right;
         var cancel = new PdfCommandButton("Cancel", action: () => Complete(null)); buttons.Children.Add(cancel); _focusTargets.Add(cancel);
         var accept = new PdfCommandButton(acceptLabel, action: () => Complete(input ? InputValue() : "accepted")) { MinWidth = 85 }; accept.Primary(); buttons.Children.Add(accept); _focusTargets.Add(accept); content.Children.Add(buttons);
         Children.Add(new Border { Child = content, MaxWidth = 500, MinWidth = 300, Margin = new Thickness(20), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, Background = PdfTheme.Brush("#FFFFFF"), BorderBrush = PdfTheme.Brush("#BBBBBB"), BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(12) });
         inputControl.KeyDown += (_, e) => { if (e.Key == VirtualKey.Enter && !multiline) { Complete(InputValue()); e.Handled = true; } };
-        DispatcherQueue.TryEnqueue(() => { if (!IsOpen) return; if (input) { inputControl.Focus(FocusState.Programmatic); if (!secret) field.SelectAll(); } else accept.Focus(FocusState.Programmatic); });
+        PdfInputFocus.ActivateWhenLoaded(input ? inputControl : accept, () => ReferenceEquals(_completion?.Task, task), selectAll: input && !secret);
         return task;
     }
     public Task<string?> SecretAsync(string title, string description, string accept = "Continue") => PromptAsync(title, description, acceptLabel: accept, secret: true);

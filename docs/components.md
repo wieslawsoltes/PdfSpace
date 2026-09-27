@@ -88,3 +88,9 @@ var protectedPdf = await security.EncryptAsync(result.Bytes,
 Inject a platform provider as the optional fourth `PdfWorkbench` constructor argument. The App project supplies `BrowserPdfSecurityProvider` on WebAssembly; a custom browser host must also ship its worker/runtime assets. The default provider is native .NET and must not be used for AES on browserwasm. `PdfUnlockResult.WasEncrypted` must propagate into source sensitivity so recovery cannot silently persist decrypted bytes.
 
 `EditorSession.UpdateField` applies logical properties across all widgets of a field while changing bounds only on the selected widget. `SetFieldValue` enforces type, choice and read-only rules. `DeleteField` supports imported widgets; native save prunes the corresponding field hierarchy. Neither ordinary deletion nor workspace serialization sanitizes confidential source data.
+
+## Form interchange and PDF navigation
+
+`PdfFormDataCodec` in Documents reads/writes plain-field XFDF and JSON. `EditorSession.PrepareFormDataImport` validates a batch against a snapshot; `ApplyFormDataImport` applies one undoable transaction and refuses stale plans. `PdfNavigation.ReadBookmarks` exposes read-only source outlines with resolved local page indices. `WorkspacePages.Select` performs page extraction/reordering while remapping internal destinations. Host picker integration and full examples are in [form data and navigation](form-data-and-navigation.md).
+
+`PdfInputFocus.ActivateWhenLoaded` provides one-shot initial focus/selection for newly attached Uno editors and dialogs. Its current-owner predicate cancels an obsolete activation; it never reselects text on a later Loaded notification.

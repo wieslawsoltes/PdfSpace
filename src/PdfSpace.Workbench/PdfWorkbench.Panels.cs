@@ -161,14 +161,37 @@ public sealed partial class PdfWorkbench
         }
         if (comments.Length > 200) content.Children.Add(Paragraph("Showing the first 200 items. Resolve or filter comments to narrow the review."));
     }
+    private PdfWorkspace? _bookmarkDocument;
+    private IReadOnlyList<PdfBookmark> _sourceBookmarks = [];
     private void BuildBookmarks(StackPanel content)
     {
         content.Children.Add(new PdfCommandButton("Bookmark current page", PdfIconKind.Plus, () => Run(BookmarkAsync)));
-        var bookmarks = Session.Document.Pages.Select((p, i) => (Page: p, Index: i)).Where(p => p.Page.Bookmark.Length > 0).ToArray();
+        var bookmarks = Session.Document.Pages.Select((page, index) => (Page: page, Index: index)).Where(item => item.Page.Bookmark.Length > 0).ToArray();
         foreach (var item in bookmarks)
             content.Children.Add(new PdfCommandButton(item.Page.Bookmark, PdfIconKind.Bookmark, () => Viewport.Navigate(item.Index)) { HorizontalContentAlignment = HorizontalAlignment.Left, HorizontalAlignment = HorizontalAlignment.Stretch });
-        if (bookmarks.Length == 0) content.Children.Add(Paragraph("Add bookmarks to quickly return to important pages. Workspace bookmarks are saved in .pdfspace files."));
-        content.Children.Add(PdfTheme.Divider()); content.Children.Add(new PdfCommandButton("Remove current bookmark", PdfIconKind.Trash, () => Safe(() => Session.BookmarkPage(""))));
+        if (bookmarks.Length == 0) content.Children.Add(Paragraph("Add bookmarks for important pages. New bookmarks are retained in native PDF exports and editable workspaces."));
+        content.Children.Add(new PdfCommandButton("Remove current bookmark", PdfIconKind.Trash, () => Safe(() => Session.BookmarkPage(""))));
+        content.Children.Add(PdfTheme.Divider()); content.Children.Add(PdfTheme.Text("DOCUMENT BOOKMARKS", 10, "#777777", true));
+        try
+        {
+            if (!ReferenceEquals(_bookmarkDocument, Session.Document))
+            { _sourceBookmarks = PdfNavigation.ReadBookmarks(Session.Document); _bookmarkDocument = Session.Document; }
+            foreach (var entry in _sourceBookmarks.Take(1000))
+            {
+                var target = entry.PageIndex;
+                var button = new PdfCommandButton("Document bookmark: " + entry.Title, PdfIconKind.Bookmark, () => { if (target is { } index) Viewport.Navigate(index); })
+                {
+                    IsEnabled = target is not null, HorizontalAlignment = HorizontalAlignment.Stretch, HorizontalContentAlignment = HorizontalAlignment.Left,
+                    Margin = new Thickness(Math.Min(entry.Depth, 6) * 12, 0, 0, 0)
+                };
+                button.Content = Paragraph(entry.Title, 12, target is null ? "#888888" : "#333333");
+                ToolTipService.SetToolTip(button, entry.SourceName + (target is { } page ? $" · Page {page + 1}" : " · No supported local destination"));
+                content.Children.Add(button);
+            }
+            if (_sourceBookmarks.Count == 0) content.Children.Add(Paragraph("This source has no additional document bookmarks."));
+            if (_sourceBookmarks.Count > 1000) content.Children.Add(Paragraph("Showing the first 1,000 source bookmarks."));
+        }
+        catch (Exception ex) { content.Children.Add(Paragraph("Source bookmarks could not be read: " + ex.Message)); }
     }
     private void BuildFind(StackPanel content)
     {

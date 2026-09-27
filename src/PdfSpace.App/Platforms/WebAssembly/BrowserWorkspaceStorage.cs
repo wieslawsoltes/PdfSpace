@@ -5,10 +5,13 @@ namespace PdfSpace.App;
 
 internal sealed class BrowserWorkspaceStorage : IWorkspaceStorage
 {
-    public async Task<WorkspaceFile?> OpenAsync()
+    public async Task<WorkspaceFile?> OpenAsync() => Decode(await BrowserFiles.Open());
+    public async Task<WorkspaceFile?> OpenFormDataAsync() => Decode(await BrowserFiles.OpenFormData());
+    private static WorkspaceFile? Decode(string result)
     {
-        var result = await BrowserFiles.Open(); if (string.IsNullOrEmpty(result)) return null;
-        using var json = JsonDocument.Parse(result); return new(json.RootElement.GetProperty("name").GetString()!, Convert.FromBase64String(json.RootElement.GetProperty("base64").GetString()!));
+        if (string.IsNullOrEmpty(result)) return null;
+        using var json = JsonDocument.Parse(result);
+        return new(json.RootElement.GetProperty("name").GetString()!, Convert.FromBase64String(json.RootElement.GetProperty("base64").GetString()!));
     }
     public async Task SaveAsync(string name, byte[] bytes, string contentType) => await BrowserFiles.Download(name, Convert.ToBase64String(bytes), contentType);
     public async Task<string?> ReadRecoveryAsync() => await BrowserFiles.Load();
@@ -20,6 +23,7 @@ internal sealed class BrowserWorkspaceStorage : IWorkspaceStorage
 internal static partial class BrowserFiles
 {
     [JSImport("globalThis.pdfSpaceFiles.open")][return: JSMarshalAs<JSType.Promise<JSType.String>>] internal static partial Task<string> Open();
+    [JSImport("globalThis.pdfSpaceFiles.openFormData")][return: JSMarshalAs<JSType.Promise<JSType.String>>] internal static partial Task<string> OpenFormData();
     [JSImport("globalThis.pdfSpaceFiles.download")][return: JSMarshalAs<JSType.Promise<JSType.String>>] internal static partial Task<string> Download(string name, string base64, string type);
     [JSImport("globalThis.pdfSpaceFiles.load")][return: JSMarshalAs<JSType.Promise<JSType.String>>] internal static partial Task<string> Load();
     [JSImport("globalThis.pdfSpaceFiles.save")][return: JSMarshalAs<JSType.Promise<JSType.String>>] internal static partial Task<string> Save(string workspace);
