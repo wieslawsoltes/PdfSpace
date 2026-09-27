@@ -33,7 +33,9 @@ public sealed class PdfTextField : TextBox
 {
     public PdfTextField(string name, string placeholder = "")
     {
-        Style = (Style)PdfResources.Shared["TextFieldStyle"]; FontFamily = PdfTheme.Font; PlaceholderText = placeholder;
+        Style = (Style)PdfResources.Shared["TextFieldStyle"];
+        MinWidth = 0;
+        FontFamily = PdfTheme.Font; PlaceholderText = placeholder;
         AutomationProperties.SetName(this, name); AutomationProperties.SetAutomationId(this, name);
     }
 }
