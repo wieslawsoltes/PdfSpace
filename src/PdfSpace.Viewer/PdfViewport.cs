@@ -44,6 +44,7 @@ public sealed partial class PdfViewport : UserControl, IDisposable
         _canvas.DoubleTapped += DoubleTapped;
         _canvas.RightTapped += (_, e) => { ContextRequested?.Invoke(e.GetPosition(this)); e.Handled = true; };
         SizeChanged += (_, _) => { ClampScroll(); Invalidate(); };
+        PreviewKeyDown += (_, args) => HandleFormTab(args);
         KeyDown += Keyboard;
         session.Changed += DocumentChanged; session.ViewChanged += SessionViewChanged;
     }
