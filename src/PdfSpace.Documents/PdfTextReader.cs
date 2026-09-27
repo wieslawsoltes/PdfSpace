@@ -13,6 +13,9 @@ public sealed class PdfTextReader : IDisposable
     public PdfWord[] Words(PdfPageState page)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
+        // A reviewed layer replaces this page's recognized word index. Do not
+        // combine it with an older hidden OCR stream in the retained source PDF.
+        if (page.Ocr is { } ocr) return ocr.Words.Select(word => new PdfWord(word.Text, word.Bounds)).ToArray();
         if (page.SourceId is not { } id) return [];
         var key = (id, page.SourcePage);
         if (_words.TryGetValue(key, out var cached)) return cached;

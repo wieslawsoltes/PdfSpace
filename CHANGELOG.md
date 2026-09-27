@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.3.0-alpha.1 — 2026-09-27
+
+- Add local Scan & OCR, English/Polish/German recognition, page ranges, cancellation and atomic snapshot application.
+- Add per-word confidence review, correction and undo; normal text selection/search includes recognized layers.
+- Export interoperable invisible Unicode PDF text with editable OCR metadata, repeated-save deduplication and crop/rotation normalization.
+- Add PNG/JPEG scan import with EXIF orientation and an image-only synthetic example.
+- Add the eleventh reusable library, `PdfSpace.Ocr`, native process and browser WASM adapters, pinned self-hosted assets and end-to-end tests.
+- Preserve original scan pixels and sensitive-source recovery/export rules.
+
 ## 0.2.1-alpha.1 — 2026-09-27
 
 - XFDF and versioned/legacy JSON form-data import/export, complete-batch validation, unmatched-name reporting and atomic undo/redo.

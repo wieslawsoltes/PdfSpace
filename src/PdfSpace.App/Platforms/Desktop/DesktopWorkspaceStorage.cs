@@ -9,6 +9,7 @@ internal sealed class DesktopWorkspaceStorage : IWorkspaceStorage
 {
     private static string RecoveryDirectory => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "PdfSpace");
     private static string RecoveryPath => Path.Combine(RecoveryDirectory, "recovery.pdfspace");
+    public Task<WorkspaceFile?> OpenImageAsync() => OpenCoreAsync([".png", ".jpg", ".jpeg"], 32 * 1024 * 1024);
     public Task<WorkspaceFile?> OpenAsync() => OpenCoreAsync([".pdf", ".pdfspace"], 128 * 1024 * 1024);
     public Task<WorkspaceFile?> OpenFormDataAsync() => OpenCoreAsync([".xfdf", ".json"], 4 * 1024 * 1024);
     private static async Task<WorkspaceFile?> OpenCoreAsync(string[] extensions, int maximumBytes)

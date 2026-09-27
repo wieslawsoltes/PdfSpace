@@ -21,3 +21,6 @@ playwright-report/
 **/PdfSecurity/runtime-manifest.json
 
 **/__pycache__/
+
+# Fetched and hash-verified by scripts/fetch-ocr-assets.py
+src/PdfSpace.App/Platforms/WebAssembly/OcrAssets/

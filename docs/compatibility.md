@@ -1,6 +1,6 @@
 # PDF compatibility and release boundary
 
-## 0.2.1-alpha.1
+## 0.3.0-alpha.1
 
 PdfSpace is an independent Uno/Skia workspace. This release adds interoperable PDF workflows; it does not claim complete Acrobat feature or pixel parity.
 
@@ -38,7 +38,7 @@ Tab and Shift+Tab navigate supported editable widgets in page/annotation-array o
 
 ## Not implemented
 
-OCR; arbitrary PDF text/image layout editing; general font replacement and paragraph reflow; certificate signing/validation and trusted timestamping; complete PDF accessibility tagging; PDF/A, PDF/X or PDF/UA certification; professional print-production/preflight; complete Office conversion; portfolios/multimedia; cloud identity, audit trails, real-time review and Adobe plug-in compatibility. Visual drawn signatures are not cryptographic signatures.
+Arbitrary PDF text/image layout editing; general font replacement and paragraph reflow; certificate signing/validation and trusted timestamping; complete PDF accessibility tagging; PDF/A, PDF/X or PDF/UA certification; professional print-production/preflight; complete Office conversion; portfolios/multimedia; cloud identity, audit trails, real-time review and Adobe plug-in compatibility. Visual drawn signatures are not cryptographic signatures.
 
 ## Limits and verification
 
@@ -51,3 +51,7 @@ The tests exercise native PDF round trips, source text replacement, hierarchy-aw
 Plain-field XFDF and versioned/legacy JSON import/export are implemented with complete-batch validation, explicit unmatched-name reporting and one undo operation. Required-field checks cover supported plain values, not script/XFA/certificate rules. DTD/entity processing is disabled; form-data input is limited to 4 MiB.
 
 The viewer exposes original source outline navigation and resolves local legacy/name-tree destinations. Supported internal links follow retained page identities during page operations; removed destinations remove their links. Native save rewrites these links to page-fit destinations. Source-only outlines/named metadata are not promised during page reassembly. Managed workspace bookmarks round-trip separately from source outlines. See [form data and navigation](form-data-and-navigation.md).
+
+## Scan & OCR (0.3)
+
+Image-only PDF recognition, PNG/JPEG-to-PDF import, English/Polish/German models, per-word confidence review/correction, cancellation, snapshot-safe batch application and native searchable PDF export are implemented. Existing text pages are skipped; mixed text/image-region recognition, automatic deskew, handwriting guarantees, arbitrary languages and complex shaping remain unsupported. Native hosts need Tesseract 5 installed. The browser hosts all pinned code and models itself. See [OCR](ocr.md) for the exact export and resource limits.

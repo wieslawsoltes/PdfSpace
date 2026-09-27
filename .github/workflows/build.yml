@@ -18,7 +18,12 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           global-json-file: global.json
-      - run: dotnet run --project tests/PdfSpace.Tests -c Release
+      - name: Install native OCR test engine
+        run: sudo apt-get update -qq && sudo apt-get install -y tesseract-ocr tesseract-ocr-eng
+      - name: Native engine and OCR regression checks
+        env:
+          PDFSPACE_TEST_NATIVE_OCR: '1'
+        run: dotnet run --project tests/PdfSpace.Tests -c Release
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -62,6 +67,7 @@ jobs:
           python3 scripts/serve-site.py --directory artifacts/site --port 4173 > artifacts/server.log 2>&1 &
           npm run test:browser
           dotnet run --project tests/PdfSpace.Tests -c Release -- --verify-browser-security artifacts/browser-exports
+          dotnet run --project tests/PdfSpace.Tests -c Release -- --verify-browser-ocr artifacts/browser-exports
       - name: Package reusable libraries
         run: |
           for project in src/*/*.csproj; do

@@ -21,6 +21,7 @@ public sealed record PdfPageState
     public string Bookmark { get; init; } = "";
     public Annotation[] Annotations { get; init; } = [];
     public PdfFormFieldState[] Fields { get; init; } = [];
+    public PdfOcrLayer? Ocr { get; init; }
     public RectD VisibleBox => Crop ?? new RectD(0, 0, Width, Height);
     public double DisplayWidth => Rotation % 180 == 0 ? VisibleBox.Width : VisibleBox.Height;
     public double DisplayHeight => Rotation % 180 == 0 ? VisibleBox.Height : VisibleBox.Width;

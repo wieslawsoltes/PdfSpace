@@ -7,6 +7,8 @@ using SkiaSharp;
 
 if (args is ["--verify-browser-security", var directory]) { BrowserSecurityVerification.Run(directory); return; }
 
+if (args is ["--verify-browser-ocr", var ocrDirectory]) { BrowserOcrVerification.Run(ocrDirectory); return; }
+
 var passed = 0;
 void Check(bool condition, string name) { if (!condition) throw new Exception("FAILED: " + name); Console.WriteLine("PASS " + name); passed++; }
 void Reject(Action action, string name) { try { action(); } catch { Check(true, name); return; } throw new Exception("FAILED: " + name); }
@@ -85,4 +87,5 @@ StructuredPdfTests.Run(Check, Reject);
 FormPersistenceTests.Run(Check, Reject);
 FormDataTests.Run(Check, Reject);
 NavigationTests.Run(Check, Reject);
+await OcrTests.Run(Check, Reject);
 Console.WriteLine($"\n{passed} engine checks passed.");

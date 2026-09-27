@@ -94,7 +94,7 @@ public static class PdfDocumentEngine
             {
                 for (var i = 0; i < pages.Length; i++)
                     if (pages[i].SourceId == source.Id)
-                        pages[i] = pages[i] with { Annotations = annotationsByPage[pages[i].SourcePage], Fields = fieldsByPage[pages[i].SourcePage], Bookmark = managedBookmarks.GetValueOrDefault(pages[i].SourcePage, pages[i].Bookmark) };
+                        pages[i] = pages[i] with { Annotations = annotationsByPage[pages[i].SourcePage], Fields = fieldsByPage[pages[i].SourcePage], Bookmark = managedBookmarks.GetValueOrDefault(pages[i].SourcePage, pages[i].Bookmark), Ocr = NativeOcr.Read(native.Pages[pages[i].SourcePage - 1], pages[i].Width, pages[i].Height) };
             }
             foreach (var page in pages.Where(page => page.SourceId == source.Id))
                 if (page.SourcePage > native.PageCount) throw new InvalidDataException("A workspace refers to a nonexistent source page.");
@@ -185,6 +185,8 @@ public static class PdfDocumentEngine
                 }
             }
             output.Info.Title = workspace.Title; output.Info.Author = workspace.Author;
+            var ocrTexts = workspace.Pages.SelectMany(page => page.Ocr?.Words ?? []).Select(word => word.Text).ToArray();
+            var ocrFont = ocrTexts.Length > 0 ? new OcrPdfFont(output, typeface, ocrTexts) : null;
             for (var i = 0; i < workspace.Pages.Length; i++)
             {
                 var state = workspace.Pages[i]; var page = output.Pages[i]; var geometry = new SourceGeometry(page);
@@ -214,6 +216,7 @@ public static class PdfDocumentEngine
                 }
                 foreach (var annotation in state.Annotations) NativeAnnotations.Write(output, page, annotation, geometry, typeface);
                 foreach (var field in state.Fields) NativeForms.Write(output, page, field, geometry, typeface, field.SourceKey is { } key && fields.TryGetValue(key, out var originalField) ? originalField : null);
+                NativeOcr.Write(output, page, state, geometry, ocrFont);
                 if (state.Crop is { } crop) page.CropBox = geometry.ToPdf(crop);
                 page.Rotate = (geometry.Rotation + state.Rotation) % 360;
             }

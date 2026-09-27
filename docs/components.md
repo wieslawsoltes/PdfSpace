@@ -1,6 +1,6 @@
 # Embedding the reusable components
 
-All ten libraries are packable with `dotnet pack`; the application itself is not. The Uno UI libraries contain browser and desktop assets. Use the same Uno/Skia dependency versions as the host.
+All eleven libraries are packable with `dotnet pack`; the application itself is not. The Uno UI libraries contain browser and desktop assets. Use the same Uno/Skia dependency versions as the host.
 
 ## Headless editing
 
@@ -94,3 +94,7 @@ Inject a platform provider as the optional fourth `PdfWorkbench` constructor arg
 `PdfFormDataCodec` in Documents reads/writes plain-field XFDF and JSON. `EditorSession.PrepareFormDataImport` validates a batch against a snapshot; `ApplyFormDataImport` applies one undoable transaction and refuses stale plans. `PdfNavigation.ReadBookmarks` exposes read-only source outlines with resolved local page indices. `WorkspacePages.Select` performs page extraction/reordering while remapping internal destinations. Host picker integration and full examples are in [form data and navigation](form-data-and-navigation.md).
 
 `PdfInputFocus.ActivateWhenLoaded` provides one-shot initial focus/selection for newly attached Uno editors and dialogs. Its current-owner predicate cancels an obsolete activation; it never reselects text on a later Loaded notification.
+
+## OCR engine injection
+
+Pass an `IOcrEngine` as the optional fifth `PdfWorkbench` constructor argument. The browser host supplies `BrowserOcrEngine` and its self-hosted assets; desktop uses `TesseractProcessEngine`. A reusable host without an injected engine reports OCR unavailable rather than pretending to recognize text. See [OCR integration](ocr.md).

@@ -66,3 +66,7 @@ Browser acceptance tests use `?test=1` to enable read-only state and control-pos
 `IPdfSecurityProvider` separates platform cryptography from document editing. The desktop provider uses .NET/PDFsharp; the browser provider marshals one request to a short-lived QPDF WASM worker with explicit owner authentication. It does not replace the Uno/Skia rendering engine. The worker and its exact runtime hashes are collected under `security/` in the published static root. No server receives document data.
 
 Logical field properties are synchronized across widgets in an editing transaction. Native widget deletion detaches both the page annotation and the field-tree reference, retaining siblings and pruning only empty ancestors. Form input commits before Tab traversal. Password-protected source data is represented as an explicitly sensitive in-memory working copy and is excluded from implicit recovery.
+
+## Recognition (0.3)
+
+`PdfSpace.Ocr` renders only source visuals, never current form values or annotation overlays, and requests bounded TSV from an injected provider. Results remain detached until the original workspace snapshot is still current. Serializable per-word layers join the ordinary word-selection/search path. The structured PDF writer embeds Unicode-mapped invisible text and normalizes editable metadata across crop/rotation; it replaces only its owned streams. Browser workers are reused within a batch, then terminated. Native providers use process stdin/stdout without image temp files. See `docs/ocr.md`.

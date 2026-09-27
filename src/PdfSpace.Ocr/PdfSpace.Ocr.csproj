@@ -1,0 +1,4 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><TargetFramework>net10.0</TargetFramework><Description>Local OCR contracts, bounded Tesseract TSV decoding, cancellable snapshot recognition and searchable scan workflows.</Description></PropertyGroup>
+  <ItemGroup><ProjectReference Include="../PdfSpace.Skia/PdfSpace.Skia.csproj" /></ItemGroup>
+</Project>

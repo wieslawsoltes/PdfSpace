@@ -29,12 +29,14 @@ public sealed partial class App : Application
             PdfTheme.Font = new FontFamily("ms-appx:///Assets/Fonts/NotoSans.ttf#Noto Sans");
 #if __WASM__
             IWorkspaceStorage storage = new BrowserWorkspaceStorage();
+            PdfSpace.Ocr.IOcrEngine ocr = new BrowserOcrEngine();
             PdfSpace.Pdf.IPdfSecurityProvider security = new BrowserPdfSecurityProvider();
 #else
             IWorkspaceStorage storage = new DesktopWorkspaceStorage();
+            PdfSpace.Ocr.IOcrEngine ocr = new PdfSpace.Ocr.TesseractProcessEngine();
             PdfSpace.Pdf.IPdfSecurityProvider security = new PdfSpace.Pdf.NativePdfSecurityProvider();
 #endif
-            var sample = SampleDocument.Create(_font); _workbench = new PdfWorkbench(sample, storage, _font, security); _window.Content = _workbench;
+            var sample = SampleDocument.Create(_font); _workbench = new PdfWorkbench(sample, storage, _font, security, ocr); _window.Content = _workbench;
 #if __WASM__
             var diagnostics = BrowserFiles.IsTestMode();
             void Publish()

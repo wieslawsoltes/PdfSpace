@@ -11,6 +11,8 @@ root = Path(__file__).resolve().parents[1]
 subprocess.run([sys.executable, str(root / 'scripts/fetch-security-assets.py')], check=True)
 security = root / 'src/PdfSpace.App/Platforms/WebAssembly/PdfSecurity'
 shutil.copytree(security, args.output / 'security', dirs_exist_ok=True)
+subprocess.run([sys.executable, str(root / 'scripts/fetch-ocr-assets.py')], check=True)
+shutil.copytree(root / 'src/PdfSpace.App/Platforms/WebAssembly/OcrAssets', args.output / 'ocr', dirs_exist_ok=True)
 (args.output / '.nojekyll').touch()
-(args.output / 'build-info.json').write_text(json.dumps({'application': 'PdfSpace', 'host': 'Uno WebAssembly', 'version': os.environ.get('VERSION', '0.2.0-alpha.1'), 'commit': os.environ.get('GITHUB_SHA', 'local')}))
+(args.output / 'build-info.json').write_text(json.dumps({'application': 'PdfSpace', 'host': 'Uno WebAssembly', 'version': os.environ.get('VERSION', '0.3.0-alpha.1'), 'commit': os.environ.get('GITHUB_SHA', 'local')}))
 print('Collected', source, 'into', args.output)

@@ -72,7 +72,7 @@ public sealed partial class PdfWorkbench
     private async Task ExportTextAsync()
     {
         ShowStatus("Extracting selectable text…"); await Task.Delay(25);
-        await _storage.SaveAsync(BaseName(Session.Document.Title) + ".txt", Encoding.UTF8.GetBytes(PdfReader.ExtractText(Session.Document)), "text/plain;charset=utf-8"); ShowStatus("Text download started. Scanned text requires OCR, which is not included.");
+        await _storage.SaveAsync(BaseName(Session.Document.Title) + ".txt", Encoding.UTF8.GetBytes(PdfReader.ExtractText(Session.Document)), "text/plain;charset=utf-8"); ShowStatus("Text download started. Unrecognized scans need Scan & OCR first.");
     }
     private async Task PrintAsync()
     {
@@ -156,7 +156,7 @@ public sealed partial class PdfWorkbench
     private async Task ShowHelpAsync()
     {
         var version = typeof(PdfWorkbench).Assembly.GetName().Version?.ToString(3) ?? "development";
-        await _dialogs.PromptAsync($"PdfSpace · {version} alpha", "Ctrl/Cmd+O — open PDF or workspace\nCtrl/Cmd+S — save editable workspace\nCtrl/Cmd+Shift+S — export PDF\nCtrl/Cmd+F — find text\nCtrl/Cmd+Z / Shift+Z — undo / redo\nCtrl/Cmd+C — copy selected text\nPage Up / Page Down — navigate pages\nV — select · H — hand · T — add text · D — draw\nEscape — cancel · Delete — delete annotation\nCtrl+wheel — zoom around pointer\n\nPdfSpace is an independent Uno Platform / SkiaSharp app, not Adobe Acrobat. Structured PDF export supports native annotations and AcroForms. Original text editing uses existing font glyphs without paragraph reflow. Redaction rebuilds all pages as raster images. Password export uses AES-256. XFA, OCR, certificate signing/trust, full accessibility/compliance and cloud services remain unsupported.", acceptLabel: "Close", input: false);
+        await _dialogs.PromptAsync($"PdfSpace · {version} alpha", "Ctrl/Cmd+O — open PDF or workspace\nCtrl/Cmd+S — save editable workspace\nCtrl/Cmd+Shift+S — export PDF\nCtrl/Cmd+F — find text\nCtrl/Cmd+Z / Shift+Z — undo / redo\nCtrl/Cmd+C — copy selected text\nPage Up / Page Down — navigate pages\nV — select · H — hand · T — add text · D — draw\nEscape — cancel · Delete — delete annotation\nCtrl+wheel — zoom around pointer\n\nPdfSpace is an independent Uno Platform / SkiaSharp app, not Adobe Acrobat. Structured PDF export supports native annotations and AcroForms. Original text editing uses existing font glyphs without paragraph reflow. Redaction rebuilds all pages as raster images. Password export uses AES-256. Scan & OCR recognizes English, Polish and German scans locally and exports corrected searchable text. Native OCR requires Tesseract installed. XFA, certificate signing/trust, full accessibility/compliance and cloud services remain unsupported.", acceptLabel: "Close", input: false);
     }
     private void ShowFileMenu()
     {

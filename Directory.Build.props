@@ -3,7 +3,7 @@
     <LangVersion>14.0</LangVersion>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <Version>0.2.1-alpha.1</Version>
+    <Version>0.3.0-alpha.1</Version>
     <Authors>PdfSpace contributors</Authors>
     <RepositoryUrl>https://github.com/wieslawsoltes/PdfSpace</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
