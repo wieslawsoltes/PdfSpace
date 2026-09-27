@@ -1,0 +1,34 @@
+name: Browser PDF codec
+on:
+  push:
+    branches: [build/browser-pdf-codec]
+    paths: ['.github/workflows/browser-pdf-codec.yml']
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+      - run: |
+          mkdir -p artifacts/codec
+          cd artifacts/codec
+          npm pack @neslinesli93/qpdf-wasm@0.3.0
+          tar -xzf *.tgz
+          npm view @neslinesli93/qpdf-wasm@0.3.0 dist.integrity version repository --json > package-metadata.json
+          sha256sum package/dist/* > SHA256SUMS.txt
+          node - <<'JS'
+          const create = require('./package/dist/qpdf.js');
+          create({locateFile: () => require('path').resolve('package/dist/qpdf.wasm')}).then(m => {
+            m.callMain(['--version']);
+            m.callMain(['--json-help=2']);
+          });
+          JS
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PdfSpace-browser-codec
+          path: artifacts/codec
+          retention-days: 1
