@@ -6,10 +6,10 @@ All ten libraries are packable with `dotnet pack`; the application itself is not
 
 ```csharp
 using PdfSpace.Core;
-using PdfSpace.Documents;
+using PdfSpace.Pdf;
 using PdfSpace.Editing;
 
-var workspace = PdfReader.Open(File.ReadAllBytes("input.pdf"), "input.pdf");
+var workspace = PdfDocumentEngine.Open(File.ReadAllBytes("input.pdf"), "input.pdf");
 var editor = new EditorSession(workspace);
 editor.AddAnnotation(new Annotation
 {
@@ -23,17 +23,17 @@ editor.Undo();
 File.WriteAllText("review.pdfspace", WorkspaceJson.Save(editor.Document));
 ```
 
-## Render or export without the workbench
+## Render or explicitly flatten without the workbench
 
 ```csharp
 using PdfSpace.Skia;
 
 using var renderer = new PdfRenderer { CacheCapacity = 8 };
-File.WriteAllBytes("review.pdf", renderer.ExportPdf(editor.Document));
+File.WriteAllBytes("review-flattened.pdf", renderer.ExportPdf(editor.Document));
 File.WriteAllBytes("first-page.png", renderer.ExportPng(editor.Document, 0, 2));
 ```
 
-Provide the native SkiaSharp runtime for your target. Set `renderer.Typeface` to a host-owned `SKTypeface` for annotation fallback text. Dispose the renderer before disposing the typeface. Export creates a new flattened visual PDF, not a lossless source-file save.
+Provide the native SkiaSharp runtime for your target. Set `renderer.Typeface` to a host-owned `SKTypeface` for annotation fallback text. Dispose the renderer before disposing the typeface. `PdfRenderer.ExportPdf` explicitly creates a flattened visual PDF. Use `PdfDocumentEngine.Save`, shown below, for native annotations and interactive forms; do not interchange the two contracts.
 
 ## Embed the viewport in Uno
 
@@ -69,7 +69,6 @@ The host owns the injected typeface. The workbench owns the viewports it creates
 `PdfResources.xaml` holds common command-button, text-field and flyout styles. `PdfTheme` supplies fonts, brushes and layout helpers. `PdfIconKind` identifies the original vector icons. Compose these independently of `PdfWorkbench`, or host only the viewer with an application-specific toolbar.
 
 This release intentionally uses a styled native Uno text field for text/IME input. It does not claim a complete custom implementation of every primitive, full screen-reader document semantics or binary/API compatibility with Adobe Acrobat.
-
 
 ## Structured PDF editing and security
 

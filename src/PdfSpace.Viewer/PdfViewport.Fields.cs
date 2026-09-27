@@ -26,16 +26,28 @@ public sealed partial class PdfViewport
         input.LostFocus += (_, _) => { if (_fieldEditor == input) FinishField(true); };
         input.KeyDown += (_, args) =>
         {
-            if (args.Key == VirtualKey.Tab)
-            {
-                var backwards = ShiftPressed();
-                args.Handled = true;
-                DispatcherQueue.TryEnqueue(() => NavigateField(backwards));
-            }
-            else if (args.Key == VirtualKey.Escape) { FinishField(false); Focus(FocusState.Programmatic); args.Handled = true; }
+            if (args.Key == VirtualKey.Escape) { FinishField(false); Focus(FocusState.Programmatic); args.Handled = true; }
             else if (args.Key == VirtualKey.Enter && !field.Multiline) { FinishField(true); Focus(FocusState.Programmatic); args.Handled = true; }
         };
         _overlay.Children.Add(input); DispatcherQueue.TryEnqueue(FocusInput); Invalidate();
+    }
+    // Tab is a focus-navigation key: Control may consume it before a bubbling
+    // KeyDown handler runs when the canvas itself (rather than a TextBox) owns
+    // focus. Intercept the tunneling event for this viewport only. Moving focus
+    // after dispatch also prevents the new editor from receiving the same key.
+    protected override void OnPreviewKeyDown(KeyRoutedEventArgs args)
+    {
+        if (!args.Handled && Session.Tool == PdfTool.FillForm && args.Key == VirtualKey.Tab)
+        {
+            var backwards = ShiftPressed();
+            args.Handled = true;
+            DispatcherQueue.TryEnqueue(() =>
+            {
+                if (!_disposed && Session.Tool == PdfTool.FillForm) NavigateField(backwards);
+            });
+            return;
+        }
+        base.OnPreviewKeyDown(args);
     }
     /// <summary>Navigate editable widgets in page and widget-array order without activating check boxes.</summary>
     public void NavigateField(bool backwards = false)
@@ -61,7 +73,6 @@ public sealed partial class PdfViewport
     private bool HandleFormKey(KeyRoutedEventArgs args)
     {
         if (Session.Tool != PdfTool.FillForm) return false;
-        if (args.Key == VirtualKey.Tab) { NavigateField(ShiftPressed()); return true; }
         if (Session.SelectedField is not { CanFill: true } field) return false;
         if (args.Key is VirtualKey.Space or VirtualKey.Enter)
         {
