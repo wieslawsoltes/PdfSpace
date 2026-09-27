@@ -5,7 +5,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: Package version, for example 0.1.0-alpha.1
+        description: Package version, for example 0.2.0-alpha.1
         required: true
         type: string
       publish_nuget:
@@ -48,10 +48,11 @@ jobs:
           cp artifacts/engine/sample.pdf artifacts/fixtures/sample.pdf
           dotnet publish src/PdfSpace.App -f net10.0-browserwasm -c Release -o artifacts/publish -p:Version="$VERSION" -p:WasmShellWebAppBasePath=/PdfSpace/
           python3 scripts/collect-site.py artifacts/publish artifacts/site
-          npm install --ignore-scripts
+          npm ci --ignore-scripts
           npx playwright install --with-deps chromium
           python3 scripts/serve-site.py --directory artifacts/site --port 4173 > artifacts/server.log 2>&1 &
           npm run test:browser
+          dotnet run --project tests/PdfSpace.Tests -c Release -- --verify-browser-security artifacts/browser-exports
           for project in src/*/*.csproj; do
             case "$project" in */PdfSpace.App/*) continue;; esac
             dotnet pack "$project" -c Release -p:Version="$VERSION" -o artifacts/packages
@@ -64,7 +65,9 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$GITHUB_REF_NAME" artifacts/packages/* "artifacts/PdfSpace-$VERSION-source.zip" "artifacts/PdfSpace-$VERSION-browser.zip" --verify-tag --generate-notes --title "PdfSpace $VERSION" --prerelease
+          OPTIONS=(--verify-tag --generate-notes --title "PdfSpace $VERSION")
+          if [[ "$VERSION" == *-* ]]; then OPTIONS+=(--prerelease); fi
+          gh release create "$GITHUB_REF_NAME" artifacts/packages/* "artifacts/PdfSpace-$VERSION-source.zip" "artifacts/PdfSpace-$VERSION-browser.zip" "${OPTIONS[@]}"
       - name: Optional NuGet publication
         if: github.event_name == 'workflow_dispatch' && inputs.publish_nuget
         env:
@@ -83,4 +86,5 @@ jobs:
             artifacts/screenshots
             artifacts/playwright-report
             artifacts/browser-results.xml
+            artifacts/browser-exports
           if-no-files-found: ignore

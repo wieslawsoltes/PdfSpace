@@ -5,6 +5,7 @@ using PdfSpace.Controls;
 using PdfSpace.Skia;
 using PdfSpace.Storage;
 using PdfSpace.Workbench;
+using PdfSpace.Viewer;
 using SkiaSharp;
 using Windows.Storage;
 namespace PdfSpace.App;
@@ -39,6 +40,20 @@ public sealed partial class App : Application
             void Publish()
             {
                 BrowserFiles.SetDirty(_workbench.HasUnsavedChanges);
+                // Uno's browser bridge deliberately leaves Tab to the DOM while
+                // document.body is focused. Keep the native canvas focused when
+                // managed focus belongs to a non-text document control.
+                var canvasFocused = false;
+                if (!_workbench.Viewport.IsEditingText && _workbench.XamlRoot is { } root)
+                {
+                    var focused = Microsoft.UI.Xaml.Input.FocusManager.GetFocusedElement(root) as DependencyObject;
+                    while (focused is not null)
+                    {
+                        if (focused is PdfViewport) { canvasFocused = true; break; }
+                        focused = VisualTreeHelper.GetParent(focused);
+                    }
+                }
+                BrowserFiles.SetCanvasFocus(canvasFocused);
                 if (diagnostics && _workbench.XamlRoot is not null)
                 {
                     try { BrowserFiles.PublishDiagnostics(_workbench.GetDiagnosticsJson()); }
@@ -46,6 +61,8 @@ public sealed partial class App : Application
                 }
             }
             _workbench.StateChanged += Publish;
+            _workbench.GotFocus += (_, _) => Publish();
+            _workbench.LostFocus += (_, _) => _workbench.DispatcherQueue.TryEnqueue(Publish);
             _workbench.Loaded += (_, _) => Publish();
             if (diagnostics)
             {
