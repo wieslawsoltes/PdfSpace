@@ -1,0 +1,37 @@
+name: Split development toolchain
+on:
+  push:
+    branches: [feat/pdf-workflows-0.2]
+    paths: ['.github/workflows/split-development-toolchain.yml']
+permissions:
+  contents: read
+  actions: read
+jobs:
+  split:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: PdfSpace-engine-toolchain
+          run-id: 36315154742
+          github-token: ${{ github.token }}
+          path: toolchain
+      - run: split -b 250M -d toolchain/PdfSpace-engine-toolchain.tar.gz toolchain/part-
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PdfSpace-toolchain-0
+          path: toolchain/part-00
+          compression-level: 0
+          retention-days: 1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PdfSpace-toolchain-1
+          path: toolchain/part-01
+          compression-level: 0
+          retention-days: 1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PdfSpace-toolchain-2
+          path: toolchain/part-02
+          compression-level: 0
+          retention-days: 1
