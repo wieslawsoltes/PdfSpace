@@ -36,7 +36,9 @@
             corePath: new URL('core/', base).href,
             langPath: new URL('lang', base).href,
             workerBlobURL: false, gzip: false, cacheMethod: 'none',
-            errorHandler: workerFailure
+            // An initializing worker may fail after cancellation. Ignore that
+            // obsolete generation without disturbing a newer recognition.
+            errorHandler: error => { if (generation === ownEpoch) workerFailure(error); }
           });
           if (current !== request || generation !== ownEpoch) { await created.terminate(); return; }
           worker = created; workerLanguage = language;

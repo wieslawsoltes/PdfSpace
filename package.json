@@ -1,1 +1,13 @@
-{"name":"pdfspace-acceptance","private":true,"version":"0.1.0","type":"module","scripts":{"test:browser":"playwright test"},"devDependencies":{"@playwright/test":"1.55.1"}}
+{
+  "name": "pdfspace-acceptance",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "test:browser": "npm run test:interop && playwright test",
+    "test:interop": "node --experimental-vm-modules --test tests/interop/*.test.mjs"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.55.1"
+  }
+}
