@@ -16,6 +16,8 @@ public sealed partial class PdfWorkbench
         switch (_mode)
         {
             case "All tools":
+                _leftPanel.Add("Prepare a form", PdfIconKind.Grid, () => SetMode("Prepare a form"), 0xFF7254C6);
+                _leftPanel.Add("Edit original text", PdfIconKind.Text, () => Run(ShowOriginalTextAsync), 0xFFD93830);
                 _leftPanel.Add("Edit a PDF", PdfIconKind.Edit, () => SetMode("Edit"), 0xFFD93830);
                 _leftPanel.Add("Export a PDF", PdfIconKind.Export, () => SetMode("Convert"), 0xFF278748);
                 _leftPanel.Add("Organize pages", PdfIconKind.Pages, () => SetMode("Organize pages"), 0xFF9063C9);
@@ -29,12 +31,16 @@ public sealed partial class PdfWorkbench
                 _leftPanel.Add("Save editable workspace", PdfIconKind.Save, () => Run(SaveWorkspaceAsync));
                 _leftPanel.Add("Find in document", PdfIconKind.Search, () => OpenRight("Find"));
                 _leftPanel.Heading("ADVANCED TOOLS");
-                foreach (var (name, icon) in new[] { ("Scan & OCR", PdfIconKind.Image), ("Protect a PDF", PdfIconKind.Lock), ("Redact a PDF", PdfIconKind.Redact) })
+                _leftPanel.Add("Protect a PDF", PdfIconKind.Lock, () => SetMode("Protect a PDF"), 0xFF52768E);
+                _leftPanel.Add("Redact a PDF", PdfIconKind.Redact, () => SetMode("Redact a PDF"), 0xFFBA2B35);
+                foreach (var (name, icon) in new[] { ("Scan & OCR", PdfIconKind.Image) })
                 { var disabled = _leftPanel.Add(name, icon, () => { }); disabled.IsEnabled = false; ToolTipService.SetToolTip(disabled, "Not supported in this release. No simulated security operation is performed."); }
                 _leftPanel.Description("Local-first PDF tools. No account, upload or subscription required.");
                 break;
             case "Edit":
-                _leftPanel.Description("Add and edit text, shapes and annotations. Original PDF content is kept intact in the source file.");
+                _leftPanel.Description("Edit supported original text operands or add text, shapes and annotations. Changes remain undoable in the workspace.");
+                _leftPanel.Add("Edit original text", PdfIconKind.Edit, () => Run(ShowOriginalTextAsync));
+                Tool("Add link", PdfIconKind.Share, PdfTool.Link);
                 Tool("Select annotation", PdfIconKind.Select, PdfTool.Select); Tool("Add text", PdfIconKind.Text, PdfTool.Text);
                 _leftPanel.Heading("MARK UP TEXT"); Tool("Highlight text", PdfIconKind.Highlight, PdfTool.Highlight); Tool("Underline text", PdfIconKind.Underline, PdfTool.Underline); Tool("Strikethrough text", PdfIconKind.Strikeout, PdfTool.Strikeout);
                 _leftPanel.Heading("DRAWING TOOLS"); Tool("Draw freehand", PdfIconKind.Pen, PdfTool.Ink); Tool("Rectangle", PdfIconKind.Rectangle, PdfTool.Rectangle); Tool("Ellipse", PdfIconKind.Ellipse, PdfTool.Ellipse); Tool("Line", PdfIconKind.Line, PdfTool.Line); Tool("Arrow", PdfIconKind.Arrow, PdfTool.Arrow);
@@ -48,7 +54,8 @@ public sealed partial class PdfWorkbench
                 _leftPanel.Add("Add page numbers", PdfIconKind.Pages, () => Run(AddPageNumbersAsync));
                 break;
             case "Convert":
-                _leftPanel.Description("Choose an output format. Visual PDF export flattens annotations into a new document; it is not a lossless round trip.");
+                _leftPanel.Description("Structured PDF retains native page content, annotations and supported forms. Flattened visual output remains a separate option.");
+                _leftPanel.Add("Flattened visual PDF", PdfIconKind.Image, () => Run(ExportFlattenedAsync));
                 _leftPanel.Add("PDF document", PdfIconKind.File, () => Run(() => ExportPdfAsync()), 0xFFD93830);
                 _leftPanel.Add("PNG image · current page", PdfIconKind.Image, () => Run(ExportPngAsync), 0xFF29834B);
                 _leftPanel.Add("Plain text", PdfIconKind.Text, () => Run(ExportTextAsync), 0xFF1473E6);
@@ -58,7 +65,14 @@ public sealed partial class PdfWorkbench
                 _leftPanel.Add("Extract selected pages", PdfIconKind.Export, () => Run(ExtractPagesAsync));
                 _leftPanel.Description("Original PDF files are never overwritten. Keep a .pdfspace file to retain editable notes, drawing marks and page organization.");
                 break;
+            case "Prepare a form":
+                BuildFormTools(); break;
+            case "Protect a PDF":
+                BuildProtectionTools(); break;
+            case "Redact a PDF":
+                BuildRedactionTools(); break;
             case "E-Sign":
+                _leftPanel.Add("Fill interactive fields", PdfIconKind.Grid, () => { UseTool(PdfTool.FillForm); ShowFormFields(); });
                 _leftPanel.Description("Fill a document with text and check marks, then draw your signature.");
                 Tool("Add text", PdfIconKind.Text, PdfTool.Text); Tool("Add check mark", PdfIconKind.Check, PdfTool.Check); Tool("Draw signature", PdfIconKind.Sign, PdfTool.Signature);
                 _leftPanel.Add("Add initials", PdfIconKind.Text, () => Run(AddInitialsAsync));
@@ -113,6 +127,8 @@ public sealed partial class PdfWorkbench
                 case "Bookmarks": BuildBookmarks(content); break;
                 case "Find": BuildFind(content); break;
                 case "Properties": BuildProperties(content); break;
+                case "Form fields": BuildFormFields(content); break;
+                case "Original text": BuildOriginalText(content); break;
             }
             PdfTheme.Place(root, new ScrollViewer { Content = content, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled }, row: 1);
         }
@@ -187,7 +203,7 @@ public sealed partial class PdfWorkbench
             content.Children.Add(new PdfCommandButton("Edit text or comment", PdfIconKind.Edit, () => Run(EditSelectedAsync)));
             content.Children.Add(new PdfCommandButton("Delete annotation", PdfIconKind.Trash, () => Safe(() => Session.DeleteSelection())));
         }
-        content.Children.Add(PdfTheme.Divider()); content.Children.Add(Paragraph("Original PDFs are preserved in the workspace. Visual export creates a new flattened PDF and does not preserve original forms, links, tags, attachments or digital signatures.", 11));
+        content.Children.Add(PdfTheme.Divider()); content.Children.Add(Paragraph("Structured export retains native content and supported interactive objects. Page assembly may lose document-level structures. XFA and signed-document edits are blocked; use the explicit flattened-copy workflow where appropriate.", 11));
     }
     private void ShowHome()
     {

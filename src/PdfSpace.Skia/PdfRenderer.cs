@@ -21,7 +21,7 @@ public sealed class PdfRenderer : IDisposable
         if (_pictures.TryGetValue(key, out var cached)) { _lru.Remove(key); _lru.AddLast(key); return cached; }
         if (!_documents.TryGetValue(id, out var pdf))
         {
-            pdf = PdfDocument.Open(workspace.Sources.First(s => s.Id == id).Bytes, SkiaRenderingParsingOptions.Instance);
+            pdf = PdfDocument.Open((workspace.Sources.First(s => s.Id == id).PreviewBytes ?? workspace.Sources.First(s => s.Id == id).Bytes), SkiaRenderingParsingOptions.Instance);
             pdf.AddSkiaPageFactory(); _documents.Add(id, pdf);
         }
         var picture = pdf.GetPage<SKPicture>(page.SourcePage);
@@ -53,6 +53,7 @@ public sealed class PdfRenderer : IDisposable
             TransformPage(canvas, page);
             if (page.SourceId is not null) canvas.DrawPicture(Picture(document, page));
             if (annotations) foreach (var annotation in page.Annotations) AnnotationPainter.Draw(canvas, annotation, Typeface);
+            foreach (var field in page.Fields) FormFieldPainter.Draw(canvas, field, Typeface);
         }
         finally { canvas.Restore(); }
     }
@@ -74,6 +75,14 @@ public sealed class PdfRenderer : IDisposable
         using var surface = SKSurface.Create(new SKImageInfo(Math.Max(1, (int)Math.Ceiling(page.DisplayWidth * scale)), Math.Max(1, (int)Math.Ceiling(page.DisplayHeight * scale))));
         surface.Canvas.Scale((float)scale); DrawPage(surface.Canvas, workspace, page);
         using var image = surface.Snapshot(); using var data = image.Encode(SKEncodedImageFormat.Png, 100); return data.ToArray();
+    }
+    public void RetainSources(PdfWorkspace workspace)
+    {
+        var ids = workspace.Sources.Select(source => source.Id).ToHashSet();
+        foreach (var key in _pictures.Keys.Where(key => !ids.Contains(key.Item1)).ToArray())
+        { _pictures.Remove(key, out var picture); picture?.Dispose(); _lru.Remove(key); }
+        foreach (var id in _documents.Keys.Where(id => !ids.Contains(id)).ToArray())
+        { _documents.Remove(id, out var document); document?.Dispose(); }
     }
     public void Dispose()
     {

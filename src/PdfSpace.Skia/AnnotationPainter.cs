@@ -10,6 +10,11 @@ public static class AnnotationPainter
         using var paint = new SKPaint { Color = color, StrokeWidth = (float)a.StrokeWidth, IsAntialias = true, Style = SKPaintStyle.Stroke, StrokeCap = SKStrokeCap.Round, StrokeJoin = SKStrokeJoin.Round };
         switch (a.Kind)
         {
+            case AnnotationKind.RedactionMark:
+                paint.Style = SKPaintStyle.Fill; paint.Color = new SKColor(180, 20, 30, 90); canvas.DrawRect(r, paint);
+                paint.Style = SKPaintStyle.Stroke; paint.Color = new SKColor(180, 20, 30); canvas.DrawRect(r, paint); break;
+            case AnnotationKind.Link:
+                paint.Color = new SKColor(20, 100, 210); paint.StrokeWidth = .8f; canvas.DrawRect(r, paint); break;
             case AnnotationKind.Highlight:
                 paint.Style = SKPaintStyle.Fill; paint.Color = color.WithAlpha(75); paint.BlendMode = SKBlendMode.Multiply; canvas.DrawRect(r, paint); break;
             case AnnotationKind.Underline: canvas.DrawLine(r.Left, r.Bottom, r.Right, r.Bottom, paint); break;

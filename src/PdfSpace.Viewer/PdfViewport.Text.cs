@@ -26,6 +26,7 @@ public sealed partial class PdfViewport
     }
     public void FinishText(bool commit)
     {
+        FinishField(commit);
         if (_textEditor is null || _finishing) return; _finishing = true;
         var field = _textEditor; var annotation = _editingAnnotation; _textEditor = null; _editingAnnotation = null; _overlay.Children.Clear();
         try

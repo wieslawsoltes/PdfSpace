@@ -12,6 +12,9 @@ public sealed partial class PdfWorkbench
         {
             json.WriteStartObject(); json.WriteBoolean("ready", true); json.WriteString("title", Session.Document.Title); json.WriteString("tool", Session.Tool.ToString());
             json.WriteString("mode", _mode); json.WriteString("rightPanel", _right); json.WriteString("status", Status); json.WriteNumber("pages", Session.Document.Pages.Length); json.WriteNumber("page", Session.CurrentPage + 1);
+            json.WriteNumber("fields", Session.Document.FieldCount); json.WriteBoolean("sensitive", Session.Document.IsSensitive); json.WriteString("selectedField", Session.SelectedField?.Name);
+            json.WriteNumber("redactions", Session.Document.Pages.Sum(page => page.Annotations.Count(annotation => annotation.Kind == AnnotationKind.RedactionMark)));
+            json.WriteStartArray("formValues"); foreach (var field in Session.Document.Pages.SelectMany(page => page.Fields)) { json.WriteStartObject(); json.WriteString("name", field.Name); json.WriteString("value", Session.Document.IsSensitive ? "[protected]" : field.Value); json.WriteEndObject(); } json.WriteEndArray();
             json.WriteNumber("annotations", Session.Document.AnnotationCount); json.WriteNumber("documents", _documents.Count); json.WriteNumber("zoom", Viewport.Zoom); json.WriteNumber("rotation", Session.Page.Rotation);
             json.WriteNumber("replies", Session.Document.Pages.Sum(page => page.Annotations.Sum(annotation => annotation.Replies.Length)));
             json.WriteNumber("resolved", Session.Document.Pages.Sum(page => page.Annotations.Count(annotation => annotation.Resolved)));

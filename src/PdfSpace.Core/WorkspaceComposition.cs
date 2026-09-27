@@ -7,6 +7,7 @@ public static class WorkspaceComposition
     {
         WorkspaceJson.Validate(current);
         WorkspaceJson.Validate(incoming);
+        if (current.FieldCount > 0 || incoming.FieldCount > 0) throw new InvalidOperationException("Combining interactive forms is not supported; export flattened copies first.");
         var sourceMap = incoming.Sources.ToDictionary(source => source.Id, _ => Guid.NewGuid());
         var sources = incoming.Sources.Select(source => source with { Id = sourceMap[source.Id] }).ToArray();
         var pages = incoming.Pages.Select(page => page with

@@ -11,24 +11,54 @@ public sealed partial class PdfWorkbench
     { var file = await _storage.OpenAsync(); if (file is not null) await OpenFileAsync(file, combine); }
     public async Task OpenFileAsync(WorkspaceFile file, bool combine = false)
     {
+        var context = _active;
         ShowStatus("Opening " + file.Name + "…"); await Task.Delay(25);
-        var document = file.Name.EndsWith(".pdfspace", StringComparison.OrdinalIgnoreCase) ? WorkspaceJson.Load(Encoding.UTF8.GetString(file.Bytes)) : PdfReader.Open(file.Bytes, file.Name);
-        if (combine) { Session.Combine(document); RefreshData(); ShowStatus("PDF combined. Use Organize pages to reorder or extract pages."); }
-        else { AddDocument(document); ShowStatus("Opened " + file.Name + ". Original file unchanged."); }
+        PdfWorkspace document;
+        if (file.Name.EndsWith(".pdfspace", StringComparison.OrdinalIgnoreCase)) document = PdfDocumentEngine.PrepareWorkspace(WorkspaceJson.Load(Encoding.UTF8.GetString(file.Bytes)));
+        else
+        {
+            try { document = PdfDocumentEngine.Open(file.Bytes, file.Name); }
+            catch (PdfPasswordRequiredException)
+            {
+                var password = await _dialogs.SecretAsync("Open protected PDF", "Enter the owner/editing password. Read-only password permissions are not bypassed. The unlocked working copy stays in memory; automatic recovery is disabled.", "Unlock");
+                if (password is null) return;
+                document = PdfDocumentEngine.Open(file.Bytes, file.Name, password);
+                password = null;
+            }
+        }
+        if (combine) { context.Session.Combine(document); RefreshData(); ShowStatus("PDF combined. Use Organize pages to reorder or extract pages."); }
+        else
+        {
+            AddDocument(document);
+            ShowStatus(document.IsSensitive ? "Protected PDF unlocked in memory. Automatic recovery disabled; workspace exports are unencrypted." : $"Opened {file.Name}. {document.FieldCount} form fields imported. Original file unchanged.");
+            if (document.FieldCount > 0) { UseTool(PdfTool.FillForm); ShowFormFields(); }
+        }
     }
     private static string BaseName(string title) => Path.GetFileNameWithoutExtension(title);
     private async Task SaveWorkspaceAsync()
     {
         Viewport.FinishText(true); var context = _active; var document = context.Session.Document;
+        if (document.IsSensitive && !await _dialogs.ConfirmAsync("Export unencrypted workspace?", "This workspace contains decrypted original PDF data. It will not be password protected. Use Protect a PDF to export an encrypted PDF instead.", "Export unencrypted")) return;
         await _storage.SaveAsync(BaseName(document.Title) + ".pdfspace", Encoding.UTF8.GetBytes(WorkspaceJson.Save(document)), "application/json");
         if (ReferenceEquals(document, context.Session.Document)) context.Session.MarkSaved(); UpdateTabs(); ShowStatus("Editable workspace download started.");
     }
     private async Task ExportPdfAsync(int[]? pages = null)
     {
-        Viewport.FinishText(true); ShowStatus("Preparing visual PDF export…"); await Task.Delay(25);
-        var name = BaseName(Session.Document.Title) + (pages is null ? "-reviewed.pdf" : "-extracted.pdf");
-        var bytes = Viewport.Renderer.ExportPdf(Session.Document, pages);
-        await _storage.SaveAsync(name, bytes, "application/pdf"); ShowStatus("PDF download started. Export is flattened; keep your editable workspace too.");
+        Viewport.FinishText(true); var context = _active; var document = context.Session.Document;
+        if (document.IsSensitive && !await _dialogs.ConfirmAsync("Export unencrypted PDF?", "The unlocked source is not automatically re-encrypted. Use Protect a PDF to set new passwords, or explicitly continue with an unencrypted copy.", "Export unencrypted")) return;
+        ShowStatus("Preparing structured PDF…"); await Task.Delay(25);
+        if (pages is not null) document = document with { Pages = pages.Select(index => document.Pages[index]).ToArray() };
+        var result = PdfDocumentEngine.Save(document, _typeface);
+        await _storage.SaveAsync(BaseName(document.Title) + (pages is null ? "-reviewed.pdf" : "-extracted.pdf"), result.Bytes, "application/pdf");
+        ShowStatus(result.PreservedSourceCatalog ? "PDF saved with native annotations/forms and original page content. Source catalog retained; no signature preservation claim." : "PDF pages assembled with native content. Original document-level structures may change.");
+    }
+    private async Task ExportFlattenedAsync()
+    {
+        Viewport.FinishText(true); var context = _active;
+        if (!await _dialogs.ConfirmAsync("Export flattened visual PDF?", "Creates a separate visual copy. Interactive forms, links, annotations, metadata structures and digital signatures are not retained. This does not apply redactions or preserve password protection.", "Export flattened")) return;
+        if (context.Session.Document.Pages.Any(page => page.Annotations.Any(annotation => annotation.Kind == AnnotationKind.RedactionMark))) throw new InvalidOperationException("Apply pending redactions before exporting a normal visual copy.");
+        await _storage.SaveAsync(BaseName(context.Session.Document.Title) + "-flattened.pdf", context.Viewport.Renderer.ExportPdf(context.Session.Document), "application/pdf");
+        ShowStatus("Flattened visual PDF download started.");
     }
     private async Task ExportPngAsync()
     {
@@ -122,7 +152,7 @@ public sealed partial class PdfWorkbench
     }
     private async Task ShowHelpAsync()
     {
-        await _dialogs.PromptAsync("PdfSpace · 0.1.0 alpha", "Ctrl/Cmd+O — open PDF or workspace\nCtrl/Cmd+S — save editable workspace\nCtrl/Cmd+Shift+S — export PDF\nCtrl/Cmd+F — find text\nCtrl/Cmd+Z / Shift+Z — undo / redo\nCtrl/Cmd+C — copy selected text\nPage Up / Page Down — navigate pages\nV — select · H — hand · T — add text · D — draw\nEscape — cancel · Delete — delete annotation\nCtrl+wheel — zoom around pointer\n\nPdfSpace is an independent Uno Platform / SkiaSharp app, not Adobe Acrobat. OCR, secure redaction, original content-stream editing, AcroForm/XFA, digital certificate signatures and cloud services are not implemented. PDF export is a new, flattened visual document.", acceptLabel: "Close", input: false);
+        await _dialogs.PromptAsync("PdfSpace · 0.2.0 alpha", "Ctrl/Cmd+O — open PDF or workspace\nCtrl/Cmd+S — save editable workspace\nCtrl/Cmd+Shift+S — export PDF\nCtrl/Cmd+F — find text\nCtrl/Cmd+Z / Shift+Z — undo / redo\nCtrl/Cmd+C — copy selected text\nPage Up / Page Down — navigate pages\nV — select · H — hand · T — add text · D — draw\nEscape — cancel · Delete — delete annotation\nCtrl+wheel — zoom around pointer\n\nPdfSpace is an independent Uno Platform / SkiaSharp app, not Adobe Acrobat. Structured PDF export supports native annotations and AcroForms. Original text editing uses existing font glyphs without paragraph reflow. Redaction rebuilds all pages as raster images. Password export uses AES-256. XFA, OCR, certificate signing/trust, full accessibility/compliance and cloud services remain unsupported.", acceptLabel: "Close", input: false);
     }
     private void ShowFileMenu()
     {
