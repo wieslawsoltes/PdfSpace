@@ -14,3 +14,4 @@ global using PdfSpace.Viewer;
 global using SkiaSharp;
 global using Windows.Foundation;
 global using Windows.System;
+global using PdfSpace.Pdf;

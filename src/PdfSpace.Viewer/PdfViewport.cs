@@ -24,11 +24,15 @@ public sealed partial class PdfViewport : UserControl, IDisposable
     public double Scroll => _scroll;
     public double Pan => _pan;
     public string SelectedText { get; private set; } = "";
-    public bool IsEditingText => _textEditor is not null;
+    public bool IsEditingText => _textEditor is not null || _fieldEditor is not null;
     public PageLayoutMode LayoutMode => _mode;
     public event Action? ViewChanged;
     public event Action<string>? StatusChanged;
     public event Action<int, PointD>? NoteRequested;
+    public event Action<PdfFormFieldState>? FieldRequested;
+    public event Action<PdfFieldKind, RectD>? FieldCreated;
+    public event Action<RectD>? LinkCreated;
+    public event Action<Annotation>? LinkRequested;
     public event Action<Point>? ContextRequested;
     public PdfViewport(EditorSession session)
     {
@@ -40,10 +44,11 @@ public sealed partial class PdfViewport : UserControl, IDisposable
         _canvas.DoubleTapped += DoubleTapped;
         _canvas.RightTapped += (_, e) => { ContextRequested?.Invoke(e.GetPosition(this)); e.Handled = true; };
         SizeChanged += (_, _) => { ClampScroll(); Invalidate(); };
+        PreviewKeyDown += (_, args) => HandleFormTab(args);
         KeyDown += Keyboard;
         session.Changed += DocumentChanged; session.ViewChanged += SessionViewChanged;
     }
-    private void DocumentChanged(object? sender, EventArgs e) { CancelGesture(); ClampScroll(); Invalidate(); }
+    private void DocumentChanged(object? sender, EventArgs e) { CancelGesture(); Renderer.RetainSources(Session.Document); ClampScroll(); Invalidate(); }
     private void SessionViewChanged(object? sender, EventArgs e) => Invalidate();
     public void Invalidate() { _canvas.Invalidate(); ViewChanged?.Invoke(); }
     private PagePlacement[] Arrange(double? scroll = null) => PageLayout.Arrange(Session.Document.Pages, ActualWidth, Zoom, scroll ?? _scroll, _pan, _mode, Session.CurrentPage);
@@ -100,7 +105,8 @@ public sealed partial class PdfViewport : UserControl, IDisposable
             canvas.Save(); canvas.Translate((float)rect.X, (float)rect.Y); canvas.Scale((float)Zoom);
             try
             {
-                Renderer.DrawPage(canvas, Session.Document, page);
+                var displayed = _original is not null && _preview is not null && _dragPage == placement.Index ? page with { Annotations = page.Annotations.Where(annotation => annotation.Id != _original.Id).ToArray() } : page;
+                Renderer.DrawPage(canvas, Session.Document, displayed);
                 canvas.Save(); PdfRenderer.TransformPage(canvas, page);
                 DrawOverlays(canvas, page, placement.Index); canvas.Restore();
             }
@@ -125,6 +131,12 @@ public sealed partial class PdfViewport : UserControl, IDisposable
         if (index == Session.CurrentPage && _searchHighlight is { } found) { fill.Color = new(255, 188, 0, 90); canvas.DrawRect(PdfRenderer.Rect(found.Inflate(2)), fill); }
         if (_dragPage == index && _preview is { } preview) AnnotationPainter.Draw(canvas, preview, Renderer.Typeface);
         if (_dragPage == index && _marquee is { } marquee) { canvas.DrawRect(PdfRenderer.Rect(marquee), fill); canvas.DrawRect(PdfRenderer.Rect(marquee), line); }
+        if (Session.Tool is PdfTool.FillForm or PdfTool.FormText or PdfTool.FormCheckBox or PdfTool.FormChoice)
+            foreach (var field in page.Fields)
+            {
+                fill.Color = new SKColor(77, 125, 240, 26); canvas.DrawRect(PdfRenderer.Rect(field.Bounds), fill);
+                if (field.Id == Session.SelectedFieldId) canvas.DrawRect(PdfRenderer.Rect(field.Bounds.Inflate(2 / Zoom)), line);
+            }
         if (index != Session.CurrentPage) return;
         if (Session.SelectedAnnotation is { } selected && _textEditor is null)
         {

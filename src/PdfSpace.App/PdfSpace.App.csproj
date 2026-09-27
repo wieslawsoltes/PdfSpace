@@ -4,12 +4,12 @@
     <TargetFrameworks Condition="'$(PdfSpaceDesktopOnly)' == 'true'">net10.0-desktop</TargetFrameworks>
     <OutputType>Exe</OutputType><UnoSingleProject>true</UnoSingleProject><UnoFeatures>SkiaRenderer;</UnoFeatures>
     <ApplicationTitle>PdfSpace</ApplicationTitle><ApplicationId>io.github.wieslawsoltes.pdfspace</ApplicationId>
-    <ApplicationDisplayVersion>0.1.0</ApplicationDisplayVersion><ApplicationVersion>1</ApplicationVersion><ApplicationPublisher>PdfSpace contributors</ApplicationPublisher>
+    <ApplicationDisplayVersion>0.2.0</ApplicationDisplayVersion><ApplicationVersion>1</ApplicationVersion><ApplicationPublisher>PdfSpace contributors</ApplicationPublisher>
     <Description>Local-first PDF reading, review and editing with Uno Platform and SkiaSharp.</Description>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks><IsPackable>false</IsPackable>
     <RunAOTCompilation>false</RunAOTCompilation><WasmShellGenerateAOTProfile>false</WasmShellGenerateAOTProfile>
     <WasmEnableThreads>false</WasmEnableThreads><WasmShellEnableThreads>false</WasmShellEnableThreads>
   </PropertyGroup>
   <ItemGroup><ProjectReference Include="../PdfSpace.Workbench/PdfSpace.Workbench.csproj"/></ItemGroup>
-  <ItemGroup Condition="'$(TargetFramework)' == 'net10.0-browserwasm'"><EmbeddedResource Include="Platforms/WebAssembly/WasmScripts/Files.js"/></ItemGroup>
+  <ItemGroup Condition="'$(TargetFramework)' == 'net10.0-browserwasm'"><EmbeddedResource Include="Platforms/WebAssembly/WasmScripts/Files.js"/><EmbeddedResource Include="Platforms/WebAssembly/WasmScripts/Security.js"/></ItemGroup>
 </Project>

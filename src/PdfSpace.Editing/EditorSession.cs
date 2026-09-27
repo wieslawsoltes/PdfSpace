@@ -2,7 +2,7 @@ using PdfSpace.Core;
 namespace PdfSpace.Editing;
 
 public sealed record HistoryEntry(string Label, PdfWorkspace Before, PdfWorkspace After);
-public sealed class EditorSession
+public sealed partial class EditorSession
 {
     private readonly List<HistoryEntry> _undo = [], _redo = [];
     private PdfWorkspace _saved;
@@ -28,10 +28,10 @@ public sealed class EditorSession
     public void SetTool(PdfTool tool)
     {
         if (!Enum.IsDefined(tool)) throw new ArgumentOutOfRangeException(nameof(tool));
-        Tool = tool; SelectedAnnotationId = null; ViewChanged?.Invoke(this, EventArgs.Empty);
+        Tool = tool; SelectedAnnotationId = null; SelectedFieldId = null; ViewChanged?.Invoke(this, EventArgs.Empty);
     }
-    public void Navigate(int index) { CurrentPage = Math.Clamp(index, 0, Document.Pages.Length - 1); SelectedAnnotationId = null; ViewChanged?.Invoke(this, EventArgs.Empty); }
-    public void Select(Guid? id) { SelectedAnnotationId = id; ViewChanged?.Invoke(this, EventArgs.Empty); }
+    public void Navigate(int index) { SelectedFieldId = null; CurrentPage = Math.Clamp(index, 0, Document.Pages.Length - 1); SelectedAnnotationId = null; ViewChanged?.Invoke(this, EventArgs.Empty); }
+    public void Select(Guid? id) { SelectedFieldId = null; SelectedAnnotationId = id; ViewChanged?.Invoke(this, EventArgs.Empty); }
     public void Execute(string label, Func<PdfWorkspace, PdfWorkspace> command)
     {
         var before = Document; var after = command(before); if (ReferenceEquals(before, after)) return;
@@ -88,6 +88,7 @@ public sealed class EditorSession
     public void DuplicatePage()
     {
         var index = CurrentPage;
+        if (Page.Fields.Length > 0) throw new InvalidOperationException("Duplicating interactive form pages is not supported; flatten a copy first.");
         var copy = Page with { Id = Guid.NewGuid(), Annotations = Page.Annotations.Select(annotation => annotation with { Id = Guid.NewGuid(), Replies = annotation.Replies.Select(reply => reply with { Id = Guid.NewGuid() }).ToArray() }).ToArray() };
         Execute("Duplicate page", document => document with { Pages = [..document.Pages.Take(index + 1), copy, ..document.Pages.Skip(index + 1)] }); Navigate(index + 1);
     }

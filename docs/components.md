@@ -1,15 +1,15 @@
 # Embedding the reusable components
 
-All nine libraries are packable with `dotnet pack`; the application itself is not. The Uno UI libraries contain browser and desktop assets. Use the same Uno/Skia dependency versions as the host.
+All ten libraries are packable with `dotnet pack`; the application itself is not. The Uno UI libraries contain browser and desktop assets. Use the same Uno/Skia dependency versions as the host.
 
 ## Headless editing
 
 ```csharp
 using PdfSpace.Core;
-using PdfSpace.Documents;
+using PdfSpace.Pdf;
 using PdfSpace.Editing;
 
-var workspace = PdfReader.Open(File.ReadAllBytes("input.pdf"), "input.pdf");
+var workspace = PdfDocumentEngine.Open(File.ReadAllBytes("input.pdf"), "input.pdf");
 var editor = new EditorSession(workspace);
 editor.AddAnnotation(new Annotation
 {
@@ -23,17 +23,17 @@ editor.Undo();
 File.WriteAllText("review.pdfspace", WorkspaceJson.Save(editor.Document));
 ```
 
-## Render or export without the workbench
+## Render or explicitly flatten without the workbench
 
 ```csharp
 using PdfSpace.Skia;
 
 using var renderer = new PdfRenderer { CacheCapacity = 8 };
-File.WriteAllBytes("review.pdf", renderer.ExportPdf(editor.Document));
+File.WriteAllBytes("review-flattened.pdf", renderer.ExportPdf(editor.Document));
 File.WriteAllBytes("first-page.png", renderer.ExportPng(editor.Document, 0, 2));
 ```
 
-Provide the native SkiaSharp runtime for your target. Set `renderer.Typeface` to a host-owned `SKTypeface` for annotation fallback text. Dispose the renderer before disposing the typeface. Export creates a new flattened visual PDF, not a lossless source-file save.
+Provide the native SkiaSharp runtime for your target. Set `renderer.Typeface` to a host-owned `SKTypeface` for annotation fallback text. Dispose the renderer before disposing the typeface. `PdfRenderer.ExportPdf` explicitly creates a flattened visual PDF. Use `PdfDocumentEngine.Save`, shown below, for native annotations and interactive forms; do not interchange the two contracts.
 
 ## Embed the viewport in Uno
 
@@ -69,3 +69,22 @@ The host owns the injected typeface. The workbench owns the viewports it creates
 `PdfResources.xaml` holds common command-button, text-field and flyout styles. `PdfTheme` supplies fonts, brushes and layout helpers. `PdfIconKind` identifies the original vector icons. Compose these independently of `PdfWorkbench`, or host only the viewer with an application-specific toolbar.
 
 This release intentionally uses a styled native Uno text field for text/IME input. It does not claim a complete custom implementation of every primitive, full screen-reader document semantics or binary/API compatibility with Adobe Acrobat.
+
+## Structured PDF editing and security
+
+```csharp
+using PdfSpace.Pdf;
+
+var document = PdfDocumentEngine.Open(File.ReadAllBytes("input.pdf"), "input.pdf");
+var result = PdfDocumentEngine.Save(document, typeface);
+File.WriteAllBytes("native-copy.pdf", result.Bytes);
+foreach (var warning in result.Warnings) Console.WriteLine(warning);
+
+IPdfSecurityProvider security = new NativePdfSecurityProvider();
+var protectedPdf = await security.EncryptAsync(result.Bytes,
+    new PdfProtectionOptions(openingPassword, ownerPassword, AllowCopy: false));
+```
+
+Inject a platform provider as the optional fourth `PdfWorkbench` constructor argument. The App project supplies `BrowserPdfSecurityProvider` on WebAssembly; a custom browser host must also ship its worker/runtime assets. The default provider is native .NET and must not be used for AES on browserwasm. `PdfUnlockResult.WasEncrypted` must propagate into source sensitivity so recovery cannot silently persist decrypted bytes.
+
+`EditorSession.UpdateField` applies logical properties across all widgets of a field while changing bounds only on the selected widget. `SetFieldValue` enforces type, choice and read-only rules. `DeleteField` supports imported widgets; native save prunes the corresponding field hierarchy. Neither ordinary deletion nor workspace serialization sanitizes confidential source data.

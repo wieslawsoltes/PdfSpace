@@ -1,0 +1,4 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><TargetFramework>net10.0</TargetFramework><Description>Structured PDF editing, interoperable annotations, AcroForms, source text operations, and password protection.</Description></PropertyGroup>
+  <ItemGroup><ProjectReference Include="../PdfSpace.Skia/PdfSpace.Skia.csproj"/><PackageReference Include="PDFsharp" Version="6.2.4"/></ItemGroup>
+</Project>

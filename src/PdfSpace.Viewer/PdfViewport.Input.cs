@@ -33,6 +33,15 @@ public sealed partial class PdfViewport
         var hit = Arrange().Where(p => p.Bounds.Contains(screen)).ToArray(); if (hit.Length == 0) { CancelGesture(); return; }
         var placement = hit[0]; _dragPage = placement.Index; if (Session.CurrentPage != _dragPage) Session.Navigate(_dragPage);
         var page = Session.Page; _start = placement.ToPage(page, screen, Zoom); _points.Clear(); _points.Add(_start); SelectedText = ""; _searchHighlight = null;
+        if (Session.Tool == PdfTool.FillForm)
+        {
+            var field = page.Fields.Reverse().FirstOrDefault(item => item.Bounds.Contains(_start));
+            var link = page.Annotations.FirstOrDefault(item => item.Kind == AnnotationKind.Link && item.Bounds.Contains(_start));
+            CancelGesture();
+            if (field is not null) { Session.SelectField(field.Id); FieldRequested?.Invoke(field); }
+            else if (link is not null) LinkRequested?.Invoke(link);
+            e.Handled = true; return;
+        }
         if (Session.Tool == PdfTool.Select)
         {
             if (Session.SelectedAnnotation is { } selected)
@@ -56,7 +65,7 @@ public sealed partial class PdfViewport
         else
         {
             _gesture = Gesture.Create;
-            var kind = Session.Tool == PdfTool.Measure ? AnnotationKind.Line : Enum.Parse<AnnotationKind>(Session.Tool.ToString());
+            var kind = Session.Tool switch { PdfTool.Measure => AnnotationKind.Line, PdfTool.Redact => AnnotationKind.RedactionMark, PdfTool.FormText or PdfTool.FormCheckBox or PdfTool.FormChoice => AnnotationKind.Rectangle, _ => Enum.Parse<AnnotationKind>(Session.Tool.ToString()) };
             _preview = new Annotation { Kind = kind, Bounds = new(_start.X, _start.Y, 0, 0), Color = Session.Tool == PdfTool.Highlight ? (Session.Color == 0xFF1473E6 ? 0xFFFFCA28 : Session.Color) : Session.Color, StrokeWidth = Session.Tool == PdfTool.Signature ? Math.Max(2, Session.StrokeWidth) : Session.StrokeWidth, FontSize = Session.FontSize };
         }
         e.Handled = true; Invalidate();
@@ -98,13 +107,18 @@ public sealed partial class PdfViewport
     {
         _touches.Remove(e.Pointer.PointerId);
         if (_gesture == Gesture.Pinch) { if (_touches.Count == 0) CancelGesture(); e.Handled = true; return; }
-        var gesture = _gesture; var preview = _preview; var marquee = _marquee; var index = _dragPage;
+        var gesture = _gesture; var preview = _preview; var marquee = _marquee; var index = _dragPage; var original = _original;
         CancelGesture();
         try
         {
             if (gesture == Gesture.Create && preview is not null && (preview.Bounds.Width > .5 || preview.Bounds.Height > .5))
             {
-                if (Session.Tool == PdfTool.Measure)
+                if (Session.Tool is PdfTool.FormText or PdfTool.FormCheckBox or PdfTool.FormChoice)
+                {
+                    if (preview.Bounds.Width >= 8 && preview.Bounds.Height >= 8) FieldCreated?.Invoke(Session.Tool switch { PdfTool.FormCheckBox => PdfFieldKind.CheckBox, PdfTool.FormChoice => PdfFieldKind.ComboBox, _ => PdfFieldKind.Text }, preview.Bounds);
+                }
+                else if (Session.Tool == PdfTool.Link) LinkCreated?.Invoke(preview.Bounds);
+                else if (Session.Tool == PdfTool.Measure)
                 { var length = preview.Points[0].Distance(preview.Points[^1]); StatusChanged?.Invoke($"Distance: {length:F1} pt / {length * 25.4 / 72:F2} mm (page units)"); }
                 else if (preview.Kind is AnnotationKind.Highlight or AnnotationKind.Underline or AnnotationKind.Strikeout)
                 {
@@ -119,7 +133,7 @@ public sealed partial class PdfViewport
                 }
                 else Session.AddAnnotation(preview, index);
             }
-            else if (gesture is Gesture.Move or Gesture.Resize && preview is not null && preview != _original) Session.UpdateAnnotation(preview.Id, _ => preview, gesture == Gesture.Move ? "Move annotation" : "Resize annotation");
+            else if (gesture is Gesture.Move or Gesture.Resize && preview is not null && preview != original) Session.UpdateAnnotation(preview.Id, _ => preview, gesture == Gesture.Move ? "Move annotation" : "Resize annotation");
             else if (gesture == Gesture.Crop && marquee is { Width: >= 10, Height: >= 10 } crop) Session.CropPage(crop);
             else if (gesture == Gesture.SelectText && marquee is { } selection)
             {
@@ -153,8 +167,9 @@ public sealed partial class PdfViewport
     private void Keyboard(object sender, KeyRoutedEventArgs e)
     {
         if (IsEditingText) return;
+        if (HandleFormKey(e)) { e.Handled = true; return; }
         if (e.Key == VirtualKey.Escape) { CancelGesture(); Session.Select(null); Invalidate(); e.Handled = true; }
-        else if (e.Key is VirtualKey.Delete or VirtualKey.Back) { Session.DeleteSelection(); e.Handled = true; }
+        else if (e.Key is VirtualKey.Delete or VirtualKey.Back) { if (Session.SelectedFieldId is not null) { try { Session.DeleteField(); } catch (InvalidOperationException ex) { StatusChanged?.Invoke(ex.Message); } } else Session.DeleteSelection(); e.Handled = true; }
         else if (e.Key is VirtualKey.PageDown or VirtualKey.PageUp) { Navigate(Session.CurrentPage + (e.Key == VirtualKey.PageDown ? 1 : -1)); e.Handled = true; }
         else if (Session.SelectedAnnotation is { } selected && e.Key is VirtualKey.Left or VirtualKey.Right or VirtualKey.Up or VirtualKey.Down)
         {

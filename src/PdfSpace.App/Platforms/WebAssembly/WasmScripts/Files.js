@@ -1,6 +1,20 @@
 (() => {
   'use strict';
   let dirty = false;
+  let canvasOwnsManagedFocus = false;
+  let canvasFocusScheduled = false;
+  function focusDocumentCanvas() {
+    canvasFocusScheduled = false;
+    if (!canvasOwnsManagedFocus || !document.hasFocus()) return;
+    const active = document.activeElement;
+    // Never take focus from a native editor, dialog, semantic accessibility
+    // element, or the browser's explicit Enable accessibility entry point.
+    if (active && active !== document.body && active !== document.documentElement) return;
+    const canvas = document.getElementById('uno-canvas');
+    if (!(canvas instanceof HTMLCanvasElement) || !canvas.isConnected) return;
+    if (!canvas.hasAttribute('tabindex')) canvas.tabIndex = -1;
+    canvas.focus({ preventScroll: true });
+  }
   const openDatabase = () => new Promise((resolve, reject) => {
     const request = indexedDB.open('PdfSpace', 1);
     request.onupgradeneeded = () => request.result.createObjectStore('recovery');
@@ -59,6 +73,15 @@
     },
     isTestMode: () => new URLSearchParams(location.search).has('test'),
     publishDiagnostics: json => { if (!new URLSearchParams(location.search).has('test')) return; globalThis.pdfSpaceDiagnostics = Object.freeze(JSON.parse(json)); document.documentElement.dataset.pdfspaceReady = 'true'; },
+    setCanvasFocus: value => {
+      canvasOwnsManagedFocus = value;
+      if (!value || canvasFocusScheduled) return;
+      canvasFocusScheduled = true;
+      // Uno detaches its hidden text input in a microtask. Run after that
+      // detach so the next Tab reaches managed focus routing rather than
+      // falling through to native body -> accessibility-button navigation.
+      queueMicrotask(focusDocumentCanvas);
+    },
     setDirty: value => { dirty = value; }
   };
   addEventListener('beforeunload', event => { if (dirty) { event.preventDefault(); event.returnValue = ''; } });

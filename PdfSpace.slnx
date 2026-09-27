@@ -5,6 +5,7 @@
     <Project Path="src/PdfSpace.Editing/PdfSpace.Editing.csproj"/>
     <Project Path="src/PdfSpace.Documents/PdfSpace.Documents.csproj"/>
     <Project Path="src/PdfSpace.Skia/PdfSpace.Skia.csproj"/>
+    <Project Path="src/PdfSpace.Pdf/PdfSpace.Pdf.csproj"/>
     <Project Path="src/PdfSpace.Controls/PdfSpace.Controls.csproj"/>
     <Project Path="src/PdfSpace.Viewer/PdfSpace.Viewer.csproj"/>
     <Project Path="src/PdfSpace.Storage/PdfSpace.Storage.csproj"/>

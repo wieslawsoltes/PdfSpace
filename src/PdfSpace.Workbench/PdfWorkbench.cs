@@ -8,6 +8,7 @@ public sealed partial class PdfWorkbench : UserControl, IDisposable
     private readonly List<DocumentContext> _documents = [];
     private DocumentContext _active = null!;
     private readonly IWorkspaceStorage _storage;
+    private readonly IPdfSecurityProvider _security;
     private readonly SKTypeface _typeface;
     private readonly DispatcherTimer _autosave = new() { Interval = TimeSpan.FromSeconds(1.2) };
     private bool _savingRecovery, _saveAgain, _disposed;
@@ -21,9 +22,9 @@ public sealed partial class PdfWorkbench : UserControl, IDisposable
     public string Status => _statusText;
     public int DocumentCount => _documents.Count;
     public event Action? StateChanged;
-    public PdfWorkbench(PdfWorkspace initial, IWorkspaceStorage storage, SKTypeface typeface)
+    public PdfWorkbench(PdfWorkspace initial, IWorkspaceStorage storage, SKTypeface typeface, IPdfSecurityProvider? security = null)
     {
-        _storage = storage; _typeface = typeface;
+        _storage = storage; _typeface = typeface; _security = security ?? new NativePdfSecurityProvider();
         HorizontalContentAlignment = HorizontalAlignment.Stretch; VerticalContentAlignment = VerticalAlignment.Stretch;
         BuildShell(); AddDocument(initial);
         _autosave.Tick += async (_, _) => { _autosave.Stop(); await SaveRecoveryAsync(); };
@@ -50,7 +51,7 @@ public sealed partial class PdfWorkbench : UserControl, IDisposable
         var tab = new PdfDocumentTab(document.Title); var context = new DocumentContext(session, viewport, tab);
         _documents.Add(context); _tabs.Children.Add(tab);
         tab.Activated += () => Activate(context); tab.CloseRequested += () => Run(() => CloseAsync(context));
-        session.Changed += (_, _) => { if (_active == context) { RefreshData(); _autosave.Stop(); _autosave.Start(); } UpdateTabs(); };
+        session.Changed += (_, _) => { if (_active == context) { RefreshData(); _autosave.Stop(); if (!context.Session.Document.IsSensitive) _autosave.Start(); } UpdateTabs(); };
         session.ViewChanged += (_, _) => { if (_active == context) UpdateChrome(); };
         viewport.ViewChanged += () => { if (_active == context) UpdateChrome(); };
         viewport.StatusChanged += text => ShowStatus(text);
@@ -60,6 +61,10 @@ public sealed partial class PdfWorkbench : UserControl, IDisposable
             if (!string.IsNullOrWhiteSpace(text)) { session.Navigate(index); session.AddAnnotation(new Annotation { Kind = AnnotationKind.Note, Bounds = new(point.X, point.Y, 23, 23), Text = text, Color = session.Color }, index); OpenRight("Comments"); }
         });
         viewport.ContextRequested += point => ShowContextMenu(point);
+        viewport.FieldRequested += field => Run(() => FillFieldAsync(context, field));
+        viewport.FieldCreated += (kind, bounds) => Run(() => CreateFieldAsync(context, kind, bounds));
+        viewport.LinkCreated += bounds => Run(() => CreateLinkAsync(context, bounds));
+        viewport.LinkRequested += annotation => Run(() => FollowLinkAsync(context, annotation));
         Activate(context);
     }
     private void Activate(DocumentContext context)
@@ -67,7 +72,7 @@ public sealed partial class PdfWorkbench : UserControl, IDisposable
         if (_active is not null) _active.Viewport.FinishText(true);
         _active = context; _home = false; _documentHost.Children.Clear(); _documentHost.Children.Add(context.Viewport);
         _organizerHost.Content = new PdfThumbnailView(context.Viewport) { OrganizeMode = true };
-        BuildLeft(); RefreshData(); UpdateModeVisibility(); ShowStatus("All files stay on your device.");
+        BuildLeft(); RefreshData(); UpdateModeVisibility(); ShowStatus(Session.Document.IsSensitive ? "Unlocked protected PDF: automatic recovery disabled. Workspace copies would be unencrypted." : "All files stay on your device.");
     }
     private async Task CloseAsync(DocumentContext context)
     {
@@ -87,7 +92,7 @@ public sealed partial class PdfWorkbench : UserControl, IDisposable
     private void UpdateChrome()
     {
         if (_active is null) return;
-        _pageField.Text = (Session.CurrentPage + 1).ToString(CultureInfo.InvariantCulture); _pageTotal.Text = "/ " + Session.Document.Pages.Length;
+        if (XamlRoot is null || !ReferenceEquals(FocusManager.GetFocusedElement(XamlRoot), _pageField)) _pageField.Text = (Session.CurrentPage + 1).ToString(CultureInfo.InvariantCulture); _pageTotal.Text = "/ " + Session.Document.Pages.Length;
         _zoomLabel.Text = $"{Viewport.Zoom * 100:F0}%";
         _undo.IsEnabled = Session.CanUndo; _redo.IsEnabled = Session.CanRedo;
         foreach (var (tool, button) in _toolButtons) button.Select(Session.Tool == tool);
@@ -111,7 +116,7 @@ public sealed partial class PdfWorkbench : UserControl, IDisposable
     {
         Viewport.FinishText(true); Viewport.CancelGesture(); Session.SetTool(tool);
         if (_mode == "Organize pages") SetMode("Edit");
-        ShowStatus(tool switch { PdfTool.Hand => "Drag to pan. Ctrl+wheel zooms around the pointer.", PdfTool.Select => "Select annotations or drag across text. Double-click an added text box to edit.", PdfTool.Text => "Click on a page to add text. Click outside the text box to apply.", PdfTool.Note => "Click on a page to place a comment.", PdfTool.Signature => "Draw your signature. This creates a visual mark, not a digital certificate signature.", PdfTool.Crop => "Drag a crop rectangle. Cropping hides content; it does not securely remove it.", PdfTool.Measure => "Drag between two points to measure the distance in page units.", _ => "Drag on the page to add " + tool.ToString().ToLowerInvariant() + "." });
+        ShowStatus(tool switch { PdfTool.FillForm => "Click a field to fill it. Values are saved as native AcroForm data in Export PDF.", PdfTool.FormText or PdfTool.FormCheckBox or PdfTool.FormChoice => "Drag a rectangle on the page to create a real PDF form field.", PdfTool.Redact => "Mark sensitive areas, then apply raster redactions. Marks alone do not remove data.", PdfTool.Link => "Drag a clickable area, then choose a web address or page number.", PdfTool.Hand => "Drag to pan. Ctrl+wheel zooms around the pointer.", PdfTool.Select => "Select annotations or drag across text. Double-click an added text box to edit.", PdfTool.Text => "Click on a page to add text. Click outside the text box to apply.", PdfTool.Note => "Click on a page to place a comment.", PdfTool.Signature => "Draw your signature. This creates a visual mark, not a digital certificate signature.", PdfTool.Crop => "Drag a crop rectangle. Cropping hides content; it does not securely remove it.", PdfTool.Measure => "Drag between two points to measure the distance in page units.", _ => "Drag on the page to add " + tool.ToString().ToLowerInvariant() + "." });
     }
     private async void Run(Func<Task> action)
     { try { await action(); } catch (Exception ex) { ShowStatus(ex.Message, true); } }
@@ -119,7 +124,7 @@ public sealed partial class PdfWorkbench : UserControl, IDisposable
     { try { action(); } catch (Exception ex) { ShowStatus(ex.Message, true); } }
     private async Task SaveRecoveryAsync()
     {
-        if (_disposed) return;
+        if (_disposed || Session.Document.IsSensitive) return;
         if (_savingRecovery) { _saveAgain = true; return; }
         _savingRecovery = true;
         try
@@ -127,6 +132,7 @@ public sealed partial class PdfWorkbench : UserControl, IDisposable
             do
             {
                 _saveAgain = false; var document = Session.Document;
+                if (document.IsSensitive) return;
                 await _storage.WriteRecoveryAsync(WorkspaceJson.Save(document));
                 if (ReferenceEquals(document, Session.Document)) ShowStatus("Recovery copy saved on this device. Export a workspace for a permanent copy.");
                 else _saveAgain = true;
@@ -140,7 +146,7 @@ public sealed partial class PdfWorkbench : UserControl, IDisposable
         try
         {
             var json = await _storage.ReadRecoveryAsync(); if (string.IsNullOrWhiteSpace(json)) return;
-            if (await _dialogs.ConfirmAsync("Restore your previous workspace?", "A recovery copy is available on this device. Your source PDF has not been changed.", "Restore")) AddDocument(WorkspaceJson.Load(json));
+            if (await _dialogs.ConfirmAsync("Restore your previous workspace?", "A recovery copy is available on this device. Your source PDF has not been changed.", "Restore")) AddDocument(PdfDocumentEngine.PrepareWorkspace(WorkspaceJson.Load(json)));
         }
         catch (Exception ex) { ShowStatus("Recovery is unavailable: " + ex.Message, true); }
     }

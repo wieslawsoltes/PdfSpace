@@ -28,5 +28,6 @@ internal static partial class BrowserFiles
     [JSImport("globalThis.pdfSpaceFiles.print")][return: JSMarshalAs<JSType.Promise<JSType.String>>] internal static partial Task<string> Print(string name, string base64);
     [JSImport("globalThis.pdfSpaceFiles.isTestMode")] internal static partial bool IsTestMode();
     [JSImport("globalThis.pdfSpaceFiles.publishDiagnostics")] internal static partial void PublishDiagnostics(string json);
+    [JSImport("globalThis.pdfSpaceFiles.setCanvasFocus")] internal static partial void SetCanvasFocus(bool focused);
     [JSImport("globalThis.pdfSpaceFiles.setDirty")] internal static partial void SetDirty(bool dirty);
 }

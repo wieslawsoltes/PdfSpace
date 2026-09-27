@@ -10,3 +10,14 @@ playwright-report/
 *.user
 *.suo
 .DS_Store
+
+**/PdfSecurity/qpdf.js
+**/PdfSecurity/qpdf.wasm
+
+**/PdfSecurity/*LICENSE*
+**/PdfSecurity/*NOTICE*
+**/PdfSecurity/*README*
+**/PdfSecurity/*package.json
+**/PdfSecurity/runtime-manifest.json
+
+**/__pycache__/
