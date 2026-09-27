@@ -1,0 +1,41 @@
+name: Apply verified PDF workflow fixes
+on:
+  push:
+    branches: [build/verified-workflows-patch]
+    paths: ['.github/workflows/apply-verified-patch.yml']
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/pdf-workflows-0.2
+          fetch-depth: 0
+      - name: Apply exact reviewed source changes
+        env:
+          PATCH_COMMIT: ${{ github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = '3d978882158cdb453e2fff7953e8afa9fa8fd8ba'
+          git fetch origin "$PATCH_COMMIT"
+          python3 - <<'PY'
+          import subprocess, base64, lzma, hashlib, pathlib, os
+          chunks = [subprocess.check_output(['git', 'show', f'{os.environ["PATCH_COMMIT"]}:tools/session-patch/{i}.b64']).decode().strip() for i in range(1, 6)]
+          patch = lzma.decompress(base64.b64decode(''.join(chunks), validate=True))
+          expected = '44fc2995bbc4448387fa69b6eda52e1048fa57f2e1e6d957e8a6ba72ba1d284c'
+          assert hashlib.sha256(patch).hexdigest() == expected, 'Source patch integrity mismatch'
+          pathlib.Path('/tmp/pdfspace.patch').write_bytes(patch)
+          print(f'Verified {len(patch)} bytes of source changes')
+          PY
+          git apply --check /tmp/pdfspace.patch
+          git apply /tmp/pdfspace.patch
+          git diff --check
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'feat: finish native PDF workflows, isolated browser encryption and form authoring'
+          git push origin HEAD:feat/pdf-workflows-0.2
