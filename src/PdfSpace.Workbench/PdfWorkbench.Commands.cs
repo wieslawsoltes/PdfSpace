@@ -211,14 +211,14 @@ public sealed partial class PdfWorkbench
                 case VirtualKey.P: Run(PrintAsync); break;
                 case VirtualKey.Z: if (Viewport.IsEditingText) return; if (shift) Session.Redo(); else Session.Undo(); break;
                 case VirtualKey.Y: if (Viewport.IsEditingText) return; Session.Redo(); break;
-                case VirtualKey.C: if (FocusManager.GetFocusedElement(XamlRoot) is TextBox) return; Run(CopyTextAsync); break;
+                case VirtualKey.C: if ((XamlRoot is { } copyRoot ? FocusManager.GetFocusedElement(copyRoot) : null) is TextBox) return; Run(CopyTextAsync); break;
                 case VirtualKey.Number0: Viewport.FitPage(); break;
                 case VirtualKey.Number1: Viewport.ZoomTo(1); break;
                 default: return;
             }
             e.Handled = true; return;
         }
-        if (FocusManager.GetFocusedElement(XamlRoot) is TextBox || Viewport.IsEditingText) return;
+        if ((XamlRoot is { } focusRoot ? FocusManager.GetFocusedElement(focusRoot) : null) is TextBox || Viewport.IsEditingText) return;
         switch (e.Key)
         {
             case VirtualKey.V: UseTool(PdfTool.Select); break;

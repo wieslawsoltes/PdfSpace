@@ -18,7 +18,9 @@ public sealed partial class PdfViewport
     private int[] _objectSelectionOrdinals = [];
     private readonly List<int> _drawObjects = [];
     private RectD _objectSelectionBounds;
+    private bool _objectSelectionEditable;
     private RectD _objectInitial;
+    private int? _objectToggleOnClick;
     private RectD? _objectPreview;
     private int[] _marqueeBase = [];
     private NativeObjectPoint? _objectNode;
@@ -50,6 +52,7 @@ public sealed partial class PdfViewport
         _objectSelectionOrdinals = [];
         _objectSelectionSet.Clear();
         _objectSelectionBounds = default;
+        _objectSelectionEditable = false;
         _objectPreview = null;
         Invalidate();
     }
@@ -57,13 +60,18 @@ public sealed partial class PdfViewport
     public void SelectNativeObjects(IEnumerable<int> indices, bool notify = true)
     {
         ArgumentNullException.ThrowIfNull(indices);
-        _objectSelection = indices.Distinct().Where(_objectLookup.ContainsKey).Order().ToArray();
+        var next = indices.Distinct().Where(_objectLookup.ContainsKey).Order().ToArray();
+        if (next.AsSpan().SequenceEqual(_objectSelection)) return;
+        _objectSelection = next;
         _objectSelectionSet = new(_objectSelection);
         _objectSelectionOrdinals = _objectSelection.Select(index => _objectOrdinals[index]).Order().ToArray();
         _objectSelectionBounds = default;
+        _objectSelectionEditable = next.Length > 0;
         for (var index = 0; index < _objectSelection.Length; index++)
         {
-            var bounds = _objectLookup[_objectSelection[index]].Bounds;
+            var target = _objectLookup[_objectSelection[index]];
+            var bounds = target.Bounds;
+            _objectSelectionEditable &= target.Editable;
             _objectSelectionBounds = index == 0 ? bounds : RectD.Union(_objectSelectionBounds, bounds);
         }
         if (notify)
@@ -91,7 +99,7 @@ public sealed partial class PdfViewport
         if (Session.Tool != PdfTool.EditObject)
             return false;
         var additive = args.KeyModifiers.HasFlag(VirtualKeyModifiers.Shift) || args.KeyModifiers.HasFlag(VirtualKeyModifiers.Control);
-        if (EditObjectPoints && _objectSelection.Length == 1)
+        if (EditObjectPoints && _objectSelectionEditable && _objectSelection.Length == 1)
         {
             var selected = _objectLookup.GetValueOrDefault(_objectSelection[0]);
             _objectNode = selected?.Points.FirstOrDefault(p => p.Position.Distance(_start) <= 7 / Zoom);
@@ -103,7 +111,7 @@ public sealed partial class PdfViewport
             }
         }
 
-        if (_objectSelection.Length > 0 && !additive)
+        if (_objectSelectionEditable && !args.KeyModifiers.HasFlag(VirtualKeyModifiers.Control))
         {
             var bounds = ObjectBounds();
             var handle = Array.FindIndex(Handles(bounds), p => p.Distance(_start) <= 7 / Zoom);
@@ -131,10 +139,19 @@ public sealed partial class PdfViewport
         }
 
         if (additive)
-            SelectNativeObjects(_objectSelectionSet.Contains(hit.Index) ? _objectSelection.Where(i => i != hit.Index) : _objectSelection.Append(hit.Index));
+        {
+            // Shift-click toggles, but Shift-drag must retain an already selected object
+            // so the same modifier can constrain its movement.
+            if (_objectSelectionSet.Contains(hit.Index))
+            {
+                if (_objectSelectionEditable) _objectToggleOnClick = hit.Index;
+                else SelectNativeObjects(_objectSelection.Where(index => index != hit.Index));
+            }
+            else SelectNativeObjects(_objectSelection.Append(hit.Index));
+        }
         else if (!_objectSelectionSet.Contains(hit.Index))
             SelectNativeObjects([hit.Index]);
-        if (_objectSelection.Length > 0 && _objectSelection.All(index => _objectLookup[index].Editable))
+        if (_objectSelectionEditable)
         {
             _objectInitial = ObjectBounds();
             _objectPreview = _objectInitial;
@@ -148,7 +165,9 @@ public sealed partial class PdfViewport
     {
         if (_gesture is Gesture.ObjectMarquee or Gesture.ObjectCrop or Gesture.ObjectInsert)
         {
-            _marquee = RectD.Between(_start, world);
+            _marquee = _gesture == Gesture.ObjectInsert
+                ? SelectionTransform.Create(_start, world, ShiftPressed(), AltPressed())
+                : RectD.Between(_start, world);
             return true;
         }
 
@@ -161,26 +180,13 @@ public sealed partial class PdfViewport
         if (_gesture == Gesture.ObjectMove)
         {
             if (world.Distance(_start) * Zoom >= 3)
-                _objectPreview = _objectInitial.Translate(world - _start);
+                _objectPreview = _objectInitial.Translate(SelectionTransform.ConstrainMove(world - _start, ShiftPressed()));
             return true;
         }
 
         if (_gesture != Gesture.ObjectResize)
             return false;
-        var b = _objectInitial;
-        var l = b.X;
-        var r = b.Right;
-        var t = b.Y;
-        var bottom = b.Bottom;
-        if (_handle is 0 or 6 or 7)
-            l = world.X;
-        if (_handle is 2 or 3 or 4)
-            r = world.X;
-        if (_handle is 0 or 1 or 2)
-            t = world.Y;
-        if (_handle is 4 or 5 or 6)
-            bottom = world.Y;
-        _objectPreview = RectD.Between(new(l, t), new(r, bottom));
+        _objectPreview = SelectionTransform.Resize(_objectInitial, _handle, world - _start, ShiftPressed(), AltPressed());
         return true;
     }
 
@@ -197,6 +203,7 @@ public sealed partial class PdfViewport
         var point = _objectNodePreview;
         var ellipse = Session.Tool == PdfTool.ObjectEllipse;
         var marqueeBase = _marqueeBase;
+        var toggle = _objectToggleOnClick;
         CancelGesture();
         try
         {
@@ -213,6 +220,8 @@ public sealed partial class PdfViewport
                 NativeObjectPointChanged?.Invoke(indices[0], node.Node, node.Ordinate, p);
             else if (gesture is Gesture.ObjectMove or Gesture.ObjectResize && preview is { } bounds && bounds != initial)
                 NativeObjectsTransformed?.Invoke(indices, initial, bounds);
+            else if (gesture == Gesture.ObjectMove && toggle is { } removed)
+                SelectNativeObjects(indices.Where(index => index != removed));
         }
         catch (Exception ex)
         {
@@ -259,7 +268,7 @@ public sealed partial class PdfViewport
             return true;
         }
 
-        if (_objectSelection.Length > 0 && args.Key is VirtualKey.Left or VirtualKey.Right or VirtualKey.Up or VirtualKey.Down)
+        if (_objectSelectionEditable && args.Key is VirtualKey.Left or VirtualKey.Right or VirtualKey.Up or VirtualKey.Down)
         {
             var n = DownKey(VirtualKey.Shift) ? 10 : 1;
             var d = args.Key switch
@@ -325,7 +334,7 @@ public sealed partial class PdfViewport
             }
 
             canvas.DrawRect(PdfRenderer.Rect(bounds), line);
-            if (selected && EditObjectPoints && _objectSelection.Length == 1)
+            if (selected && _objectSelectionEditable && EditObjectPoints && _objectSelection.Length == 1)
                 foreach (var point in item.Points)
                 {
                     var p = point == _objectNode && _objectNodePreview is { } np ? np : point.Position;
@@ -340,7 +349,7 @@ public sealed partial class PdfViewport
             line.Color = new(20, 115, 230);
             var bounds = _objectPreview ?? ObjectBounds();
             canvas.DrawRect(PdfRenderer.Rect(bounds), line);
-            if (!EditObjectPoints)
+            if (!EditObjectPoints && _objectSelectionEditable)
                 foreach (var point in Handles(bounds))
                 {
                     var r = PdfRenderer.Rect(new(point.X - 3 / Zoom, point.Y - 3 / Zoom, 6 / Zoom, 6 / Zoom));

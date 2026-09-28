@@ -155,7 +155,7 @@ public sealed partial class PdfViewport
     }
     public void CancelGesture()
     {
-        _objectPreview = null; _objectNode = null; _objectNodePreview = null;
+        _objectToggleOnClick = null; _objectPreview = null; _objectNode = null; _objectNodePreview = null;
         _gesture = Gesture.None; _imagePreview = null; _preview = null; _original = null; _marquee = null; _points.Clear();
         if (!_releasing) { _releasing = true; _canvas.ReleasePointerCaptures(); _releasing = false; }
     }

@@ -23,6 +23,8 @@ export async function settledUnoControl(page, name, timeout = 10000) {
   return page.evaluate(async ({ name, timeout }) => {
     const deadline = performance.now() + timeout;
     let previous = null;
+    let revision = -1;
+    let freshSamples = 0;
     let stableSince = performance.now();
     while (performance.now() < deadline) {
       const target = globalThis.pdfSpaceDiagnostics?.controls.find(control =>
@@ -31,8 +33,11 @@ export async function settledUnoControl(page, name, timeout = 10000) {
       const finite = target && [target.x, target.y, target.width, target.height].every(Number.isFinite);
       const same = finite && previous &&
         ['x', 'y', 'width', 'height'].every(key => Math.abs(target[key] - previous[key]) < 0.05);
-      if (!same) stableSince = now;
-      if (same && now - stableSince >= 250) return { ...target };
+      const published = globalThis.pdfSpaceDiagnostics?.diagnosticRevision;
+      if (!same) { stableSince = now; freshSamples = 0; }
+      if (published !== undefined && published !== revision) { freshSamples++; revision = published; }
+      // Stable old data is not evidence that a compositor animation has finished.
+      if (same && now - stableSince >= 250 && (published === undefined || freshSamples >= 3)) return { ...target };
       previous = finite ? { ...target } : null;
       await new Promise(resolve => setTimeout(resolve, 50));
     }

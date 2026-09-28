@@ -52,13 +52,10 @@ public sealed partial class PdfViewport
     }
     private bool MoveNativeImage(PointD world)
     {
-        if (_gesture == Gesture.ImageInsert) { _marquee = RectD.Between(_start, world); return true; }
-        if (_gesture == Gesture.ImageMove) { _imagePreview = _imageInitial.Translate(world - _start); return true; }
+        if (_gesture == Gesture.ImageInsert) { _marquee = SelectionTransform.Create(_start, world, ShiftPressed(), AltPressed()); return true; }
+        if (_gesture == Gesture.ImageMove) { _imagePreview = _imageInitial.Translate(SelectionTransform.ConstrainMove(world - _start, ShiftPressed())); return true; }
         if (_gesture != Gesture.ImageResize) return false;
-        var b = _imageInitial; var left = b.X; var right = b.Right; var top = b.Y; var bottom = b.Bottom;
-        if (_handle is 0 or 6 or 7) left = world.X; if (_handle is 2 or 3 or 4) right = world.X;
-        if (_handle is 0 or 1 or 2) top = world.Y; if (_handle is 4 or 5 or 6) bottom = world.Y;
-        _imagePreview = RectD.Between(new(left, top), new(right, bottom)); return true;
+        _imagePreview = SelectionTransform.Resize(_imageInitial, _handle, world - _start, ShiftPressed(), AltPressed()); return true;
     }
     private void DrawNativeImages(SKCanvas canvas, int pageIndex)
     {

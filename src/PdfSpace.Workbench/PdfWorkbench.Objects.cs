@@ -308,6 +308,7 @@ public sealed partial class PdfWorkbench
         Button("Draw native rectangle", () => UseTool(PdfTool.ObjectRectangle), PdfIconKind.Rectangle);
         Button("Draw native ellipse", () => UseTool(PdfTool.ObjectEllipse), PdfIconKind.Ellipse);
         Command("Add native text");
+        content.Children.Add(Paragraph("Shift: constrain move/proportions. Alt: resize or draw from center. Escape: cancel without rewriting the PDF.", 10));
         var selected = _selectedObjects.Where(i => (uint)i < _pageObjects.Length).Select(i => _pageObjects[i]).ToArray();
         if (selected.Length == 0)
             return;

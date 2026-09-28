@@ -15,6 +15,9 @@ public sealed partial class App : Application
     private Window? _window;
     private SKTypeface? _font;
     private PdfWorkbench? _workbench;
+#if __WASM__
+    private DispatcherTimer? _diagnosticTimer;
+#endif
     public App() { InitializeComponent(); RequestedTheme = ApplicationTheme.Light; }
     protected override async void OnLaunched(LaunchActivatedEventArgs args)
     {
@@ -39,14 +42,19 @@ public sealed partial class App : Application
             var sample = SampleDocument.Create(_font); _workbench = new PdfWorkbench(sample, storage, _font, security, ocr); _window.Content = _workbench;
 #if __WASM__
             var diagnostics = BrowserFiles.IsTestMode();
+            void Observe()
+            {
+                if (!diagnostics || _workbench.XamlRoot is null) return;
+                try { BrowserFiles.PublishDiagnostics(_workbench.GetDiagnosticsJson()); }
+                catch (InvalidOperationException) { /* A just-detached visual is absent from the next snapshot. */ }
+            }
             void Publish()
             {
                 BrowserFiles.SetDirty(_workbench.HasUnsavedChanges);
-                // Uno's browser bridge deliberately leaves Tab to the DOM while
-                // document.body is focused. Keep the native canvas focused when
-                // managed focus belongs to a non-text document control.
+                // Preserve a keyboard recipient during the native editor attachment gap.
+                // The JS bridge never takes focus from an active native input or accessibility element.
                 var canvasFocused = false;
-                if (!_workbench.Viewport.IsEditingText && _workbench.XamlRoot is { } root)
+                if (_workbench.XamlRoot is { } root)
                 {
                     var focused = Microsoft.UI.Xaml.Input.FocusManager.GetFocusedElement(root) as DependencyObject;
                     while (focused is not null)
@@ -56,11 +64,7 @@ public sealed partial class App : Application
                     }
                 }
                 BrowserFiles.SetCanvasFocus(canvasFocused);
-                if (diagnostics && _workbench.XamlRoot is not null)
-                {
-                    try { BrowserFiles.PublishDiagnostics(_workbench.GetDiagnosticsJson()); }
-                    catch (InvalidOperationException) { /* A just-detached visual is absent from the next layout snapshot. */ }
-                }
+                Observe();
             }
             _workbench.StateChanged += Publish;
             _workbench.GotFocus += (_, _) => Publish();
@@ -68,12 +72,22 @@ public sealed partial class App : Application
             _workbench.Loaded += (_, _) => Publish();
             if (diagnostics)
             {
-                // Panel construction changes desired size before controls receive arranged bounds.
-                // Publish geometry after layout, not just when the underlying document state changes.
-                _workbench.LayoutUpdated += (_, _) => Publish();
+                _workbench.LayoutUpdated += (_, _) => Observe();
+                // Compositor scroll transforms can change without layout. Sample read-only geometry,
+                // not Publish(): diagnostics must not repair focus or otherwise mask production bugs.
+                // Normal sessions have no diagnostic timer and no diagnostic serialization overhead.
+                _diagnosticTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(80) };
+                _diagnosticTimer.Tick += (_, _) => Observe();
+                _diagnosticTimer.Start();
             }
 #endif
-            _window.Closed += (_, _) => { _workbench.Dispose(); _font?.Dispose(); };
+            _window.Closed += (_, _) =>
+            {
+#if __WASM__
+                _diagnosticTimer?.Stop(); _diagnosticTimer = null;
+#endif
+                _workbench.Dispose(); _font?.Dispose();
+            };
             await _workbench.OfferRecoveryAsync();
         }
         catch (Exception ex)

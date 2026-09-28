@@ -17,6 +17,8 @@ if (args is ["--verify-browser-mixed", var mixedDirectory]) { BrowserMixedObject
 
 if (args is ["--verify-browser-paint", var paintDirectory]) { BrowserPaintVerification.Run(paintDirectory); return; }
 
+if (args is ["--verify-browser-gestures", var gestureDirectory]) { BrowserGestureVerification.Run(gestureDirectory); return; }
+
 var passed = 0;
 void Check(bool condition, string name) { if (!condition) throw new Exception("FAILED: " + name); Console.WriteLine("PASS " + name); passed++; }
 void Reject(Action action, string name) { try { action(); } catch { Check(true, name); return; } throw new Exception("FAILED: " + name); }
@@ -115,4 +117,5 @@ HistoryMemoryTests.Run(Check, Reject);
 ObjectPaintTests.Run(Check, Reject); RendererPaintTests.Run(Check);
 SpatialBoundsIndexTests.Run(Check, Reject);
 UnifiedObjectTests.Run(Check, Reject);
+SelectionTransformTests.Run(Check, Reject);
 Console.WriteLine($"\n{passed} engine checks passed.");
