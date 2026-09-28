@@ -1,0 +1,108 @@
+name: Apply photo cache lifetime review
+on:
+  push:
+    branches: [build/photo-memory-validation-tools]
+    paths: [.github/workflows/review-photo-cache-lifetime.yml]
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/photo-memory-0.4.1
+          fetch-depth: 0
+      - name: Apply reviewed changes to exact source snapshot
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = 'a180e92a4a43830ed6dfc08b619c34225364e95f'
+          python3 - <<'PY'
+          from pathlib import Path
+          root=Path('.')
+          def edit(p,old,new):
+              f=root/p; text=f.read_text(); assert old in text,(p,old);f.write_text(text.replace(old,new))
+          (root/'src/PdfSpace.Core/WorkspaceSnapshotStamp.cs').write_text('''namespace PdfSpace.Core;
+
+          /// <summary>
+          /// Remembers a workspace identity without retaining its original PDF buffers.
+          /// Use this for snapshot-aware UI caches whose values do not own the document.
+          /// The immutable current workspace or an active transaction must own its lifetime.
+          /// </summary>
+          public sealed class WorkspaceSnapshotStamp
+          {
+              private WeakReference<PdfWorkspace>? _snapshot;
+
+              public bool Matches(PdfWorkspace snapshot)
+              {
+                  ArgumentNullException.ThrowIfNull(snapshot);
+                  return _snapshot is not null && _snapshot.TryGetTarget(out var remembered) &&
+                      ReferenceEquals(remembered, snapshot);
+              }
+
+              public void Remember(PdfWorkspace snapshot)
+              {
+                  ArgumentNullException.ThrowIfNull(snapshot);
+                  if (_snapshot is null) _snapshot = new(snapshot);
+                  else _snapshot.SetTarget(snapshot);
+              }
+
+              public void Clear() => _snapshot = null;
+          }
+          ''')
+          edit('src/PdfSpace.Workbench/PdfWorkbench.Images.cs','private PdfWorkspace? _imageSnapshot;','private readonly WorkspaceSnapshotStamp _imageSnapshot = new();')
+          edit('src/PdfSpace.Workbench/PdfWorkbench.Images.cs','ReferenceEquals(_imageSnapshot, Session.Document)','_imageSnapshot.Matches(Session.Document)')
+          edit('src/PdfSpace.Workbench/PdfWorkbench.Images.cs','_imageSnapshot = Session.Document;','_imageSnapshot.Remember(Session.Document);')
+          edit('src/PdfSpace.Workbench/PdfWorkbench.Images.cs','ReferenceEquals(_imageSnapshot, context.Session.Document)','_imageSnapshot.Matches(context.Session.Document)')
+          edit('src/PdfSpace.Workbench/PdfWorkbench.cs','_active = context; _imageSnapshot = null;','_homeHost.Content = null; // Hidden recent-document cards must not retain closed sessions.\n        _active = context; _imageSnapshot.Clear();')
+          edit('src/PdfSpace.Workbench/PdfWorkbench.cs','private PdfWorkspace? _chromeDocument;','private readonly WorkspaceSnapshotStamp _chromeDocument = new();')
+          edit('src/PdfSpace.Workbench/PdfWorkbench.cs','ReferenceEquals(_chromeDocument, Session.Document)','_chromeDocument.Matches(Session.Document)')
+          edit('src/PdfSpace.Workbench/PdfWorkbench.cs','_chromeDocument = Session.Document;','_chromeDocument.Remember(Session.Document);')
+          edit('src/PdfSpace.Workbench/PdfWorkbench.cs','else if (_active == context) Activate(_documents[^1]);\n        UpdateTabs();','else if (_active == context) Activate(_documents[^1]);\n        if (_home) ShowHome();\n        UpdateTabs();')
+          edit('src/PdfSpace.Workbench/PdfWorkbench.Panels.cs','private PdfWorkspace? _bookmarkDocument;','private readonly WorkspaceSnapshotStamp _bookmarkDocument = new();')
+          edit('src/PdfSpace.Workbench/PdfWorkbench.Panels.cs','ReferenceEquals(_bookmarkDocument, Session.Document)','_bookmarkDocument.Matches(Session.Document)')
+          edit('src/PdfSpace.Workbench/PdfWorkbench.Panels.cs','_bookmarkDocument = Session.Document;','_bookmarkDocument.Remember(Session.Document);')
+          edit('tests/PdfSpace.Tests/HistoryMemoryTests.cs','        GC.KeepAlive(collectible);','''        GC.KeepAlive(collectible);
+                  var stamp = new WorkspaceSnapshotStamp();
+                  check(!stamp.Matches(current), "empty UI snapshot stamp is invalid");
+                  stamp.Remember(current);
+                  check(stamp.Matches(current) && !stamp.Matches(current with { }), "UI cache stamp compares exact snapshot identity");
+                  stamp.Clear(); check(!stamp.Matches(current), "clearing a UI stamp invalidates its cache");
+                  var expired = StampCollectible(stamp);
+                  GC.Collect(); GC.WaitForPendingFinalizers(); GC.Collect();
+                  check(!expired.IsAlive && !stamp.Matches(current), "UI snapshot stamps do not pin discarded PDF buffers");
+                  stamp.Remember(current); check(stamp.Matches(current), "expired UI stamp can be reused for the active document");
+                  reject(() => stamp.Remember(null!), "UI stamp rejects a null snapshot");
+                  GC.KeepAlive(current); GC.KeepAlive(stamp);''')
+          edit('tests/PdfSpace.Tests/HistoryMemoryTests.cs','    private static PdfWorkspace Source(int count)','''    [MethodImpl(MethodImplOptions.NoInlining)]
+              private static WeakReference StampCollectible(WorkspaceSnapshotStamp stamp)
+              {
+                  var previous = Source(512); stamp.Remember(previous); return new WeakReference(previous);
+              }
+              private static PdfWorkspace Source(int count)''')
+          (root/'docs/photo-import.md').write_text((root/'docs/photo-import.md').read_text()+'''\n## UI cache lifetime\n\nImage, bookmark and shell cache stamps use `WorkspaceSnapshotStamp`, a weak identity marker. They can reuse results for the active immutable snapshot without keeping an obsolete source PDF alive after history trimming. Hidden home cards are detached when returning to a document, and the home list is rebuilt after closing a tab. These changes remove application-owned references; garbage collection and Skia cache eviction still control when physical memory returns to the runtime.\n''')
+          f=root/'tests/browser/photo-memory.spec.mjs'
+          f.write_text(f.read_text()+'''
+
+          test('closing a document from Home removes its card instead of retaining a stale session', async ({ page }) => {
+            const errors = []; page.on('pageerror', error => errors.push(error.message));
+            await start(page); const initial = (await state(page)).title;
+            await click(page, 'Edit'); await click(page, 'Edit original images'); await click(page, 'Open native object example');
+            const active = (await state(page)).title;
+            await click(page, 'Home'); await click(page, 'Close ' + initial);
+            await expect.poll(async () => (await state(page)).documents).toBe(1);
+            await expect.poll(async () => (await state(page)).controls.some(control => control.name === initial)).toBe(false);
+            await click(page, active); await click(page, 'Next page');
+            await expect.poll(async () => (await state(page)).page).toBe(2);
+            expect(errors).toEqual([]);
+          });
+          ''')
+          PY
+          git diff --check
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src docs tests
+          git commit -m 'fix: stop UI cache stamps and hidden home cards retaining obsolete PDFs'
+          git push origin HEAD:feat/photo-memory-0.4.1
