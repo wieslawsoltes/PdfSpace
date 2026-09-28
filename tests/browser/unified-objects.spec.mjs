@@ -1,22 +1,9 @@
 import { test, expect } from '@playwright/test';
 import fs from 'node:fs';
+import { clickUnoControl as click } from './support/uno-pointer.mjs';
 const url = process.env.PDFSPACE_URL || 'http://127.0.0.1:4173/PdfSpace/';
 const state = page => page.evaluate(() => globalThis.pdfSpaceDiagnostics);
 
-async function click(page,name) {
-  const fixed = ['Edit','Home','Undo','Redo','Export PDF','Next page','Fit page','Zoom in','Open PDF'].includes(name);
-  await expect.poll(async () => (await state(page))?.controls.some(c=>c.name===name && c.enabled && c.width>1)).toBe(true);
-  for(let attempt=0;attempt<24;attempt++){
-    const c=(await state(page)).controls.find(c=>c.name===name && c.enabled && c.width>1);
-    const bottom=page.viewportSize().height-28;
-    if(!fixed && (c.y<112 || c.y+c.height>bottom) && c.x>1000){
-      await page.mouse.move(c.x+c.width/2,c.y<112?260:bottom-120);
-      await page.mouse.wheel(0,c.y<112?-260:260);await page.waitForTimeout(160);continue;
-    }
-    await page.mouse.click(c.x+c.width/2,c.y+c.height/2);await page.waitForTimeout(180);return;
-  }
-  throw new Error('Could not reveal '+name);
-}
 async function start(page){
   page.on('dialog',dialog=>dialog.accept());
   await page.goto(url+(url.includes('?')?'&':'?')+'test=1');
@@ -95,6 +82,7 @@ test('native grouping round trips and arrangement does not retarget stale select
   await click(page,'Ungroup objects');await expect.poll(async ()=>(await state(page)).nativeObjects).toBe(12);
   await click(page,'Undo');await click(page,'Undo');
   await point(page,113,397);await click(page,'Send objects front');
+  await expect.poll(async ()=>(await state(page)).undoCount).toBe(1);
   await expect.poll(async ()=>(await state(page)).selectedObjects).toEqual([]);
   expect((await state(page)).nativeObjects).toBe(12);
 });
