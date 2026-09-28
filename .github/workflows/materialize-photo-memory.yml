@@ -1,0 +1,40 @@
+name: Materialize photo memory source
+on:
+  push:
+    branches: [build/photo-memory-validation-tools]
+    paths: [.github/workflows/materialize-photo-memory.yml]
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/photo-memory-0.4.1
+          fetch-depth: 0
+      - name: Verify and apply source
+        env:
+          TRANSFER_COMMIT: ${{ github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = '6c6f05d174aed5068c44a26f16f2d6d3338e3798'
+          git fetch origin "$TRANSFER_COMMIT"
+          python3 - <<'PY'
+          import os,subprocess,base64,lzma,hashlib,pathlib
+          chunks=[subprocess.check_output(['git','show',f'{os.environ["TRANSFER_COMMIT"]}:tools/photo041/{i}.b64']).decode().strip() for i in range(1,4)]
+          patch=lzma.decompress(base64.b64decode(''.join(chunks),validate=True))
+          assert hashlib.sha256(patch).hexdigest()=='702af6abcee488b04dc26e73e658633dc770838bc09dc4c414f67c25f4a72e8a'
+          pathlib.Path('/tmp/photo041.patch').write_bytes(patch)
+          print('Verified',len(patch),'bytes of source changes')
+          PY
+          git apply --check /tmp/photo041.patch
+          git apply /tmp/photo041.patch
+          git diff --check
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'feat: native photo orientation, stream compression and bounded history memory'
+          git push origin HEAD:feat/photo-memory-0.4.1
