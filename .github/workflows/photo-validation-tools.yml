@@ -1,0 +1,27 @@
+name: Photo validation dependencies
+on:
+  push:
+    branches: [build/photo-memory-validation-tools]
+    paths: [.github/workflows/photo-validation-tools.yml]
+permissions:
+  contents: read
+jobs:
+  dependencies:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - run: |
+          dotnet restore tests/PdfSpace.Tests
+          python3 scripts/fetch-assets.py
+          mkdir -p /tmp/photo-tools
+          cp -R "$HOME/.nuget/packages/harfbuzzsharp.nativeassets.linux" /tmp/photo-tools/
+          cp -R /usr/share/dotnet/packs/Microsoft.AspNetCore.App.Ref /tmp/photo-tools/
+          cp src/PdfSpace.App/Assets/Fonts/NotoSans.ttf /tmp/photo-tools/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PdfSpace-photo-validation-dependencies
+          path: /tmp/photo-tools
