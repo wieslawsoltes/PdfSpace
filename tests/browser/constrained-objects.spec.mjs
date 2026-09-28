@@ -11,6 +11,10 @@ async function start(page) {
   await expect.poll(async () => (await state(page)).nativeObjects).toBe(12);
   await click(page, 'Fit page');
 }
+async function point(page, x, y) {
+  const s = await state(page), b = s.pageBounds;
+  await page.mouse.click(b.x + x*s.zoom, b.y + y*s.zoom);
+}
 async function drag(page, from, to, keys = [], cancel = false) {
   const s = await state(page), b = s.pageBounds;
   const screen = p => [b.x + p[0] * s.zoom, b.y + p[1] * s.zoom];
@@ -24,7 +28,8 @@ async function drag(page, from, to, keys = [], cancel = false) {
 }
 
 test('Shift native move and Shift+Alt resize keep selection and one undo transaction', async ({ page }) => {
-  await start(page); await click(page, 'Select object 7');
+  await start(page); await point(page, 113, 397);
+  await expect.poll(async () => (await state(page)).selectedObjects).toEqual([6]);
   const s = await state(page), initial = s.objects.find(o => o.index === 6);
   const center = [initial.x + initial.width / 2, initial.y + initial.height / 2];
   await drag(page, center, [center[0] + 24, center[1] + 9], ['Shift']);
@@ -32,9 +37,9 @@ test('Shift native move and Shift+Alt resize keep selection and one undo transac
   expect((await state(page)).objects[6].y).toBeCloseTo(initial.y, 4);
   expect((await state(page)).undoCount).toBe(1);
   expect((await state(page)).selectedObjects).toEqual([6]);
-  await click(page, 'Undo'); await click(page, 'Select object 7');
-  // A two-point offset from the bottom-right handle must remain a grab offset,
-  // not become an unintended extra two-point resize.
+  await click(page, 'Undo'); await point(page, 113, 397);
+  await expect.poll(async () => (await state(page)).selectedObjects).toEqual([6]);
+  // A two-point offset from the handle remains a grab offset, not an extra resize.
   const corner = [initial.x + initial.width - 2, initial.y + initial.height - 2];
   await drag(page, corner, [corner[0] + 26, corner[1] + 8], ['Shift', 'Alt']);
   await expect.poll(async () => (await state(page)).objects[6].width).toBeCloseTo(initial.width + 52, 0);
@@ -58,9 +63,11 @@ test('centered native circle creation, cancelled drag and repeated selection do 
   const ellipse = (await state(page)).objects.at(-1);
   expect(ellipse.x).toBeCloseTo(335, 0); expect(ellipse.y).toBeCloseTo(545, 0);
   expect(ellipse.width).toBeCloseTo(70, 0); expect(ellipse.height).toBeCloseTo(70, 0);
-  await click(page, 'Select object 13');
+  await point(page, 370, 580);
+  await expect.poll(async () => (await state(page)).selectedObjects).toEqual([12]);
   const before = await state(page);
-  await click(page, 'Select object 13');
+  await point(page, 370, 580);
+  await expect.poll(async () => (await state(page)).selectedObjects).toEqual([12]);
   expect((await state(page)).objectIndexBuilds).toBe(before.objectIndexBuilds);
   await drag(page, [370, 580], [400, 590], ['Shift'], true);
   const after = await state(page);
