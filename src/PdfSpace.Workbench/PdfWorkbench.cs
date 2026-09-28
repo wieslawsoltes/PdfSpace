@@ -55,7 +55,17 @@ public sealed partial class PdfWorkbench : UserControl, IDisposable
         tab.Activated += () => Activate(context); tab.CloseRequested += () => Run(() => CloseAsync(context));
         session.Changed += (_, _) => { if (_active == context) { RefreshData(); _autosave.Stop(); if (!context.Session.Document.IsSensitive) _autosave.Start(); } UpdateTabs(); };
         session.ViewChanged += (_, _) => { if (_active == context) { var prior = _imagePageId; RefreshNativeImages(); if (_right == "Original images" && prior != _imagePageId) RefreshRight(); UpdateChrome(); } };
-        viewport.ViewChanged += () => { if (_active == context) { RefreshNativeImages(); UpdateChrome(); } };
+        viewport.ViewChanged += () =>
+        {
+            if (_active != context) return;
+            var previousPage = _imagePageId;
+            RefreshNativeImages();
+            // The viewport is subscribed to Session.ViewChanged before the
+            // workbench. Its callback can update the descriptors first, so
+            // refresh the inspector here rather than missing the page change.
+            if (_right == "Original images" && previousPage != _imagePageId) RefreshRight();
+            UpdateChrome();
+        };
         viewport.StatusChanged += text => ShowStatus(text);
         viewport.NoteRequested += (index, point) => Run(async () =>
         {

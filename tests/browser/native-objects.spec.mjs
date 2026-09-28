@@ -59,7 +59,7 @@ test('native image placement moves, resizes, flips, replaces and reopens without
   await click(page, 'Image width'); await type(page, '180'); await click(page, 'Apply image geometry');
   await expect.poll(async () => (await state(page)).imageBounds?.width).toBeCloseTo(180, 4);
   await click(page, 'Rotate image right');
-  await expect.poll(async () => (await state(page)).imageBounds?.height).toBeCloseTo(180, 4);
+  await expect.poll(async () => (await state(page)).imageBounds?.height).toBeCloseTo(180, 3); // PDF content numbers round during serialization.
   await click(page, 'Undo'); await click(page, 'Select image 1');
   await click(page, 'Flip image horizontally');
   const chooser = page.waitForEvent('filechooser'); await click(page, 'Replace image');
@@ -70,6 +70,7 @@ test('native image placement moves, resizes, flips, replaces and reopens without
   await click(page, 'Edit original images'); await expect.poll(async () => (await state(page)).nativeImages).toBe(2);
   await click(page, 'Select image 1'); expect((await state(page)).imageBounds.width).toBeCloseTo(180, 4);
   await click(page, 'Next page'); await expect.poll(async () => (await state(page)).nativeImages).toBe(1);
+  await expect.poll(async () => (await state(page)).controls.some(c => c.name === 'Select image 2')).toBe(false);
   await click(page, 'Select image 1'); expect((await state(page)).imageBounds.width).toBeCloseTo(160, 4);
 });
 
@@ -94,7 +95,7 @@ test('native image insertion and deletion are undoable, and whole-word search fi
   await click(page, 'Select image 3'); await click(page, 'Delete source image'); await click(page, 'Delete image');
   await expect.poll(async () => (await state(page)).nativeImages).toBe(2);
   await click(page, 'Undo'); await expect.poll(async () => (await state(page)).nativeImages).toBe(3);
-  await click(page, 'Find in document'); await type(page, 'Shar'); await page.keyboard.press('Enter');
+  await click(page, 'Find in document'); await type(page, 'Shared image and te'); await page.keyboard.press('Enter');
   await expect.poll(async () => (await state(page)).results).toBe(3);
   await click(page, 'Whole words'); await expect.poll(async () => (await state(page)).results).toBe(0);
 });
