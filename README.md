@@ -13,7 +13,7 @@
 
 PdfSpace is an independent, local-first PDF application built in **C# with Uno Platform and SkiaSharp**. The browser runs a real Uno WebAssembly application with the same document, editing and rendering libraries as the desktop host. An Acrobat-inspired shell brings together document tabs, floating quick tools, comments, form preparation, original-text editing, protection, redaction and page organization.
 
-> **0.5.0-alpha.1:** functional PDF workflows, not complete or pixel-identical Adobe Acrobat compatibility. PdfSpace has original branding and icons and is not affiliated with Adobe. Review the [save and security boundaries](docs/compatibility.md) before processing important documents.
+> **0.5.1-alpha.1:** functional PDF workflows, not complete or pixel-identical Adobe Acrobat compatibility. PdfSpace has original branding and icons and is not affiliated with Adobe. Review the [save and security boundaries](docs/compatibility.md) before processing important documents.
 
 ## Native object editing in 0.5
 
@@ -77,6 +77,7 @@ Form-data files are unencrypted. Document URLs and scripts are never followed or
 | `PdfSpace.Layout` | Crop/rotation transforms and viewport/page layouts |
 | `PdfSpace.Editing` | Transactional editing, shared field state and bounded undo/redo |
 | `PdfSpace.Documents` | PdfPig import, search, page ranges and XFDF/JSON form data |
+| `PdfSpace.Rendering.Skia` | Source-pinned Apache-2.0 PDF renderer adaptation with image-alpha, dash and miter fixes. |
 | `PdfSpace.Skia` | Cached rendering, overlays, visual export and raster redaction |
 | `PdfSpace.Pdf` | PDFsharp native annotation/form writer, source-text editing, inspection and security-provider contract |
 | `PdfSpace.Ocr` | Local recognition contracts, raster preparation, bounded TSV decoding, snapshot batches and native process adapter |
@@ -85,11 +86,11 @@ Form-data files are unencrypted. Document URLs and scripts are never followed or
 | `PdfSpace.Storage` | File, recovery, clipboard and print contracts |
 | `PdfSpace.Workbench` | Complete multi-document shell and PDF workflows |
 
-The application is a thin browser/desktop host. All eleven libraries are packable; CI produces NuGet artifacts. This does not mean they have been published to nuget.org. See [embedding examples](docs/components.md).
+The application is a thin browser/desktop host. All twelve libraries are packable; CI produces NuGet artifacts. This does not mean they have been published to nuget.org. See [embedding examples](docs/components.md).
 
 ## Toolchain
 
-.NET SDK **10.0.401**, Uno SDK **6.7.30** / WinUI **6.7.135**, matched managed/native SkiaSharp **3.119.4**, PdfPig **0.1.16**, PdfPig.Rendering.Skia **0.1.16.4**, PDFsharp **6.2.4**. Browser security uses hash-pinned `@neslinesli93/qpdf-wasm` **0.3.0** / QPDF **12.2.0**. Rendering is still Uno/Skia, not a third-party web PDF viewer.
+.NET SDK **10.0.401**, Uno SDK **6.7.30** / WinUI **6.7.135**, matched managed/native SkiaSharp **3.119.4**, PdfPig **0.1.16**, the source-pinned **PdfSpace.Rendering.Skia** adaptation of PdfPig.Rendering.Skia **0.1.16.4**, PDFsharp **6.2.4**. Browser security uses hash-pinned `@neslinesli93/qpdf-wasm` **0.3.0** / QPDF **12.2.0**. Rendering is still Uno/Skia, not a third-party web PDF viewer.
 
 ## Build and run
 
@@ -141,3 +142,7 @@ UI tests use real pointer, keyboard, file-picker and download/reopen interaction
 ## License
 
 PdfSpace source is [MIT licensed](LICENSE). Dependencies and fonts retain their upstream licenses. Adobe and Acrobat are trademarks of their respective owners; Adobe proprietary code, branding and assets are not included.
+
+### Object appearance (0.5.1)
+
+Native opacity/blending, stroke caps/joins/miter and dash editing are available under **Edit → Edit objects → Object appearance**. Dense pages use a reusable ordered spatial index for picking and visible selection outlines. The source-pinned Apache-2.0 renderer fixes image alpha, odd dash patterns and miter rendering. See [appearance, architecture and precise compatibility limits](docs/object-appearance.md).

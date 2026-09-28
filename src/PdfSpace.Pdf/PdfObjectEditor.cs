@@ -182,6 +182,11 @@ public static partial class PdfObjectEditor
         ArgumentNullException.ThrowIfNull(appearance);
         if (appearance.StrokeWidth is { } w && (!double.IsFinite(w) || w is < 0 or > 1000))
             throw new ArgumentOutOfRangeException(nameof(appearance));
+        if (appearance.LineCap is { } cap && !Enum.IsDefined(cap) || appearance.LineJoin is { } join && !Enum.IsDefined(join) ||
+            appearance.MiterLimit is { } m && (!double.IsFinite(m) || m is < 1 or > 10000))
+            throw new ArgumentOutOfRangeException(nameof(appearance));
+        if (appearance.Dash is { Phase: var phase } && phase != Math.Truncate(phase))
+            throw new NotSupportedException("Dash phase authoring currently requires whole local units; fractional imported phases are retained but the renderer quantizes them.");
         return Edit(workspace, objects, (native, items) => ChangeScopes(native, items, (content, resources, item) =>
         {
             if (item.Object.Kind != PdfPageObjectKind.Path)
@@ -199,9 +204,14 @@ public static partial class PdfObjectEditor
                 prefix.Append(Color(sc, true));
             if (appearance.StrokeWidth is { } width)
                 prefix.Append(F(width)).Append(" w\n");
+            if (appearance.LineCap is { } capStyle) prefix.Append((int)capStyle).Append(" J\n");
+            if (appearance.LineJoin is { } joinStyle) prefix.Append((int)joinStyle).Append(" j\n");
+            if (appearance.MiterLimit is { } limit) prefix.Append(F(limit)).Append(" M\n");
+            if (appearance.Dash is { } dash)
+                prefix.Append('[').Append(string.Join(" ", dash.Lengths.Select(F))).Append("] ").Append(F(dash.Phase)).Append(" d\n");
             var body = new CSequence();
-            foreach (var o in content.Skip(item.Object.Start).Take(item.Object.End - item.Object.Start))
-                body.Add(o);
+            for (var i = item.Object.Start; i < item.Object.End; i++)
+                body.Add(content[i]);
             if (op is "s" or "b" or "b*")
                 Append(body, "h\n");
             Append(body, paint + "\n");

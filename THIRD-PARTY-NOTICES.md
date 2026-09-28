@@ -23,3 +23,7 @@ Security assets are self-hosted. Original input PDFs and passwords are not sent 
 ## OCR (0.3)
 
 Tesseract.js 7.0.0, Tesseract.js-core 7.0.0 and `tessdata_fast` 4.1.0 language models are Apache-2.0-licensed upstream components. Runtime/native subcomponents retain their own notices. Build-time acquisition is pinned by `scripts/ocr-inputs.json` and `scripts/ocr-assets.json`. License files are copied into the self-hosted OCR asset folders. Tesseract.js source: https://github.com/naptha/tesseract.js; engine: https://github.com/tesseract-ocr/tesseract; models: https://github.com/tesseract-ocr/tessdata_fast. Native distributors remain responsible for packaging the CLI and transitive license notices.
+
+## Source-pinned renderer adaptation (0.5.1)
+
+`src/PdfSpace.Rendering.Skia/Upstream` contains modified Apache-2.0 source from BobLd/PdfPig.Rendering.Skia at `e4476d80f98bf1a5a7cd6f7d45fb7c2afe10ec11`. This derivative is separately packaged as `PdfSpace.Rendering.Skia`, not relicensed as MIT. Its `LICENSE.txt`, `NOTICE.txt`, original copyright comments, `UPSTREAM.json` source hashes and `ADAPTATIONS.md` are retained. No upstream private signing key, font or native binary is copied.

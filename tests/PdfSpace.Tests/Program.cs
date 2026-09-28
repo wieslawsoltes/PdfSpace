@@ -15,6 +15,8 @@ if (args is ["--verify-browser-photos", var photoDirectory]) { BrowserPhotoVerif
 
 if (args is ["--verify-browser-mixed", var mixedDirectory]) { BrowserMixedObjectVerification.Run(mixedDirectory); return; }
 
+if (args is ["--verify-browser-paint", var paintDirectory]) { BrowserPaintVerification.Run(paintDirectory); return; }
+
 var passed = 0;
 void Check(bool condition, string name) { if (!condition) throw new Exception("FAILED: " + name); Console.WriteLine("PASS " + name); passed++; }
 void Reject(Action action, string name) { try { action(); } catch { Check(true, name); return; } throw new Exception("FAILED: " + name); }
@@ -23,6 +25,11 @@ if (args is ["--test-unified-objects"])
     UnifiedObjectTests.Run(Check, Reject);
     Console.WriteLine($"{passed} unified checks passed.");
     return;
+}
+if (args is ["--test-object-paint"])
+{
+    ObjectPaintTests.Run(Check, Reject); RendererPaintTests.Run(Check); SpatialBoundsIndexTests.Run(Check, Reject);
+    Console.WriteLine($"{passed} paint/spatial checks passed."); return;
 }
 var session = new EditorSession(new PdfWorkspace());
 Check(!session.IsDirty, "new session is clean");
@@ -105,5 +112,7 @@ LayoutIndexTests.Run(Check, Reject);
 SearchCacheTests.Run(Check, Reject);
 PhotoImportTests.Run(Check, Reject);
 HistoryMemoryTests.Run(Check, Reject);
+ObjectPaintTests.Run(Check, Reject); RendererPaintTests.Run(Check);
+SpatialBoundsIndexTests.Run(Check, Reject);
 UnifiedObjectTests.Run(Check, Reject);
 Console.WriteLine($"\n{passed} engine checks passed.");

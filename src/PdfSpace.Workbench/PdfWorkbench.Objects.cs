@@ -434,5 +434,6 @@ public sealed partial class PdfWorkbench
 
             content.Children.Add(Paragraph(item.Limitation, 11));
         }
+        BuildObjectPaintControls(content, selected);
     }
 }

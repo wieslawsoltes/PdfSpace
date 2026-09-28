@@ -45,10 +45,10 @@ internal sealed class PdfObjectScanner
         _locked = info.SignatureFields > 0 || info.HasXfa;
         using var text = UglyToad.PdfPig.PdfDocument.Open(source.Bytes);
         _letters = text.GetPage(_sourcePage).Letters.GroupBy(l => l.TextSequence).ToDictionary(g => g.Key, g => g.ToArray());
-        Visit("", null, null, 0, 0);
+        Visit("", null, null, 0, 0, new());
     }
 
-    private void Visit(string scopePath, StateCommand? inherited, Clip? inheritedClip, int inheritedMode, int depth)
+    private void Visit(string scopePath, StateCommand? inherited, Clip? inheritedClip, int inheritedMode, int depth, PdfObjectPaintState inheritedPaint)
     {
         var scope = _scopes[scopePath];
         var lastMatrix = _logical * scope.Transform;
@@ -56,7 +56,10 @@ internal sealed class PdfObjectScanner
         var current = inherited;
         var clip = inheritedClip;
         var mode = inheritedMode;
-        var stack = new Stack<(StateCommand? , Clip? , int)>();
+        var paintState = inheritedPaint;
+        var stack = new Stack<(StateCommand?, Clip?, int, PdfObjectPaintState)>();
+        PdfObjectPaintState startPaint = paintState;
+        PdfObjectPaintState? textPaint = null;
         var start = -1;
         var startMatrix = PdfAffineMatrix.Identity;
         StateCommand? startState = null;
@@ -80,12 +83,12 @@ internal sealed class PdfObjectScanner
             var matrix = _logical * transform;
             lastMatrix = matrix;
             if (op.Name == "q")
-                stack.Push((current, clip, mode));
+                stack.Push((current, clip, mode, paintState));
             else if (op.Name == "Q")
             {
                 if (stack.Count == 0)
                     throw new InvalidDataException("Unbalanced object graphics state.");
-                (current, clip, mode) = stack.Pop();
+                (current, clip, mode, paintState) = stack.Pop();
             }
 
             if (op.Name == "BT")
@@ -99,6 +102,7 @@ internal sealed class PdfObjectScanner
                 textClip = clip;
                 textPoints.Clear();
                 textValue.Clear();
+                textPaint = null;
                 textSafe = mode < 4;
                 textSides = false;
                 textClips = false;
@@ -107,6 +111,7 @@ internal sealed class PdfObjectScanner
             if (StateOps.Contains(op.Name))
             {
                 current = new(op, scope.Resources, matrix, current);
+                paintState = PdfObjectPaintReader.Apply(paintState, op, scope.Resources);
                 if (op.Name == "Tr")
                     mode = (int)N(op.Operands[0]);
                 if (textStart >= 0)
@@ -121,6 +126,7 @@ internal sealed class PdfObjectScanner
             if (op.Name is "Tj" or "TJ" or "'" or "\"")
             {
                 _sequence++;
+                textPaint = textPaint is null ? paintState : PdfObjectPaintState.Merge(textPaint, paintState);
                 textClips |= mode >= 4;
                 if (_letters.TryGetValue(_sequence, out var letters))
                 {
@@ -148,7 +154,7 @@ internal sealed class PdfObjectScanner
             if (op.Name == "ET" && textStart >= 0)
             {
                 if (textPoints.Count > 0)
-                    Add(textStart, index, PdfPageObjectKind.Text, Bounds(textPoints), textMatrix, matrix, textState, textClip, textSafe, "Clipping or interleaved graphics inside this text object require specialized editing.", textValue.ToString(), [], textSides);
+                    Add(textStart, index, PdfPageObjectKind.Text, Bounds(textPoints), textMatrix, matrix, textState, textClip, textSafe, "Clipping or interleaved graphics inside this text object require specialized editing.", textValue.ToString(), [], textSides, objectPaint: textPaint);
                 if (textClips) clip = new("", textMatrix, clip, Reproducible: false);
                 textStart = -1;
             }
@@ -160,6 +166,7 @@ internal sealed class PdfObjectScanner
                     start = index;
                     startMatrix = matrix;
                     startState = current;
+                    startPaint = paintState;
                     startClip = clip;
                     pathNodes.Clear();
                     pathText.Clear();
@@ -185,7 +192,7 @@ internal sealed class PdfObjectScanner
                 if (Paint.Contains(op.Name))
                 {
                     var b = shape.TightBounds;
-                    Add(start, index, PdfPageObjectKind.Path, new(b.Left, b.Top, b.Width, b.Height), startMatrix, matrix, startState, startClip, pathSafe && !clips, "This path changes clipping or contains interleaved state; edits are blocked to preserve other content.", "", pathNodes.ToArray(), false);
+                    Add(start, index, PdfPageObjectKind.Path, new(b.Left, b.Top, b.Width, b.Height), startMatrix, matrix, startState, startClip, pathSafe && !clips, "This path changes clipping or contains interleaved state; edits are blocked to preserve other content.", "", pathNodes.ToArray(), false, objectPaint: startPaint);
                 }
 
                 start = -1;
@@ -235,7 +242,7 @@ internal sealed class PdfObjectScanner
                             }
                         };
                     var actualBox = PdfObjects.Rectangle(obj.Elements["/BBox"]);
-                    Visit(child, current, new($"{F(actualBox.X1)} {F(actualBox.Y1)} {F(actualBox.Width)} {F(actualBox.Height)} re W n\n", childMatrix, clip), mode, depth + 1);
+                    Visit(child, current, new($"{F(actualBox.X1)} {F(actualBox.Y1)} {F(actualBox.Width)} {F(actualBox.Height)} re W n\n", childMatrix, clip), mode, depth + 1, PdfObjects.Text(PdfObjects.Dictionary(obj.Elements["/Group"])?.Elements["/S"]) == "Transparency" ? paintState with { FillOpacity = 1, StrokeOpacity = 1, BlendMode = PdfBlendMode.Normal, HasSoftMask = false } : paintState);
                     if (isGroup && Items.Count > retained)
                         Items.RemoveRange(retained, Items.Count - retained);
                 }
@@ -245,7 +252,7 @@ internal sealed class PdfObjectScanner
         ScopeEnds[scopePath] = (clip, lastMatrix);
         if (textStart >= 0)
             throw new InvalidDataException("Unterminated text object.");
-        void Add(int first, int last, PdfPageObjectKind kind, RectD bounds, PdfAffineMatrix matrix, PdfAffineMatrix endMatrix, StateCommand? state, Clip? clipping, bool editable, string limitation, string text, PdfPathNode[] nodes, bool sides, int pw = 0, int ph = 0)
+        void Add(int first, int last, PdfPageObjectKind kind, RectD bounds, PdfAffineMatrix matrix, PdfAffineMatrix endMatrix, StateCommand? state, Clip? clipping, bool editable, string limitation, string text, PdfPathNode[] nodes, bool sides, int pw = 0, int ph = 0, PdfObjectPaintState? objectPaint = null)
         {
             if (Items.Count >= 20000)
                 throw new InvalidDataException("Object editing is limited to 20,000 painted occurrences per page.");
@@ -271,7 +278,7 @@ internal sealed class PdfObjectScanner
             for (var index = first; index <= last; index++)
                 sequence.Add(scope.Content[index]);
             var fingerprint = Convert.ToHexString(SHA256.HashData(sequence.ToContent()));
-            Items.Add(new(new(_pageId, _sourceId, _sourcePage, _hash, scopePath, first, last, kind, bounds, matrix, fingerprint, editable, editable ? "Native occurrence editing. Existing clipping remains effective. This is not redaction." : limitation) { Text = text, IsContainer = kind == PdfPageObjectKind.Form, Nodes = nodes, PixelWidth = pw, PixelHeight = ph }, scope.Content, scope.Resources, state, clipping, endMatrix, sides));
+            Items.Add(new(new(_pageId, _sourceId, _sourcePage, _hash, scopePath, first, last, kind, bounds, matrix, fingerprint, editable, editable ? "Native occurrence editing. Existing clipping remains effective. This is not redaction." : limitation) { Paint = objectPaint ?? paintState, Text = text, IsContainer = kind == PdfPageObjectKind.Form, Nodes = nodes, PixelWidth = pw, PixelHeight = ph }, scope.Content, scope.Resources, state, clipping, endMatrix, sides));
         }
     }
 
