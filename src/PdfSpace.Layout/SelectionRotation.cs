@@ -16,7 +16,12 @@ public static class SelectionRotation
         var a = start - center; var b = current - center; Validate(a); Validate(b);
         if (Math.Max(Math.Abs(a.X), Math.Abs(a.Y)) < 1e-9 || Math.Max(Math.Abs(b.X), Math.Abs(b.Y)) < 1e-9) return 0;
         var angle = Math.IEEERemainder((Math.Atan2(b.Y, b.X) - Math.Atan2(a.Y, a.X)) * (180 / Math.PI), 360);
-        return snapStep == 0 ? angle : Math.Round(angle / snapStep, MidpointRounding.AwayFromZero) * snapStep;
+        if (snapStep == 0) return angle;
+        var steps = angle / snapStep;
+        // A subnormal step is far below the precision of the measured angle.
+        // Avoid overflowing its quotient and keep the finite unsnapped value.
+        if (!double.IsFinite(steps)) return angle;
+        return Math.IEEERemainder(Math.Round(steps, MidpointRounding.AwayFromZero) * snapStep, 360);
     }
 
     private static void Validate(PointD point)

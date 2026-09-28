@@ -57,6 +57,8 @@ internal static class ObjectManipulationTests
         var beforeWrap = new PointD(Math.Cos(179 * Math.PI / 180), Math.Sin(179 * Math.PI / 180));
         var afterWrap = new PointD(Math.Cos(-179 * Math.PI / 180), Math.Sin(-179 * Math.PI / 180));
         check(Math.Abs(SelectionRotation.DeltaDegrees(default, beforeWrap, afterWrap) - 2) < 1e-10, "rotation is continuous across the angle branch cut");
+        check(Math.Abs(SelectionRotation.DeltaDegrees(center, start, point, double.Epsilon) - 37) < 1e-9, "subnormal rotation steps cannot produce infinite angles");
+        check(Math.Abs(SelectionRotation.DeltaDegrees(default, new(1, 0), beforeWrap, 100) + 160) < 1e-9, "arbitrary snapped rotation steps retain a normalized signed angle");
         reject(() => SelectionRotation.DeltaDegrees(center, start, new(double.NaN, 0)), "rotation rejects nonfinite pointer values");
         reject(() => SelectionRotation.DeltaDegrees(center, start, point, -1), "rotation rejects invalid snapping step");
         foreach (var rotation in new[] { 0, 90, 180, 270 })
