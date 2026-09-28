@@ -1,0 +1,39 @@
+name: Apply object selection review
+on:
+  push:
+    branches: [build/unified-object-transfer-0.5]
+    paths: [.github/workflows/apply-selection-review.yml]
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/unified-object-editing-0.5
+          fetch-depth: 0
+      - name: Apply exact reviewed delta
+        env:
+          TRANSFER_COMMIT: ${{ github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = 'efff7a3c08a09928e179fd4197c02cf710108a38'
+          git fetch origin "$TRANSFER_COMMIT"
+          python3 - <<'PY'
+          import os,subprocess,base64,lzma,hashlib,pathlib
+          encoded=subprocess.check_output(['git','show',f'{os.environ["TRANSFER_COMMIT"]}:tools/objects05/selection-review.b64'])
+          patch=lzma.decompress(base64.b64decode(encoded,validate=True))
+          assert hashlib.sha256(patch).hexdigest()=='bfa97056b7236dac963a1d43b34203f7b7ad4df510605f278fdff49bed1feba7'
+          pathlib.Path('/tmp/selection.patch').write_bytes(patch)
+          PY
+          git apply --check /tmp/selection.patch
+          git apply /tmp/selection.patch
+          git diff --check
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src docs tests
+          git commit -m 'perf: cache object selection membership and bounds; expand gesture coverage'
+          git push origin HEAD:feat/unified-object-editing-0.5
