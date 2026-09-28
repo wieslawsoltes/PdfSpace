@@ -53,3 +53,9 @@ The viewer builds an index-to-target dictionary and a selection-membership set w
 As of 0.5.1, an ordered immutable BVH queries candidates for hit testing, marquee selection and visible outline drawing. Very dense single pages, tens of thousands of path control points, and frequent source-rewriting gestures still warrant independent performance measurement. The native scanner and per-batch limits are documented in the object-editing guide.
 
 The [appearance/performance guide](object-appearance.md#spatial-index) describes the spatial index contract and its synthetic measurements. `object-spatial-performance.json` records query counts, tested leaf bounds, elapsed time and warmed current-thread allocations; source parsing and tree construction are outside that measurement.
+
+## Alignment snapping (0.5.3)
+
+`ObjectSnapIndex` sorts three horizontal and vertical anchors per target once (`O(n log n)` build; up to 20,001 target rectangles including the visible page). Each move query performs bounded binary searches and checks at most twelve candidates (`O(log n)`), without creating per-query collections. Duplicate coordinates resolve through lower-bound lookup, so coincident objects do not cause a linear scan. The index owns only geometry values and is invalidated on source-index or selection changes. Native PDF content is rewritten only at gesture commit.
+
+`ObjectManipulationTests` compares 2,000 queries with exhaustive anchor search, covers duplicate ties and axis restrictions, and records `object-snap-performance.json` for 10,000 warmed queries against 20,000 targets. Timing/allocation measurements exclude index construction, PDF parsing/writing, rendering, and the browser event loop; they are not an application-wide speedup claim.

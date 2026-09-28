@@ -3,7 +3,7 @@ namespace PdfSpace.Viewer;
 
 public sealed partial class PdfViewport
 {
-    private enum Gesture { None, Pan, Create, Move, Resize, SelectText, Crop, Pinch, ImageMove, ImageResize, ImageInsert, ObjectMove, ObjectResize, ObjectMarquee, ObjectCrop, ObjectInsert, ObjectNode }
+    private enum Gesture { None, Pan, Create, Move, Resize, SelectText, Crop, Pinch, ImageMove, ImageResize, ImageInsert, ObjectMove, ObjectResize, ObjectMarquee, ObjectCrop, ObjectInsert, ObjectNode, ObjectRotate }
     private Gesture _gesture;
     private PointD _start, _screenStart, _startPan;
     private double _startScroll;
@@ -30,6 +30,7 @@ public sealed partial class PdfViewport
         if (!point.Properties.IsLeftButtonPressed && !point.Properties.IsMiddleButtonPressed) return;
         FinishText(true); Focus(FocusState.Pointer); _screenStart = screen; _startPan = new(_pan, 0); _startScroll = _scroll; _canvas.CapturePointer(e.Pointer);
         if (Session.Tool == PdfTool.Hand || point.Properties.IsMiddleButtonPressed) { _gesture = Gesture.Pan; e.Handled = true; return; }
+        if (TryBeginObjectRotation(screen)) { e.Handled = true; Invalidate(); return; }
         var hit = HitPage(screen); if (hit < 0) { CancelGesture(); return; }
         var placement = Placement(hit); _dragPage = placement.Index; if (Session.CurrentPage != _dragPage) Session.Navigate(_dragPage);
         var page = Session.Page; _start = placement.ToPage(page, screen, Zoom); _points.Clear(); _points.Add(_start); SelectedText = ""; _searchHighlight = null;
@@ -85,6 +86,7 @@ public sealed partial class PdfViewport
         if (_gesture == Gesture.None) return;
         if (_gesture == Gesture.Pan) { _pan = _startPan.X + screen.X - _screenStart.X; _scroll = _startScroll - (screen.Y - _screenStart.Y); ClampScroll(); UpdateVisiblePage(); Invalidate(); e.Handled = true; return; }
         var page = Session.Document.Pages[_dragPage]; var placement = Placement(_dragPage); var world = placement.ToPage(page, screen, Zoom);
+        if (_gesture == Gesture.ObjectRotate) { MoveObjectRotation(world); e.Handled = true; Invalidate(); return; }
         world = new(Math.Clamp(world.X, 0, page.Width), Math.Clamp(world.Y, 0, page.Height));
         if (MoveObjects(world)) { e.Handled = true; Invalidate(); return; }
         if (MoveNativeImage(world)) { e.Handled = true; Invalidate(); return; }
@@ -155,6 +157,7 @@ public sealed partial class PdfViewport
     }
     public void CancelGesture()
     {
+        _objectDragStarted = false; _objectRotation = 0; _objectSnapVertical = null; _objectSnapHorizontal = null;
         _objectToggleOnClick = null; _objectPreview = null; _objectNode = null; _objectNodePreview = null;
         _gesture = Gesture.None; _imagePreview = null; _preview = null; _original = null; _marquee = null; _points.Clear();
         if (!_releasing) { _releasing = true; _canvas.ReleasePointerCaptures(); _releasing = false; }

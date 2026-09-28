@@ -76,6 +76,13 @@ public sealed partial class PdfWorkbench
             RefreshRight();
             AdaptLayout();
         };
+        context.Viewport.NativeObjectsRotated += (indices, center, degrees) => Safe(() =>
+        {
+            if (_active != context) return;
+            _selectedObjects = indices;
+            ApplyObjects("Rotate objects", (document, objects) => PdfObjectEditor.Transform(document, objects,
+                PdfAffineMatrix.Around(center, PdfAffineMatrix.Rotate(degrees))));
+        });
         context.Viewport.NativeObjectsTransformed += (indices, old, bounds) => Safe(() =>
         {
             if (_active != context)
@@ -303,12 +310,21 @@ public sealed partial class PdfWorkbench
         content.Children.Add(new ScrollViewer { Content = list, MaxHeight = 170, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled });
         if (_pageObjects.Length > 200)
             content.Children.Add(Paragraph("The list shows 200 objects. All indexed objects remain selectable on the canvas.", 10));
+        var snap = new PdfCommandButton("Snap moving objects", action: () =>
+        {
+            Viewport.SnapNativeObjectMovement = !Viewport.SnapNativeObjectMovement;
+            RefreshRight();
+            ShowStatus(Viewport.SnapNativeObjectMovement
+                ? "Moving objects snap to page/object edges and centers. Alt bypasses snapping; Shift preserves the movement axis."
+                : "Object snapping disabled.");
+        });
+        snap.Select(Viewport.SnapNativeObjectMovement); content.Children.Add(snap);
         Command("Select all objects");
         Command("Paste objects", _objectClipboard is not null);
         Button("Draw native rectangle", () => UseTool(PdfTool.ObjectRectangle), PdfIconKind.Rectangle);
         Button("Draw native ellipse", () => UseTool(PdfTool.ObjectEllipse), PdfIconKind.Ellipse);
         Command("Add native text");
-        content.Children.Add(Paragraph("Shift: constrain move/proportions. Alt: resize or draw from center. Escape: cancel without rewriting the PDF.", 10));
+        content.Children.Add(Paragraph("Drag the round handle to rotate; Shift snaps to 15°. Snap moving objects aligns edges/centers; Alt bypasses it. Shift constrains movement/proportions; Alt resizes/draws from center. Escape cancels.", 10));
         var selected = _selectedObjects.Where(i => (uint)i < _pageObjects.Length).Select(i => _pageObjects[i]).ToArray();
         if (selected.Length == 0)
             return;
@@ -352,6 +368,16 @@ public sealed partial class PdfWorkbench
         content.Children.Add(grid);
         static double Number(PdfTextField f) => double.TryParse(f.Text, NumberStyles.Float, CultureInfo.InvariantCulture, out var n) && double.IsFinite(n) ? n : throw new ArgumentException("Enter a finite number.");
         Button("Apply object geometry", () => ApplyObjects("Resize objects", (d, o) => PdfObjectEditor.SetBounds(d, o, new(Number(x), Number(y), Number(w), Number(h)))), PdfIconKind.Check, enabled);
+        var angle = Field("Object rotation degrees", 0);
+        content.Children.Add(angle);
+        Button("Apply object rotation", () =>
+        {
+            var degrees = Number(angle);
+            if (Math.Abs(degrees) > 360000) throw new ArgumentOutOfRangeException(nameof(degrees));
+            degrees = Math.IEEERemainder(degrees, 360);
+            ApplyObjects("Rotate objects", (d, o) => Math.Abs(degrees) < 1e-7 ? d : PdfObjectEditor.Transform(d, o,
+                PdfAffineMatrix.Around(PdfObjectEditor.SelectionBounds(o).Center, PdfAffineMatrix.Rotate(degrees))));
+        }, PdfIconKind.Rotate, enabled);
         Button("Rotate objects right", () => ApplyObjects("Rotate objects", (d, o) => PdfObjectEditor.Transform(d, o, PdfAffineMatrix.Around(PdfObjectEditor.SelectionBounds(o).Center, PdfAffineMatrix.Rotate(90)))), PdfIconKind.Rotate, enabled);
         Button("Flip objects horizontally", () => ApplyObjects("Flip objects", (d, o) => PdfObjectEditor.Transform(d, o, PdfAffineMatrix.Around(PdfObjectEditor.SelectionBounds(o).Center, PdfAffineMatrix.Scale(-1, 1)))), PdfIconKind.Left, enabled);
         Button("Flip objects vertically", () => ApplyObjects("Flip objects", (d, o) => PdfObjectEditor.Transform(d, o, PdfAffineMatrix.Around(PdfObjectEditor.SelectionBounds(o).Center, PdfAffineMatrix.Scale(1, -1)))), PdfIconKind.Up, enabled);

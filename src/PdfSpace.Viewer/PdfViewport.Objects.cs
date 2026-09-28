@@ -21,6 +21,7 @@ public sealed partial class PdfViewport
     private bool _objectSelectionEditable;
     private RectD _objectInitial;
     private int? _objectToggleOnClick;
+    private bool _objectDragStarted;
     private RectD? _objectPreview;
     private int[] _marqueeBase = [];
     private NativeObjectPoint? _objectNode;
@@ -42,6 +43,7 @@ public sealed partial class PdfViewport
         var lookup = copy.ToDictionary(target => target.Index);
         var ordinals = copy.Select((target, ordinal) => (target.Index, ordinal)).ToDictionary(p => p.Index, p => p.ordinal);
         var spatial = new SpatialBoundsIndex(copy.Select(t => t.Bounds).ToArray());
+        _objectSnapIndex = null;
         _objectTargets = copy;
         _objectLookup = lookup;
         _objectOrdinals = ordinals;
@@ -62,6 +64,7 @@ public sealed partial class PdfViewport
         ArgumentNullException.ThrowIfNull(indices);
         var next = indices.Distinct().Where(_objectLookup.ContainsKey).Order().ToArray();
         if (next.AsSpan().SequenceEqual(_objectSelection)) return;
+        _objectSnapIndex = null;
         _objectSelection = next;
         _objectSelectionSet = new(_objectSelection);
         _objectSelectionOrdinals = _objectSelection.Select(index => _objectOrdinals[index]).Order().ToArray();
@@ -180,7 +183,15 @@ public sealed partial class PdfViewport
         if (_gesture == Gesture.ObjectMove)
         {
             if (world.Distance(_start) * Zoom >= 3)
-                _objectPreview = _objectInitial.Translate(SelectionTransform.ConstrainMove(world - _start, ShiftPressed()));
+            {
+                _objectDragStarted = true;
+                _objectPreview = SnapObjectMovement(world);
+            }
+            else
+            {
+                _objectPreview = _objectInitial;
+                _objectSnapVertical = null; _objectSnapHorizontal = null;
+            }
             return true;
         }
 
@@ -193,8 +204,9 @@ public sealed partial class PdfViewport
     private bool ReleaseObjects()
     {
         var gesture = _gesture;
-        if (gesture is not (Gesture.ObjectMove or Gesture.ObjectResize or Gesture.ObjectMarquee or Gesture.ObjectCrop or Gesture.ObjectInsert or Gesture.ObjectNode))
+        if (gesture is not (Gesture.ObjectMove or Gesture.ObjectResize or Gesture.ObjectMarquee or Gesture.ObjectCrop or Gesture.ObjectInsert or Gesture.ObjectNode or Gesture.ObjectRotate))
             return false;
+        var rotation = _objectRotation;
         var preview = _objectPreview;
         var rectangle = _marquee;
         var initial = _objectInitial;
@@ -203,7 +215,7 @@ public sealed partial class PdfViewport
         var point = _objectNodePreview;
         var ellipse = Session.Tool == PdfTool.ObjectEllipse;
         var marqueeBase = _marqueeBase;
-        var toggle = _objectToggleOnClick;
+        var toggle = _objectDragStarted ? null : _objectToggleOnClick;
         CancelGesture();
         try
         {
@@ -218,6 +230,8 @@ public sealed partial class PdfViewport
                 NativeVectorCreated?.Invoke(insertion, ellipse);
             else if (gesture == Gesture.ObjectNode && node is not null && point is { } p && p != node.Position && indices.Length == 1)
                 NativeObjectPointChanged?.Invoke(indices[0], node.Node, node.Ordinate, p);
+            else if (gesture == Gesture.ObjectRotate && Math.Abs(rotation) > 1e-7)
+                NativeObjectsRotated?.Invoke(indices, initial.Center, rotation);
             else if (gesture is Gesture.ObjectMove or Gesture.ObjectResize && preview is { } bounds && bounds != initial)
                 NativeObjectsTransformed?.Invoke(indices, initial, bounds);
             else if (gesture == Gesture.ObjectMove && toggle is { } removed)
@@ -333,7 +347,10 @@ public sealed partial class PdfViewport
                 bounds = new(preview.X + (bounds.X - _objectInitial.X) * sx, preview.Y + (bounds.Y - _objectInitial.Y) * sy, bounds.Width * sx, bounds.Height * sy);
             }
 
+            canvas.Save();
+            if (selected && _gesture == Gesture.ObjectRotate) ApplyRotationPreview(canvas);
             canvas.DrawRect(PdfRenderer.Rect(bounds), line);
+            canvas.Restore();
             if (selected && _objectSelectionEditable && EditObjectPoints && _objectSelection.Length == 1)
                 foreach (var point in item.Points)
                 {
@@ -348,6 +365,8 @@ public sealed partial class PdfViewport
         {
             line.Color = new(20, 115, 230);
             var bounds = _objectPreview ?? ObjectBounds();
+            canvas.Save();
+            if (_gesture == Gesture.ObjectRotate) ApplyRotationPreview(canvas);
             canvas.DrawRect(PdfRenderer.Rect(bounds), line);
             if (!EditObjectPoints && _objectSelectionEditable)
                 foreach (var point in Handles(bounds))
@@ -356,6 +375,10 @@ public sealed partial class PdfViewport
                     canvas.DrawRect(r, fill);
                     canvas.DrawRect(r, line);
                 }
+            if (!EditObjectPoints && _objectSelectionEditable && Session.Tool == PdfTool.EditObject)
+                DrawRotationHandle(canvas, bounds, line, fill);
+            canvas.Restore();
         }
+        DrawObjectSnapGuides(canvas);
     }
 }

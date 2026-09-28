@@ -109,6 +109,9 @@ public sealed partial class PdfViewport : UserControl, IDisposable
                 Renderer.DrawPage(canvas, Session.Document, displayed);
                 canvas.Save(); PdfRenderer.TransformPage(canvas, page);
                 DrawOverlays(canvas, page, placement.Index); canvas.Restore();
+                // Native selection handles may extend into the pasteboard; PDF paint remains page-clipped.
+                canvas.Save(); PdfRenderer.TransformPage(canvas, page, clip: false);
+                DrawObjects(canvas, placement.Index); canvas.Restore();
             }
             catch (Exception ex)
             {
@@ -138,7 +141,6 @@ public sealed partial class PdfViewport : UserControl, IDisposable
                 fill.Color = new SKColor(77, 125, 240, 26); canvas.DrawRect(PdfRenderer.Rect(field.Bounds), fill);
                 if (field.Id == Session.SelectedFieldId) canvas.DrawRect(PdfRenderer.Rect(field.Bounds.Inflate(2 / Zoom)), line);
             }
-        DrawObjects(canvas, index);
         if (index != Session.CurrentPage) return;
         if (Session.SelectedAnnotation is { } selected && _textEditor is null)
         {

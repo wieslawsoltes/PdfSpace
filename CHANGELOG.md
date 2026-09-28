@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.5.3-alpha.1 — 2026-09-28
+
+- Direct native-object rotation handle with free angles, Shift 15-degree snapping, exact numeric rotation, one-transaction commit, and Escape cancellation.
+- Optional edge/center alignment snapping with visible guides, screen-constant tolerance, Shift axis locking, and temporary Alt bypass.
+- Reusable sorted snap index with bounded targets, deterministic ties, and allocation-free warm queries.
+- Returning a native drag to its origin restores the exact preview and avoids both a redundant PDF rewrite and unintended additive-selection toggling.
+- UI rotation handles can extend into the pasteboard without disabling clipping on rendered/exported PDF content. Existing two-argument transform API is retained.
+- Native geometry/property tests, real Uno browser gestures, and independent native verification of downloaded manipulated PDFs.
+
+
 ## 0.5.2-alpha.1
 
 - Added reusable constrained-move/resize/creation geometry: Shift axis/aspect lock, Alt center origin and preserved handle grab offsets; pointer release stays one native transaction.
