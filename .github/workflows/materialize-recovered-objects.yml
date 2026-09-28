@@ -1,0 +1,51 @@
+name: Materialize recovered object editor
+on:
+  push:
+    branches: [build/unified-object-transfer-0.5]
+    paths: [.github/workflows/materialize-recovered-objects.yml]
+permissions:
+  contents: write
+jobs:
+  materialize:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/unified-object-editing-0.5
+          fetch-depth: 0
+      - name: Restore exact reviewed files and complete event integration
+        env:
+          TRANSFER_COMMIT: ${{ github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = 'de634ec3367d82c26be210ff6615490c3f9e9be4'
+          git fetch origin "$TRANSFER_COMMIT"
+          python3 - <<'PY'
+          import os,subprocess,pathlib,base64,lzma,hashlib
+          chunks=[subprocess.check_output(['git','show',f'{os.environ["TRANSFER_COMMIT"]}:tools/objects05/{i}.b64']).decode().strip() for i in (1,2)]
+          partial=lzma.LZMADecompressor().decompress(base64.b64decode(''.join(chunks),validate=True))
+          patch=partial[:partial.rfind(b'\ndiff --git ')+1]
+          assert hashlib.sha256(patch).hexdigest()=='9c48ca41ea0705769f71289a331a1d4c784debe1e37d4485d740fda0e1ab1d44'
+          pathlib.Path('/tmp/objects.patch').write_bytes(patch)
+          subprocess.run(['git','apply','--check','/tmp/objects.patch'],check=True)
+          subprocess.run(['git','apply','/tmp/objects.patch'],check=True)
+          def edit(path,old,new):
+              p=pathlib.Path(path);s=p.read_text();assert old in s,(path,old);p.write_text(s.replace(old,new))
+          path='src/PdfSpace.Workbench/PdfWorkbench.cs'
+          edit(path,'if (_active != context) return;\n            var previousPage','if (_active != context) return;\n            var previousObjects = _objectPage;\n            RefreshObjects();\n            if (_right == "Objects" && previousObjects != _objectPage) RefreshRight();\n            var previousPage')
+          edit(path,'        viewport.NativeImageSelected +=','        HookObjects(context);\n        viewport.NativeImageSelected +=')
+          edit(path,'_active = context; _imageSnapshot.Clear();','_active = context; _objectStamp.Clear(); _pageObjects = []; _selectedObjects = []; _imageSnapshot.Clear();')
+          edit(path,'UpdateTabs(); RefreshNativeImages(); UpdateChrome();','UpdateTabs(); RefreshObjects(); RefreshNativeImages(); UpdateChrome();')
+          edit(path,'_disposed = true; _ocrCancellation?.Cancel();','_disposed = true; _objectClipboard = null; _pageObjects = []; _selectedObjects = []; _objectStamp.Clear(); _ocrCancellation?.Cancel();')
+          edit('src/PdfSpace.Workbench/PdfWorkbench.Objects.cs','if (_pageObjects.Length == count)','if (_pageObjects.Length == count && label != "Arrange objects")')
+          edit('src/PdfSpace.Pdf/PdfObjectScanner.cs','foreach (var o in scope.Content.Skip(first).Take(last - first + 1))\n                sequence.Add(o);','for (var index = first; index <= last; index++)\n                sequence.Add(scope.Content[index]);')
+          edit('tests/PdfSpace.Tests/PhotoImportTests.cs','((PdfReference)image.Elements["/SMask"]).Value as PdfDictionary','(image.Elements["/SMask"] as PdfReference)?.Value as PdfDictionary')
+          PY
+          git diff --check
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src docs scripts README.md CHANGELOG.md Directory.Build.props tests
+          git commit -m 'feat: unified native object editing and restored workbench integration'
+          git push origin HEAD:feat/unified-object-editing-0.5
