@@ -1,0 +1,132 @@
+{
+  "repository": "https://github.com/BobLd/PdfPig.Rendering.Skia",
+  "commit": "e4476d80f98bf1a5a7cd6f7d45fb7c2afe10ec11",
+  "package_version": "0.1.16.4",
+  "adaptation": "Namespace isolation. Renderer fixes are reviewed separately.",
+  "sources": [
+    {
+      "path": "Helpers/ParametricShadingTexture.cs",
+      "upstream_sha256": "5fe4fe79b9476ee8573d9c1a61a326d185dfd1f14a0691337f1a456308aaabb4"
+    },
+    {
+      "path": "Helpers/SKPaintCache.cs",
+      "upstream_sha256": "f26a6439aa44a129dd91a410d78b4a2d08456be7624da0d07e457c336fb99f23"
+    },
+    {
+      "path": "Helpers/SkiaExtensions.cs",
+      "upstream_sha256": "14f15da9b025b3461d9bdc9a38f249413ae976d83e9baae699758a80c7426b04"
+    },
+    {
+      "path": "Helpers/SkiaFontCache.Font.cs",
+      "upstream_sha256": "2f700b9df94f71ef4449e5d1e0210579ef320a4d8e9ceaabd07f62d8cb866de3"
+    },
+    {
+      "path": "Helpers/SkiaFontCache.Glyph.cs",
+      "upstream_sha256": "e279fdf4b0b980a5efb2347192b456bcd15a7d375f8a5ea09aaf2211c1ca4542"
+    },
+    {
+      "path": "Helpers/SkiaFontCache.Type3.cs",
+      "upstream_sha256": "7621a526ff4805c6adc30f7c821a27fc8f7fc15c7f1e6c7798e5cf22070c3109"
+    },
+    {
+      "path": "Helpers/SkiaFontCacheItem.cs",
+      "upstream_sha256": "ff180f189cbfa4f6bd3dc6c5f0bc84e2798656e1ed2c01a0c0fa8803d4c64b71"
+    },
+    {
+      "path": "Helpers/SkiaImageExtensions.cs",
+      "upstream_sha256": "cd46fe63f18adba57967cb35b0bc264f3d428e5fba6d61d17254e7e7c5740c29"
+    },
+    {
+      "path": "Helpers/Type3CachedGlyph.cs",
+      "upstream_sha256": "6f7add650059d469648b7b373b7422d07cf035d7d35ed61bfb7c9656c9840be0"
+    },
+    {
+      "path": "PageSizeFactory.cs",
+      "upstream_sha256": "a38784b827cb42d113ba45c4fb2ff1c93e11ac47eeb09d571be70ed02ffac95d"
+    },
+    {
+      "path": "PatternAwareColorSpaceContext.cs",
+      "upstream_sha256": "2a596d2c8018a23f9162710a0461d74468318e808f216f932eeba9b7b51996f6"
+    },
+    {
+      "path": "PdfPageSize.cs",
+      "upstream_sha256": "aa3e6cd6c946cdeaf610c0f2909318b9f8326173653bcc967e2a97e04a45eb71"
+    },
+    {
+      "path": "PdfPigExtensions.cs",
+      "upstream_sha256": "d2c5460e958ae26577f978431b1967cea260d4228bedae5d5222b78a7f4a48e8"
+    },
+    {
+      "path": "SkiaPageFactory.cs",
+      "upstream_sha256": "4b7283de54c2b8e92d7badf1138df26b86880228a02feba801224da55a937f9e"
+    },
+    {
+      "path": "SkiaRenderingFilterProvider.cs",
+      "upstream_sha256": "2c2ef236fea6d4ae287e60b0d6f4f5e8e42a568c213d3cde4a06fb65fcbcbaad"
+    },
+    {
+      "path": "SkiaRenderingParsingOptions.cs",
+      "upstream_sha256": "1c2b69939f2e657668cd1bc9f34961a8c81e2bed11e31239c4e8f4530a81c18a"
+    },
+    {
+      "path": "SkiaStreamProcessor.Annotations.Text.cs",
+      "upstream_sha256": "bd9ec2602d9dc306046a12087ed4636615b0c36b55fcad8d08c75561fe87cd50"
+    },
+    {
+      "path": "SkiaStreamProcessor.Annotations.cs",
+      "upstream_sha256": "10d75f279a156d9b710f04ad81af2c7513577da3c1f6c312c21332d7a45722f1"
+    },
+    {
+      "path": "SkiaStreamProcessor.Glyph.cs",
+      "upstream_sha256": "de5a9d72718fc8fc3b1b24adf3620519ac1b29d26aafe1012f7ac96a3b21a723"
+    },
+    {
+      "path": "SkiaStreamProcessor.Image.cs",
+      "upstream_sha256": "e2b15091aaec2d4df4532847953c646b5d0f0e468767607dd21fdec1ef2378b9"
+    },
+    {
+      "path": "SkiaStreamProcessor.Path.cs",
+      "upstream_sha256": "d5f3212a0626cbecbf43b239fe3c4145e6fe7d50409d395e486354690c3c94d5"
+    },
+    {
+      "path": "SkiaStreamProcessor.Shading.Axial.cs",
+      "upstream_sha256": "24577fb8ff82fc6d94458b7e74bad4125606ab0af9a97b7ba1dfdf42827ab1a4"
+    },
+    {
+      "path": "SkiaStreamProcessor.Shading.Coons.cs",
+      "upstream_sha256": "e02423371e102de099ed7d8240d37cb56c30058bf5151d46cc0809fcbd6e4a54"
+    },
+    {
+      "path": "SkiaStreamProcessor.Shading.Function.cs",
+      "upstream_sha256": "81e343bd04046d9583442c8d05ddc258d3c529aa85d76803d197d6174d9ecb7f"
+    },
+    {
+      "path": "SkiaStreamProcessor.Shading.GouraudFree.cs",
+      "upstream_sha256": "09187c2cd18f8186abfff90ff9c676f812b059cc6f46787815e1c7289494f867"
+    },
+    {
+      "path": "SkiaStreamProcessor.Shading.GouraudLattice.cs",
+      "upstream_sha256": "087d1539b7fd52d00e9765157d45f0caa1f1a97875aad0423812254480360ca5"
+    },
+    {
+      "path": "SkiaStreamProcessor.Shading.Radial.cs",
+      "upstream_sha256": "f28532dee3ce3c36a73571e51b472aeddfaba33aac9f478dc13612e291dd6a90"
+    },
+    {
+      "path": "SkiaStreamProcessor.Shading.Tensor.cs",
+      "upstream_sha256": "d47269c6f13efe9f9df920e94f72d021e524060636b80c2d508465e170b26eb2"
+    },
+    {
+      "path": "SkiaStreamProcessor.Shading.cs",
+      "upstream_sha256": "ddb2ce8e1b620dba6299567a50fce459bd5b1cd4a43e42f6a425c5c95545d69a"
+    },
+    {
+      "path": "SkiaStreamProcessor.SoftMask.cs",
+      "upstream_sha256": "36b6b301a8b36c363f6a57bd6b359c408ce203b36df78aa4dc8b5884866ec403"
+    },
+    {
+      "path": "SkiaStreamProcessor.cs",
+      "upstream_sha256": "436ee526c832f98475dbc31b868f199f2b324c9b599f1d7b383017b0c8225e5f"
+    }
+  ]
+}

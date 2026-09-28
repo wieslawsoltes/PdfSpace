@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
+    <Authors>BobLd;PdfSpace contributors</Authors>
+    <Description>Source-pinned PdfPig Skia renderer with PdfSpace interoperability fixes. Apache-2.0 derivative; see UPSTREAM.json.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="PdfPig" Version="0.1.16" />
+    <PackageReference Include="PdfPig.Filters.Dct.JpegLibrary" Version="0.1.16.1" />
+    <PackageReference Include="PdfPig.Filters.Jbig2.PdfboxJbig2" Version="0.1.16.1" />
+    <PackageReference Include="PdfPig.Filters.Jpx.OpenJpeg" Version="0.1.16" />
+    <PackageReference Include="SkiaSharp" Version="3.119.4" />
+    <PackageReference Include="SkiaSharp.HarfBuzz" Version="3.119.4" />
+    <None Update="LICENSE*;NOTICE*;UPSTREAM.json" Pack="true" PackagePath="/" />
+  </ItemGroup>
+</Project>
