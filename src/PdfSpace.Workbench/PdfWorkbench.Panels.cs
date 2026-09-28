@@ -17,6 +17,7 @@ public sealed partial class PdfWorkbench
         {
             case "All tools":
                 _leftPanel.Add("Prepare a form", PdfIconKind.Grid, () => SetMode("Prepare a form"), 0xFF7254C6);
+                _leftPanel.Add("Edit objects", PdfIconKind.Select, () => Safe(ShowObjects));
                 _leftPanel.Add("Edit original text", PdfIconKind.Text, () => Run(ShowOriginalTextAsync), 0xFFD93830);
                 _leftPanel.Add("Edit a PDF", PdfIconKind.Edit, () => SetMode("Edit"), 0xFFD93830);
                 _leftPanel.Add("Export a PDF", PdfIconKind.Export, () => SetMode("Convert"), 0xFF278748);
@@ -39,6 +40,7 @@ public sealed partial class PdfWorkbench
             case "Scan & OCR": BuildOcrTools(); break;
             case "Edit":
                 _leftPanel.Description("Edit supported original text operands or add text, shapes and annotations. Changes remain undoable in the workspace.");
+                _leftPanel.Add("Edit objects", PdfIconKind.Select, () => Safe(ShowObjects));
                 _leftPanel.Add("Edit original text", PdfIconKind.Edit, () => Run(ShowOriginalTextAsync));
                 _leftPanel.Add("Edit original images", PdfIconKind.Image, () => Safe(ShowNativeImages));
                 _leftPanel.Add("Add image", PdfIconKind.Image, () => Run(ChooseInsertImageAsync));
@@ -126,6 +128,7 @@ public sealed partial class PdfWorkbench
             switch (_right)
             {
                 case "Recognized text": BuildOcrReview(content); break;
+                case "Objects": BuildObjects(content); break;
                 case "Comments": BuildComments(content); break;
                 case "Bookmarks": BuildBookmarks(content); break;
                 case "Find": BuildFind(content); break;

@@ -3,7 +3,7 @@ namespace PdfSpace.Viewer;
 
 public sealed partial class PdfViewport
 {
-    private enum Gesture { None, Pan, Create, Move, Resize, SelectText, Crop, Pinch, ImageMove, ImageResize, ImageInsert }
+    private enum Gesture { None, Pan, Create, Move, Resize, SelectText, Crop, Pinch, ImageMove, ImageResize, ImageInsert, ObjectMove, ObjectResize, ObjectMarquee, ObjectCrop, ObjectInsert, ObjectNode }
     private Gesture _gesture;
     private PointD _start, _screenStart, _startPan;
     private double _startScroll;
@@ -33,6 +33,7 @@ public sealed partial class PdfViewport
         var hit = HitPage(screen); if (hit < 0) { CancelGesture(); return; }
         var placement = Placement(hit); _dragPage = placement.Index; if (Session.CurrentPage != _dragPage) Session.Navigate(_dragPage);
         var page = Session.Page; _start = placement.ToPage(page, screen, Zoom); _points.Clear(); _points.Add(_start); SelectedText = ""; _searchHighlight = null;
+        if (PressObjects(e)) { e.Handled = true; return; }
         if (PressNativeImage()) { e.Handled = true; return; }
         if (Session.Tool == PdfTool.FillForm)
         {
@@ -85,6 +86,7 @@ public sealed partial class PdfViewport
         if (_gesture == Gesture.Pan) { _pan = _startPan.X + screen.X - _screenStart.X; _scroll = _startScroll - (screen.Y - _screenStart.Y); ClampScroll(); UpdateVisiblePage(); Invalidate(); e.Handled = true; return; }
         var page = Session.Document.Pages[_dragPage]; var placement = Placement(_dragPage); var world = placement.ToPage(page, screen, Zoom);
         world = new(Math.Clamp(world.X, 0, page.Width), Math.Clamp(world.Y, 0, page.Height));
+        if (MoveObjects(world)) { e.Handled = true; Invalidate(); return; }
         if (MoveNativeImage(world)) { e.Handled = true; Invalidate(); return; }
         if (_gesture == Gesture.Move && _original is not null) _preview = _original.Move(world - _start);
         else if (_gesture == Gesture.Resize && _original is not null)
@@ -109,6 +111,7 @@ public sealed partial class PdfViewport
     {
         _touches.Remove(e.Pointer.PointerId);
         if (_gesture == Gesture.Pinch) { if (_touches.Count == 0) CancelGesture(); e.Handled = true; return; }
+        if (ReleaseObjects()) { e.Handled = true; return; }
         var imagePreview = _imagePreview; var imageIndex = _selectedImage;
         var gesture = _gesture; var preview = _preview; var marquee = _marquee; var index = _dragPage; var original = _original;
         CancelGesture();
@@ -152,6 +155,7 @@ public sealed partial class PdfViewport
     }
     public void CancelGesture()
     {
+        _objectPreview = null; _objectNode = null; _objectNodePreview = null;
         _gesture = Gesture.None; _imagePreview = null; _preview = null; _original = null; _marquee = null; _points.Clear();
         if (!_releasing) { _releasing = true; _canvas.ReleasePointerCaptures(); _releasing = false; }
     }
@@ -173,6 +177,7 @@ public sealed partial class PdfViewport
     private void Keyboard(object sender, KeyRoutedEventArgs e)
     {
         if (IsEditingText) return;
+        if (ObjectKeyboard(e)) { e.Handled = true; return; }
         if (Session.Tool == PdfTool.EditImage && _selectedImage >= 0 && e.Key is VirtualKey.Delete or VirtualKey.Back)
         { NativeImageDeleteRequested?.Invoke(_selectedImage); e.Handled = true; return; }
         if (HandleFormKey(e)) { e.Handled = true; return; }

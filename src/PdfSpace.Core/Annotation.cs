@@ -1,7 +1,7 @@
 namespace PdfSpace.Core;
 
 public enum AnnotationKind { Highlight, Underline, Strikeout, Ink, Rectangle, Ellipse, Line, Arrow, Text, Note, Signature, Stamp, Check, Link, RedactionMark }
-public enum PdfTool { Select, Hand, Highlight, Underline, Strikeout, Ink, Rectangle, Ellipse, Line, Arrow, Text, Note, Signature, Stamp, Check, Crop, Measure, FillForm, FormText, FormCheckBox, FormChoice, Link, Redact, EditImage, InsertImage }
+public enum PdfTool { Select, Hand, Highlight, Underline, Strikeout, Ink, Rectangle, Ellipse, Line, Arrow, Text, Note, Signature, Stamp, Check, Crop, Measure, FillForm, FormText, FormCheckBox, FormChoice, Link, Redact, EditImage, InsertImage, EditObject, ObjectCrop, ObjectRectangle, ObjectEllipse }
 public sealed record CommentReply(Guid Id, string Author, string Text, DateTimeOffset Created);
 
 /// <summary>Coordinates are PDF points in the source page's top-left logical coordinate system.</summary>

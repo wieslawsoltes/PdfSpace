@@ -9,6 +9,8 @@ namespace PdfSpace.Pdf;
 
 public sealed record PdfTextRun(Guid SourceId, int SourcePage, int Index, string SourceHash, string Text, string FontResource, bool Editable, string Limitation)
 {
+    public int OperatorStart { get; init; }
+    public int OperatorEnd { get; init; }
     public Guid PageId { get; init; }
     public string ScopePath { get; init; } = "";
     public double FontSize { get; init; }
@@ -41,7 +43,7 @@ public static class PdfTextEditor
                 result.Add(new(id, page.SourcePage, index, hash, decoded ?? "[Unsupported font encoding]", run.Font, decoded is not null && !locked,
                     locked ? "Signed/certified or XFA source; editing is blocked." : decoded is null ? "Unsupported source font encoding; no safe text replacement is available." :
                     "Edits only this text occurrence. Original-font mode requires encoded glyphs; replacement-font mode supports independent horizontal text-showing runs. No paragraph reflow.")
-                { PageId = page.Id, ScopePath = scope.Path, FontSize = run.Size, CanReplaceFont = !locked && decoded is not null && run.ReplaceFont });
+                { PageId = page.Id, ScopePath = scope.Path, FontSize = run.Size, OperatorStart = run.Operations.Min(), OperatorEnd = run.Operations.Max(), CanReplaceFont = !locked && decoded is not null && run.ReplaceFont });
             }
         return result.ToArray();
     }
