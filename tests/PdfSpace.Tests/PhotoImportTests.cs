@@ -67,7 +67,7 @@ internal static class PhotoImportTests
         using (var pdf = Open(rgbaDocument))
         {
             var image = Images(pdf).Single(i => i.Elements.GetName("/ColorSpace") == "/DeviceRGB");
-            var mask = ((PdfReference)image.Elements["/SMask"]).Value as PdfDictionary;
+            var mask = (image.Elements["/SMask"] as PdfReference)?.Value as PdfDictionary;
             check(mask is not null && mask.Stream.UnfilteredValue[0] == 64 && mask.Stream.UnfilteredValue[1] == 255, "streamed PNG alpha produces the correct native soft mask");
             var rgb = image.Stream.UnfilteredValue;
             check(rgb[0] == 240 && rgb[1] == 40 && rgb[2] == 20, "PNG stores unpremultiplied RGB samples beside its soft mask");

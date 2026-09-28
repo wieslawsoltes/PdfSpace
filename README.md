@@ -1,11 +1,7 @@
 <div align="center">
 
 # PdfSpace
-### New in 0.4.1
-
-Native image import/replacement now honors all EXIF orientations, preserves eligible JPEG compression and streams PNG alpha/RGB compression without full-image staging arrays. Image duplication shares source data; Restore image proportions works after rotation. Undo history now has a distinct-source byte budget alongside its entry cap, with explicit history release in Properties. [Photograph workflows](docs/photo-import.md) · [Performance and memory](docs/performance.md).
-
-## Read, edit and review PDFs — on your device.
+### Read, edit and review PDFs — on your device.
 
 [![Build](https://github.com/wieslawsoltes/PdfSpace/actions/workflows/build.yml/badge.svg)](https://github.com/wieslawsoltes/PdfSpace/actions/workflows/build.yml)
 [![Desktop](https://github.com/wieslawsoltes/PdfSpace/actions/workflows/desktop.yml/badge.svg)](https://github.com/wieslawsoltes/PdfSpace/actions/workflows/desktop.yml)
@@ -17,7 +13,15 @@ Native image import/replacement now honors all EXIF orientations, preserves elig
 
 PdfSpace is an independent, local-first PDF application built in **C# with Uno Platform and SkiaSharp**. The browser runs a real Uno WebAssembly application with the same document, editing and rendering libraries as the desktop host. An Acrobat-inspired shell brings together document tabs, floating quick tools, comments, form preparation, original-text editing, protection, redaction and page organization.
 
-> **0.4.1-alpha.1:** functional PDF workflows, not complete or pixel-identical Adobe Acrobat compatibility. PdfSpace has original branding and icons and is not affiliated with Adobe. Review the [save and security boundaries](docs/compatibility.md) before processing important documents.
+> **0.5.0-alpha.1:** functional PDF workflows, not complete or pixel-identical Adobe Acrobat compatibility. PdfSpace has original branding and icons and is not affiliated with Adobe. Review the [save and security boundaries](docs/compatibility.md) before processing important documents.
+
+## Native object editing in 0.5
+
+**Edit objects** selects native text, paths, images, shading and Form groups directly on the page. Mixed selections support drag/resize/nudge, align/distribute, crop, stacking, grouping, copy/paste across documents, and one-transaction undo. Path controls edit real geometry and fill/stroke; explicit replacement text blocks wrap into a chosen box with overflow checks. Source-run text and native image editing remain available. [Object editing guide and exact limits](docs/object-editing.md).
+
+## Photo compatibility and memory in 0.4.1
+
+Native image import/replacement now honors all EXIF orientations, preserves eligible JPEG compression and streams PNG alpha/RGB compression without full-image staging arrays. Image duplication shares source data; Restore image proportions works after rotation. Undo history now has a distinct-source byte budget alongside its entry cap, with explicit history release in Properties. [Photograph workflows](docs/photo-import.md) · [Performance and memory](docs/performance.md).
 
 ## Existing-PDF editing and performance in 0.4
 
@@ -37,7 +41,7 @@ Recognize image-only PDFs locally in **English, Polish or German**, review and c
 
 **Prepare and fill forms.** Create text, check-box and dropdown fields directly on a page. Fill imported text, check boxes, radio groups and single-select choices. Edit tooltips, defaults, read-only/required/multiline flags, font size, maximum length, geometry and choice labels. Delete imported widgets with undo and native PDF persistence. Tab/Shift+Tab move between fields, Space selects a button, and arrows change choices.
 
-**Edit supported original text.** Replace actual PDF text-showing operands rather than covering them with a white rectangle. Unsupported encodings, absent glyphs and stale edits are rejected. General paragraph reflow and arbitrary font/image editing remain outside this release.
+**Edit supported original text.** Replace actual PDF text-showing operands rather than covering them with a white rectangle. Unsupported encodings, absent glyphs and stale edits are rejected. Explicit replacement text blocks provide bounded word wrapping; automatic reconstruction of arbitrary source paragraphs and complex-script shaping remain outside this release.
 
 **Organize and export.** Reorder, rotate, duplicate, delete, crop, combine, extract and split pages. Download native PDF, a separately labeled flattened visual copy, PNG, text, form data or an editable workspace. Reorganized existing form documents are blocked from structured saving when the field tree cannot be preserved safely.
 

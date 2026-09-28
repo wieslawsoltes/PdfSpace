@@ -43,3 +43,11 @@ The fallback path decodes one native RGBA bitmap and writes RGB and optional alp
 The source budget is **not a whole-application memory limit**. It excludes annotation object graphs, renderer/native allocations, exported copies, and caller-owned snapshots. Eight open tabs can each retain their own budget. `RetainedSourceBytes`, `UndoCount`, `RedoCount` and `PrunedHistoryEntries` expose the behavior. Properties includes a confirmation-gated Clear undo history action; it changes neither the current document nor whether it needs saving.
 
 Toolbar selection setters now skip unchanged state, avoiding brush allocation on each pointer update. Footer document statistics are recomputed only for a new immutable document snapshot; viewport changes no longer explicitly invalidate the right panel's measure.
+
+## Unified object selection (0.5)
+
+The workbench caches native-object descriptors by weak immutable snapshot identity and page ID. Panning, zooming, selection changes and geometry-only drag previews reuse that index. One native edit batch parses its source once and builds a copy-on-write invocation trie, sharing cloned ancestor prefixes across selected descendants.
+
+The viewer builds an index-to-target dictionary and a selection-membership set when targets or selection change. It computes union bounds at selection time. Drawing object outlines therefore performs constant-time membership lookup per object instead of a nested scan of all selected IDs; pointer moves reuse the cached union. This is a complexity reduction in the selection path, not a claim of universal frame-rate improvement. The browser regressions check that zoom and fitting do not increment the native object-index build counter.
+
+Object bounds are currently scanned for hit testing and outline drawing. Very dense single pages, tens of thousands of path control points, and frequent source-rewriting gestures still warrant independent performance measurement. The native scanner and per-batch limits are documented in the object-editing guide.

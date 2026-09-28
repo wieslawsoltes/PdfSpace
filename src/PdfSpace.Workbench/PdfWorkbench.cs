@@ -58,6 +58,9 @@ public sealed partial class PdfWorkbench : UserControl, IDisposable
         viewport.ViewChanged += () =>
         {
             if (_active != context) return;
+            var previousObjects = _objectPage;
+            RefreshObjects();
+            if (_right == "Objects" && previousObjects != _objectPage) RefreshRight();
             var previousPage = _imagePageId;
             RefreshNativeImages();
             // The viewport is subscribed to Session.ViewChanged before the
@@ -72,6 +75,7 @@ public sealed partial class PdfWorkbench : UserControl, IDisposable
             var text = await _dialogs.PromptAsync("Add a comment", "Share a thought, question or suggested change.", multiline: true, acceptLabel: "Post");
             if (!string.IsNullOrWhiteSpace(text)) { session.Navigate(index); session.AddAnnotation(new Annotation { Kind = AnnotationKind.Note, Bounds = new(point.X, point.Y, 23, 23), Text = text, Color = session.Color }, index); OpenRight("Comments"); }
         });
+        HookObjects(context);
         viewport.NativeImageSelected += index => SelectSourceImage(context, index);
         viewport.NativeImageChanged += (index, bounds) => Safe(() => EditSourceImage(context, index, (document, image) => PdfImageEditor.SetBounds(document, image, bounds), "Transform source image"));
         viewport.NativeImageDeleteRequested += _ => Run(DeleteSourceImageAsync);
@@ -87,7 +91,7 @@ public sealed partial class PdfWorkbench : UserControl, IDisposable
     {
         if (_active is not null) _active.Viewport.FinishText(true);
         _homeHost.Content = null; // Hidden recent-document cards must not retain closed sessions.
-        _active = context; _imageSnapshot.Clear(); _nativeImages = []; _imageSelection = -1; _home = false; _documentHost.Children.Clear(); _documentHost.Children.Add(context.Viewport);
+        _active = context; _objectStamp.Clear(); _pageObjects = []; _selectedObjects = []; _imageSnapshot.Clear(); _nativeImages = []; _imageSelection = -1; _home = false; _documentHost.Children.Clear(); _documentHost.Children.Add(context.Viewport);
         _organizerHost.Content = new PdfThumbnailView(context.Viewport) { OrganizeMode = true };
         BuildLeft(); RefreshData(); UpdateModeVisibility(); ShowStatus(Session.Document.IsSensitive ? "Unlocked protected PDF: automatic recovery disabled. Workspace copies would be unencrypted." : "All files stay on your device.");
     }
@@ -107,7 +111,7 @@ public sealed partial class PdfWorkbench : UserControl, IDisposable
     { _statusText = text; _status.Text = text; _status.Foreground = PdfTheme.Brush(error ? "#B12620" : "#686868"); StateChanged?.Invoke(); }
     private void RefreshData()
     {
-        UpdateTabs(); RefreshNativeImages(); UpdateChrome(); RefreshRight(); (_organizerHost.Content as PdfThumbnailView)?.Invalidate();
+        UpdateTabs(); RefreshObjects(); RefreshNativeImages(); UpdateChrome(); RefreshRight(); (_organizerHost.Content as PdfThumbnailView)?.Invalidate();
     }
     private readonly WorkspaceSnapshotStamp _chromeDocument = new();
     private void UpdateChrome()
@@ -175,5 +179,5 @@ public sealed partial class PdfWorkbench : UserControl, IDisposable
         }
         catch (Exception ex) { ShowStatus("Recovery is unavailable: " + ex.Message, true); }
     }
-    public void Dispose() { if (_disposed) return; _disposed = true; _ocrCancellation?.Cancel(); _autosave.Stop(); foreach (var d in _documents) { d.Search.Clear(); d.Viewport.Dispose(); } _documents.Clear(); }
+    public void Dispose() { if (_disposed) return; _disposed = true; _objectClipboard = null; _pageObjects = []; _selectedObjects = []; _objectStamp.Clear(); _ocrCancellation?.Cancel(); _autosave.Stop(); foreach (var d in _documents) { d.Search.Clear(); d.Viewport.Dispose(); } _documents.Clear(); }
 }

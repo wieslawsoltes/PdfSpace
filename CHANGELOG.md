@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.5.0-alpha.1 — 2026-09-28
+
+- Unified native object selection and batch editing across text, vector paths, images, shading and Form groups.
+- Native object geometry, path-node editing, solid fill/stroke, clipping, stacking, grouping, application clipboard and vector/text insertion.
+- Explicit bounded replacement-block reflow with embedded searchable glyphs; original-run editing remains available.
+- Copy-on-write edit-scope trie, snapshot-cached object descriptors, geometry-only drag previews and one commit per gesture.
+- Mixed-object native and real Uno browser regressions; independent validation of downloaded PDF objects.
+
+Not arbitrary PDF/Acrobat equivalence: clipping text, inline-image streams, complex-script reflow, and cross-clipping group/stack operations remain guarded.
+
+
 ## 0.4.1-alpha.1 — 2026-09-28
 
 - Native image insertion, replacement and image-to-PDF honor all eight EXIF orientations.
