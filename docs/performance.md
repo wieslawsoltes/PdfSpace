@@ -46,7 +46,7 @@ Toolbar selection setters now skip unchanged state, avoiding brush allocation on
 
 ## Unified object selection (0.5)
 
-The workbench caches native-object descriptors by weak immutable snapshot identity and page ID. Panning, zooming, selection changes and geometry-only drag previews reuse that index. One native edit batch parses its source once and builds a copy-on-write invocation trie, sharing cloned ancestor prefixes across selected descendants.
+The workbench caches native-object descriptors by weak immutable snapshot identity and page ID. Panning, zooming, selection changes and geometry-only drag previews reuse that index. Selected occurrences are applied in one source-edit transaction with a copy-on-write invocation trie, sharing cloned ancestor prefixes across selected descendants. Native writing, PdfPig text-metrics analysis and preview rehydration remain separate parsing stages; this is not a claim that the complete operation parses bytes only once.
 
 The viewer builds an index-to-target dictionary and a selection-membership set when targets or selection change. It computes union bounds at selection time. Drawing object outlines therefore performs constant-time membership lookup per object instead of a nested scan of all selected IDs; pointer moves reuse the cached union. This is a complexity reduction in the selection path, not a claim of universal frame-rate improvement. The browser regressions check that zoom and fitting do not increment the native object-index build counter.
 
