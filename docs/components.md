@@ -102,3 +102,7 @@ Pass an `IOcrEngine` as the optional fifth `PdfWorkbench` constructor argument. 
 ## Native object editing and indexed viewing (0.4)
 
 `PdfImageEditor`, `PdfTextEditor.ReplaceWithFont` and `PdfAffineMatrix` expose native occurrence editing without the workbench. `PdfViewport` receives immutable `NativeImageTarget` geometry from the host and raises edit requests; it does not parse native objects itself. `PageLayoutIndex` is independently usable without Uno or Skia. `PdfSearchIndex` provides bounded per-document text caching. See [native object examples](native-object-editing.md) and [performance ownership](performance.md).
+
+## Photographs and history
+
+`PdfImageEditor.OpenImage`, `Duplicate` and `RestoreAspectRatio` support native photo workflows. `EditorHistoryOptions` configures count/source-byte retention; `EditorSession.ClearHistory` releases undo/redo while retaining current edits and saved-state identity. See [the photograph embedding example](photo-import.md) and [memory accounting](performance.md).

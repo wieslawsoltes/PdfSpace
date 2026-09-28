@@ -86,7 +86,8 @@ public sealed partial class PdfWorkbench : UserControl, IDisposable
     private void Activate(DocumentContext context)
     {
         if (_active is not null) _active.Viewport.FinishText(true);
-        _active = context; _imageSnapshot = null; _nativeImages = []; _imageSelection = -1; _home = false; _documentHost.Children.Clear(); _documentHost.Children.Add(context.Viewport);
+        _homeHost.Content = null; // Hidden recent-document cards must not retain closed sessions.
+        _active = context; _imageSnapshot.Clear(); _nativeImages = []; _imageSelection = -1; _home = false; _documentHost.Children.Clear(); _documentHost.Children.Add(context.Viewport);
         _organizerHost.Content = new PdfThumbnailView(context.Viewport) { OrganizeMode = true };
         BuildLeft(); RefreshData(); UpdateModeVisibility(); ShowStatus(Session.Document.IsSensitive ? "Unlocked protected PDF: automatic recovery disabled. Workspace copies would be unencrypted." : "All files stay on your device.");
     }
@@ -98,6 +99,7 @@ public sealed partial class PdfWorkbench : UserControl, IDisposable
         context.Search.Clear(); context.Viewport.Dispose(); _documents.Remove(context); _tabs.Children.Remove(context.Tab);
         if (_documents.Count == 0) AddDocument(new PdfWorkspace());
         else if (_active == context) Activate(_documents[^1]);
+        if (_home) ShowHome();
         UpdateTabs();
     }
     private void UpdateTabs() { foreach (var d in _documents) d.Tab.Update(d.Session.Document.Title, d == _active && !_home, d.Session.IsDirty); }
@@ -107,6 +109,7 @@ public sealed partial class PdfWorkbench : UserControl, IDisposable
     {
         UpdateTabs(); RefreshNativeImages(); UpdateChrome(); RefreshRight(); (_organizerHost.Content as PdfThumbnailView)?.Invalidate();
     }
+    private readonly WorkspaceSnapshotStamp _chromeDocument = new();
     private void UpdateChrome()
     {
         if (_active is null) return;
@@ -115,8 +118,12 @@ public sealed partial class PdfWorkbench : UserControl, IDisposable
         _undo.IsEnabled = Session.CanUndo; _redo.IsEnabled = Session.CanRedo;
         foreach (var (tool, button) in _toolButtons) button.Select(Session.Tool == tool);
         _selectionBar.Visibility = Session.SelectedAnnotation is not null && !_home && _mode != "Organize pages" ? Visibility.Visible : Visibility.Collapsed;
-        _documentInfo.Text = $"{Session.Document.Pages.Length} pages  ·  {Session.Document.AnnotationCount} annotations  ·  Local only";
-        (_rightHost.Content as Grid)?.InvalidateMeasure(); StateChanged?.Invoke();
+        if (!_chromeDocument.Matches(Session.Document))
+        {
+            _chromeDocument.Remember(Session.Document);
+            _documentInfo.Text = $"{Session.Document.Pages.Length} pages  ·  {Session.Document.AnnotationCount} annotations  ·  Local only";
+        }
+        StateChanged?.Invoke();
     }
     private void SetMode(string mode)
     { _mode = mode; _home = false; _leftOpen = true; BuildLeft(); UpdateModeVisibility(); AdaptLayout(); }

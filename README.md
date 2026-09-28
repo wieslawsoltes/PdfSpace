@@ -1,7 +1,11 @@
 <div align="center">
 
 # PdfSpace
-### Read, edit and review PDFs — on your device.
+### New in 0.4.1
+
+Native image import/replacement now honors all EXIF orientations, preserves eligible JPEG compression and streams PNG alpha/RGB compression without full-image staging arrays. Image duplication shares source data; Restore image proportions works after rotation. Undo history now has a distinct-source byte budget alongside its entry cap, with explicit history release in Properties. [Photograph workflows](docs/photo-import.md) · [Performance and memory](docs/performance.md).
+
+## Read, edit and review PDFs — on your device.
 
 [![Build](https://github.com/wieslawsoltes/PdfSpace/actions/workflows/build.yml/badge.svg)](https://github.com/wieslawsoltes/PdfSpace/actions/workflows/build.yml)
 [![Desktop](https://github.com/wieslawsoltes/PdfSpace/actions/workflows/desktop.yml/badge.svg)](https://github.com/wieslawsoltes/PdfSpace/actions/workflows/desktop.yml)
@@ -13,7 +17,7 @@
 
 PdfSpace is an independent, local-first PDF application built in **C# with Uno Platform and SkiaSharp**. The browser runs a real Uno WebAssembly application with the same document, editing and rendering libraries as the desktop host. An Acrobat-inspired shell brings together document tabs, floating quick tools, comments, form preparation, original-text editing, protection, redaction and page organization.
 
-> **0.4.0-alpha.1:** functional PDF workflows, not complete or pixel-identical Adobe Acrobat compatibility. PdfSpace has original branding and icons and is not affiliated with Adobe. Review the [save and security boundaries](docs/compatibility.md) before processing important documents.
+> **0.4.1-alpha.1:** functional PDF workflows, not complete or pixel-identical Adobe Acrobat compatibility. PdfSpace has original branding and icons and is not affiliated with Adobe. Review the [save and security boundaries](docs/compatibility.md) before processing important documents.
 
 ## Existing-PDF editing and performance in 0.4
 

@@ -60,3 +60,9 @@ Image-only PDF recognition, PNG/JPEG-to-PDF import, English/Polish/German models
 ## Native objects and performance (0.4)
 
 See [native object editing](native-object-editing.md) for copy-on-write occurrence isolation, encoding and graphics-state limits, and [performance](performance.md) for indexed viewport/search geometry, source reuse, cache bounds and reproducible measurements. These operations retain original bytes in undo/workspaces and must not be mistaken for sanitization.
+
+## Photo and history update (0.4.1)
+
+PNG/JPEG insertion, replacement and image-to-PDF now support all EXIF orientations. Unrotated 8-bit Gray/RGB/YCbCr JPEGs without ICC metadata retain original compressed samples; others decode to sRGB with row-streamed RGB/alpha compression. Native duplicate and restore-proportions commands are supported. Input is limited to one frame, 32 MiB, 16 megapixels and 8192 pixels per axis. Clipping-path editing, inline-image rewriting, global object arrangement and general reflow remain unimplemented. Ordinary duplication, replacement and history clearing are not sanitization.
+
+Undo retains at most 100 entries and 128 MiB of distinct original/preview buffers by default, pruning oldest undo entries as required. Current state is always retained. The budget is per session and does not count all managed/native/UI memory; external owners can retain additional snapshots. See [photo-import.md](photo-import.md) and [performance.md](performance.md).

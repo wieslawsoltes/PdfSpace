@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.4.1-alpha.1 — 2026-09-28
+
+- Native image insertion, replacement and image-to-PDF honor all eight EXIF orientations.
+- Eligible 8-bit Gray/RGB/YCbCr JPEGs retain original compressed bytes; profiled/rotated/other supported photos decode to sRGB. PNG RGB/soft-mask samples are compressed row by row.
+- Native image duplication shares the encoded resource; restoring proportions preserves center and affine orientation.
+- Reference-counted original/preview buffer retention limits undo history to 100 entries and 128 MiB by default; current state is never discarded. Saved-state identity no longer pins discarded snapshots. Properties expose history accounting and confirmed clearing.
+- Viewport updates no longer rebuild identical toolbar selection brushes or recount unchanged document statistics.
+- Additional native/real-browser regression checks and native verification of browser JPEG/orientation exports.
+
 ## 0.4.0-alpha.1 — 2026-09-28
 
 - Native image occurrence editing: direct selection/move/resize, precise geometry, rotation/reflection, replacement, insertion and deletion; copy-on-write nested Form-XObject/resource isolation.

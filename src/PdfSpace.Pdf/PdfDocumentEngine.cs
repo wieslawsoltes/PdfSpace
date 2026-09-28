@@ -113,7 +113,7 @@ public static class PdfDocumentEngine
         WorkspaceJson.Validate(result); return result;
     }
     public static PdfInspection Inspect(byte[] bytes) { using var document = OpenNative(bytes); return Inspect(document); }
-    private static PdfInspection Inspect(PdfDocument document)
+    internal static PdfInspection Inspect(PdfDocument document)
     {
         var form = PdfObjects.Dictionary(document.Internals.Catalog.Elements["/AcroForm"]); var widgets = 0; var signatures = 0; var annotations = 0;
         foreach (var page in document.Pages)

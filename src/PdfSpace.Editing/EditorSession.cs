@@ -5,7 +5,13 @@ public sealed record HistoryEntry(string Label, PdfWorkspace Before, PdfWorkspac
 public sealed partial class EditorSession
 {
     private readonly List<HistoryEntry> _undo = [], _redo = [];
-    private PdfWorkspace _saved;
+    private readonly WeakReference<PdfWorkspace> _saved;
+    private readonly SourceRetention _retention = new();
+    public EditorHistoryOptions HistoryOptions { get; }
+    public long RetainedSourceBytes => _retention.Bytes;
+    public int UndoCount => _undo.Count;
+    public int RedoCount => _redo.Count;
+    public long PrunedHistoryEntries { get; private set; }
     public PdfWorkspace Document { get; private set; }
     public event EventHandler? Changed;
     public event EventHandler? ViewChanged;
@@ -17,14 +23,20 @@ public sealed partial class EditorSession
     public double FontSize { get; set; } = 14;
     public string PendingText { get; set; } = "";
     public long Revision { get; private set; }
-    public bool IsDirty => !ReferenceEquals(_saved, Document);
+    public bool IsDirty => !_saved.TryGetTarget(out var saved) || !ReferenceEquals(saved, Document);
     public bool CanUndo => _undo.Count > 0;
     public bool CanRedo => _redo.Count > 0;
     public string UndoLabel => CanUndo ? _undo[^1].Label : "";
     public PdfPageState Page => Document.Pages[CurrentPage];
     public Annotation? SelectedAnnotation => Page.Annotations.FirstOrDefault(a => a.Id == SelectedAnnotationId);
-    public EditorSession(PdfWorkspace document) { WorkspaceJson.Validate(document); Document = _saved = document; }
-    public void MarkSaved() { _saved = Document; ViewChanged?.Invoke(this, EventArgs.Empty); }
+    public EditorSession(PdfWorkspace document) : this(document, new EditorHistoryOptions()) { }
+    public EditorSession(PdfWorkspace document, EditorHistoryOptions historyOptions)
+    {
+        ArgumentNullException.ThrowIfNull(historyOptions); historyOptions.Validate();
+        WorkspaceJson.Validate(document); Document = document; _saved = new(document);
+        HistoryOptions = historyOptions; _retention.Add(document);
+    }
+    public void MarkSaved() { _saved.SetTarget(Document); ViewChanged?.Invoke(this, EventArgs.Empty); }
     public void SetTool(PdfTool tool)
     {
         if (!Enum.IsDefined(tool)) throw new ArgumentOutOfRangeException(nameof(tool));
@@ -35,9 +47,30 @@ public sealed partial class EditorSession
     public void Execute(string label, Func<PdfWorkspace, PdfWorkspace> command)
     {
         var before = Document; var after = command(before); if (ReferenceEquals(before, after)) return;
-        WorkspaceJson.Validate(after); _undo.Add(new(label, before, after));
-        if (_undo.Count > 100) _undo.RemoveAt(0);
-        _redo.Clear(); Document = after; Notify();
+        WorkspaceJson.Validate(after);
+        foreach (var entry in _redo) Release(entry);
+        _redo.Clear();
+        _retention.Add(before); _retention.Add(after);
+        _undo.Add(new(label, before, after));
+        SetDocument(after);
+        // Never discard current state. A current source larger than the budget
+        // remains editable, but no historical buffers are kept merely for undo.
+        while (_undo.Count > 0 && (_undo.Count > HistoryOptions.MaximumEntries || _retention.Bytes > HistoryOptions.MaximumSourceBytes))
+        {
+            var oldest = _undo[0]; _undo.RemoveAt(0); Release(oldest); PrunedHistoryEntries++;
+        }
+        Notify();
+    }
+    private void Release(HistoryEntry entry) { _retention.Remove(entry.Before); _retention.Remove(entry.After); }
+    private void SetDocument(PdfWorkspace document)
+    { _retention.Add(document); _retention.Remove(Document); Document = document; }
+
+    /// <summary>Releases undo/redo history without changing the current document or saved-state identity.</summary>
+    public void ClearHistory()
+    {
+        foreach (var entry in _undo) Release(entry);
+        foreach (var entry in _redo) Release(entry);
+        _undo.Clear(); _redo.Clear(); ViewChanged?.Invoke(this, EventArgs.Empty);
     }
     private void Notify()
     {
@@ -46,8 +79,8 @@ public sealed partial class EditorSession
         if (!Page.Fields.Any(field => field.Id == SelectedFieldId)) SelectedFieldId = null;
         Revision++; Changed?.Invoke(this, EventArgs.Empty);
     }
-    public void Undo() { if (!CanUndo) return; var entry = _undo[^1]; _undo.RemoveAt(_undo.Count - 1); _redo.Add(entry); Document = entry.Before; Notify(); }
-    public void Redo() { if (!CanRedo) return; var entry = _redo[^1]; _redo.RemoveAt(_redo.Count - 1); _undo.Add(entry); Document = entry.After; Notify(); }
+    public void Undo() { if (!CanUndo) return; var entry = _undo[^1]; _undo.RemoveAt(_undo.Count - 1); _redo.Add(entry); SetDocument(entry.Before); Notify(); }
+    public void Redo() { if (!CanRedo) return; var entry = _redo[^1]; _redo.RemoveAt(_redo.Count - 1); _undo.Add(entry); SetDocument(entry.After); Notify(); }
     public void AddAnnotation(Annotation annotation, int? pageIndex = null)
     {
         var index = pageIndex ?? CurrentPage;

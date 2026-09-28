@@ -36,6 +36,12 @@ public sealed partial class PdfWorkbench
             json.WriteEndArray();
             json.WriteNumber("nativeImages", _nativeImages.Length); json.WriteNumber("selectedImage", _imageSelection);
             if ((uint)_imageSelection < _nativeImages.Length) { var image = _nativeImages[_imageSelection]; json.WriteStartObject("imageBounds"); json.WriteNumber("x", image.Bounds.X); json.WriteNumber("y", image.Bounds.Y); json.WriteNumber("width", image.Bounds.Width); json.WriteNumber("height", image.Bounds.Height); json.WriteEndObject(); }
+            json.WriteNumber("retainedSourceBytes", Session.RetainedSourceBytes);
+            json.WriteNumber("undoCount", Session.UndoCount); json.WriteNumber("redoCount", Session.RedoCount);
+            json.WriteNumber("prunedHistoryEntries", Session.PrunedHistoryEntries);
+            json.WriteStartArray("imageSamples");
+            foreach (var image in _nativeImages) { json.WriteStartObject(); json.WriteNumber("width", image.PixelWidth); json.WriteNumber("height", image.PixelHeight); json.WriteEndObject(); }
+            json.WriteEndArray();
             json.WriteStartArray("controls");
             void Visit(DependencyObject node, bool visible)
             {

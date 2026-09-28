@@ -4,7 +4,7 @@ namespace PdfSpace.Workbench;
 public sealed partial class PdfWorkbench
 {
     private PdfImageOccurrence[] _nativeImages = [];
-    private PdfWorkspace? _imageSnapshot;
+    private readonly WorkspaceSnapshotStamp _imageSnapshot = new();
     private Guid _imagePageId;
     private int _imageSelection = -1;
     private bool _refreshingImages;
@@ -18,11 +18,11 @@ public sealed partial class PdfWorkbench
     private void RefreshNativeImages()
     {
         if (_refreshingImages || _active is null || Session.Tool != PdfTool.EditImage ||
-            (ReferenceEquals(_imageSnapshot, Session.Document) && _imagePageId == Session.Page.Id)) return;
+            (_imageSnapshot.Matches(Session.Document) && _imagePageId == Session.Page.Id)) return;
         _refreshingImages = true;
         try
         {
-            _imageSnapshot = Session.Document; _imagePageId = Session.Page.Id; _imageSelection = -1;
+            _imageSnapshot.Remember(Session.Document); _imagePageId = Session.Page.Id; _imageSelection = -1;
             _nativeImages = PdfImageEditor.Read(Session.Document, Session.CurrentPage);
             Viewport.SetNativeImages(_nativeImages.Select((image, index) => new NativeImageTarget(index, image.Bounds,
                 [image.UnitToPage.Transform(new(0, 0)), image.UnitToPage.Transform(new(1, 0)), image.UnitToPage.Transform(new(1, 1)), image.UnitToPage.Transform(new(0, 1))], image.Editable)).ToArray());
@@ -36,7 +36,7 @@ public sealed partial class PdfWorkbench
     }
     private void EditSourceImage(DocumentContext context, int index, Func<PdfWorkspace, PdfImageOccurrence, PdfWorkspace> edit, string label)
     {
-        if (_active != context || !ReferenceEquals(_imageSnapshot, context.Session.Document) || (uint)index >= _nativeImages.Length)
+        if (_active != context || !_imageSnapshot.Matches(context.Session.Document) || (uint)index >= _nativeImages.Length)
             throw new InvalidOperationException("The selected image changed. Select it again.");
         var target = _nativeImages[index]; context.Viewport.FinishText(true);
         context.Session.Execute(label, document => edit(document, target));
@@ -81,12 +81,15 @@ public sealed partial class PdfWorkbench
             if (!ReferenceEquals(snapshot, context.Session.Document)) throw new InvalidOperationException("The document changed while choosing the image.");
             EditSourceImage(context, selectedIndex, (document, image) => PdfImageEditor.Replace(document, image, file.Bytes), "Replace image");
         })) { IsEnabled = selected.Editable });
+        Command("Restore image proportions", PdfIconKind.FitPage, PdfImageEditor.RestoreAspectRatio);
+        Command("Duplicate image", PdfIconKind.Copy, (document, image) => PdfImageEditor.Duplicate(document, image, new PointD(24, 24)));
         Command("Rotate image left", PdfIconKind.Rotate, (document, image) => PdfImageEditor.Rotate(document, image, -90));
         Command("Rotate image right", PdfIconKind.Rotate, (document, image) => PdfImageEditor.Rotate(document, image, 90));
         Command("Flip image horizontally", PdfIconKind.Left, (document, image) => PdfImageEditor.Flip(document, image, true));
         Command("Flip image vertically", PdfIconKind.Up, (document, image) => PdfImageEditor.Flip(document, image, false));
         content.Children.Add(new PdfCommandButton("Delete source image", PdfIconKind.Trash, () => Run(DeleteSourceImageAsync)) { IsEnabled = selected.Editable });
         content.Children.Add(Paragraph(selected.Limitation, 11));
+        content.Children.Add(Paragraph("PNG transparency and all EXIF orientations are supported. Eligible JPEGs retain their original compression; other images are normalized to sRGB.", 11));
     }
     private async Task DeleteSourceImageAsync()
     {

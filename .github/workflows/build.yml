@@ -15,6 +15,12 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
+      - name: Source snapshot
+        run: git archive --format=zip --output=/tmp/PdfSpace-source.zip HEAD
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PdfSpace-source
+          path: /tmp/PdfSpace-source.zip
       - uses: actions/setup-dotnet@v4
         with:
           global-json-file: global.json
@@ -66,9 +72,7 @@ jobs:
           npx playwright install --with-deps chromium
           python3 scripts/serve-site.py --directory artifacts/site --port 4173 > artifacts/server.log 2>&1 &
           npm run test:browser
-          dotnet run --project tests/PdfSpace.Tests -c Release -- --verify-browser-security artifacts/browser-exports
-          dotnet run --project tests/PdfSpace.Tests -c Release -- --verify-browser-ocr artifacts/browser-exports
-          dotnet run --project tests/PdfSpace.Tests -c Release -- --verify-browser-objects artifacts/browser-exports
+          bash scripts/verify-browser-exports.sh artifacts/browser-exports
       - name: Package reusable libraries
         run: |
           for project in src/*/*.csproj; do
@@ -101,11 +105,3 @@ jobs:
           name: PdfSpace-packages
           path: artifacts/packages
           if-no-files-found: ignore
-      - name: Source snapshot
-        if: always()
-        run: git archive --format=zip --output=/tmp/PdfSpace-source.zip HEAD
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: PdfSpace-source
-          path: /tmp/PdfSpace-source.zip

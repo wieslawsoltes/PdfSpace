@@ -19,6 +19,7 @@ public sealed class PdfCommandButton : Button
     }
     public void Select(bool selected)
     {
+        if (IsSelected == selected) return;
         IsSelected = selected; Background = PdfTheme.Brush(selected ? "#E7F0FF" : "#00FFFFFF");
         _icon.Color = selected ? 0xFF0865CB : 0xFF363636; _label.Foreground = PdfTheme.Brush(selected ? "#0865CB" : "#292929");
     }

@@ -31,3 +31,15 @@ PDFSPACE_TEST_NATIVE_OCR=1 dotnet run --project tests/PdfSpace.Tests -c Release
 ```
 
 The build retains structured fixtures and measurement JSON in `PdfSpace-structured-validation`. Browser tests exercise actual pointer/keyboard/file-picker operations and export native PDFs for independent reopening by the native backend. Physical GPU profiling, large real-world document corpora and process-wide peak-memory measurements remain separate work.
+
+## Photo import and history source budgets (0.4.1)
+
+`PdfImageEditor.OpenImage` is the native image-to-PDF entry point used by the workbench. Unrotated 8-bit Gray/RGB/YCbCr JPEGs without embedded ICC profiles are stored as original `DCTDecode` bytes after bounded marker/frame/scan checks. Their samples are not expanded or recompressed at import. A later renderer will still decode them to display the page. Profiled JPEGs, CMYK and oriented photographs use Skia's sRGB decoder instead of being mislabeled as ordinary RGB.
+
+The fallback path decodes one native RGBA bitmap and writes RGB and optional alpha to zlib streams a row at a time. It normalizes all eight EXIF orientations while walking samples, so no second rotated bitmap is necessary. It replaces the old full-image RGB and alpha arrays with at most `4 * orientedWidth` scratch bytes. The native bitmap and compressed output still consume memory. At 1600 × 1000, the eliminated RGB/alpha staging was 6.4 MB. `PhotoImportTests` records current-thread allocations, elapsed import time and encoded/output sizes in `photo-performance.json`; these are not process-wide peak-memory or application frame-rate measurements.
+
+`EditorHistoryOptions` limits retained history to 100 entries and 128 MiB of distinct original/preview source arrays by default. Reference counting is per immutable snapshot and per byte-array identity: metadata edits and aliases do not multiply the charge. On a new edit the oldest undo entries are pruned until the count and source budget are satisfied. Current state is never discarded even when it alone exceeds the budget. Undo/redo transfer existing registrations; branching releases redo buffers. A weak saved-state marker preserves clean/dirty identity without rooting a discarded source snapshot.
+
+The source budget is **not a whole-application memory limit**. It excludes annotation object graphs, renderer/native allocations, exported copies, and caller-owned snapshots. Eight open tabs can each retain their own budget. `RetainedSourceBytes`, `UndoCount`, `RedoCount` and `PrunedHistoryEntries` expose the behavior. Properties includes a confirmation-gated Clear undo history action; it changes neither the current document nor whether it needs saving.
+
+Toolbar selection setters now skip unchanged state, avoiding brush allocation on each pointer update. Footer document statistics are recomputed only for a new immutable document snapshot; viewport changes no longer explicitly invalidate the right panel's measure.
