@@ -30,8 +30,9 @@ jobs:
           pathlib.Path('/tmp/photo041.patch').write_bytes(patch)
           print('Verified',len(patch),'bytes of source changes')
           PY
-          git apply --check /tmp/photo041.patch
-          git apply /tmp/photo041.patch
+          # Workflow edits are applied separately through the authorized connector.
+          git apply --check --exclude='.github/workflows/*' /tmp/photo041.patch
+          git apply --exclude='.github/workflows/*' /tmp/photo041.patch
           git diff --check
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
