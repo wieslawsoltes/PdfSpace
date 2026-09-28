@@ -18,6 +18,7 @@ public sealed partial class PdfViewport
     private int[] _objectSelectionOrdinals = [];
     private readonly List<int> _drawObjects = [];
     private RectD _objectSelectionBounds;
+    private bool _objectSelectionEditable;
     private RectD _objectInitial;
     private int? _objectToggleOnClick;
     private RectD? _objectPreview;
@@ -51,6 +52,7 @@ public sealed partial class PdfViewport
         _objectSelectionOrdinals = [];
         _objectSelectionSet.Clear();
         _objectSelectionBounds = default;
+        _objectSelectionEditable = false;
         _objectPreview = null;
         Invalidate();
     }
@@ -64,9 +66,12 @@ public sealed partial class PdfViewport
         _objectSelectionSet = new(_objectSelection);
         _objectSelectionOrdinals = _objectSelection.Select(index => _objectOrdinals[index]).Order().ToArray();
         _objectSelectionBounds = default;
+        _objectSelectionEditable = next.Length > 0;
         for (var index = 0; index < _objectSelection.Length; index++)
         {
-            var bounds = _objectLookup[_objectSelection[index]].Bounds;
+            var target = _objectLookup[_objectSelection[index]];
+            var bounds = target.Bounds;
+            _objectSelectionEditable &= target.Editable;
             _objectSelectionBounds = index == 0 ? bounds : RectD.Union(_objectSelectionBounds, bounds);
         }
         if (notify)
@@ -94,7 +99,7 @@ public sealed partial class PdfViewport
         if (Session.Tool != PdfTool.EditObject)
             return false;
         var additive = args.KeyModifiers.HasFlag(VirtualKeyModifiers.Shift) || args.KeyModifiers.HasFlag(VirtualKeyModifiers.Control);
-        if (EditObjectPoints && _objectSelection.Length == 1)
+        if (EditObjectPoints && _objectSelectionEditable && _objectSelection.Length == 1)
         {
             var selected = _objectLookup.GetValueOrDefault(_objectSelection[0]);
             _objectNode = selected?.Points.FirstOrDefault(p => p.Position.Distance(_start) <= 7 / Zoom);
@@ -106,7 +111,7 @@ public sealed partial class PdfViewport
             }
         }
 
-        if (_objectSelection.Length > 0 && !args.KeyModifiers.HasFlag(VirtualKeyModifiers.Control))
+        if (_objectSelectionEditable && !args.KeyModifiers.HasFlag(VirtualKeyModifiers.Control))
         {
             var bounds = ObjectBounds();
             var handle = Array.FindIndex(Handles(bounds), p => p.Distance(_start) <= 7 / Zoom);
@@ -137,12 +142,16 @@ public sealed partial class PdfViewport
         {
             // Shift-click toggles, but Shift-drag must retain an already selected object
             // so the same modifier can constrain its movement.
-            if (_objectSelectionSet.Contains(hit.Index)) _objectToggleOnClick = hit.Index;
+            if (_objectSelectionSet.Contains(hit.Index))
+            {
+                if (_objectSelectionEditable) _objectToggleOnClick = hit.Index;
+                else SelectNativeObjects(_objectSelection.Where(index => index != hit.Index));
+            }
             else SelectNativeObjects(_objectSelection.Append(hit.Index));
         }
         else if (!_objectSelectionSet.Contains(hit.Index))
             SelectNativeObjects([hit.Index]);
-        if (_objectSelection.Length > 0 && _objectSelection.All(index => _objectLookup[index].Editable))
+        if (_objectSelectionEditable)
         {
             _objectInitial = ObjectBounds();
             _objectPreview = _objectInitial;
@@ -259,7 +268,7 @@ public sealed partial class PdfViewport
             return true;
         }
 
-        if (_objectSelection.Length > 0 && args.Key is VirtualKey.Left or VirtualKey.Right or VirtualKey.Up or VirtualKey.Down)
+        if (_objectSelectionEditable && args.Key is VirtualKey.Left or VirtualKey.Right or VirtualKey.Up or VirtualKey.Down)
         {
             var n = DownKey(VirtualKey.Shift) ? 10 : 1;
             var d = args.Key switch
@@ -325,7 +334,7 @@ public sealed partial class PdfViewport
             }
 
             canvas.DrawRect(PdfRenderer.Rect(bounds), line);
-            if (selected && EditObjectPoints && _objectSelection.Length == 1)
+            if (selected && _objectSelectionEditable && EditObjectPoints && _objectSelection.Length == 1)
                 foreach (var point in item.Points)
                 {
                     var p = point == _objectNode && _objectNodePreview is { } np ? np : point.Position;
@@ -340,7 +349,7 @@ public sealed partial class PdfViewport
             line.Color = new(20, 115, 230);
             var bounds = _objectPreview ?? ObjectBounds();
             canvas.DrawRect(PdfRenderer.Rect(bounds), line);
-            if (!EditObjectPoints)
+            if (!EditObjectPoints && _objectSelectionEditable)
                 foreach (var point in Handles(bounds))
                 {
                     var r = PdfRenderer.Rect(new(point.X - 3 / Zoom, point.Y - 3 / Zoom, 6 / Zoom, 6 / Zoom));
