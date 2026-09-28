@@ -1,0 +1,37 @@
+name: Review rotation handle selection
+on:
+  push:
+    branches: [build/rotation-snapping-0.5.3]
+    paths: [.github/workflows/handle-selection-review.yml]
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/rotation-snapping-0.5.3
+          fetch-depth: 0
+      - name: Apply exact reviewed routing and fixture targeting
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = '65e0c2d1630e5842a22b3f18540de0480e3c046d'
+          python3 - <<'PY'
+          from pathlib import Path
+          def edit(path,old,new):
+              p=Path(path);text=p.read_text();assert text.count(old)==1,(path,old);p.write_text(text.replace(old,new))
+          edit('src/PdfSpace.Viewer/PdfViewport.ObjectManipulation.cs','private bool TryBeginObjectRotation(PointD screen)\n    {\n        if (NativeObjectRotationHandle is not { } handle) return false;', 'private bool TryBeginObjectRotation(PointD screen, bool bypassHandles)\n    {\n        // Match resize-handle routing: Ctrl-click selects underlying content.\n        // Shift remains available for constrained rotation from pointer-down.\n        if (bypassHandles || NativeObjectRotationHandle is not { } handle) return false;')
+          edit('src/PdfSpace.Viewer/PdfViewport.Input.cs','if (TryBeginObjectRotation(screen))','if (TryBeginObjectRotation(screen, e.KeyModifiers.HasFlag(VirtualKeyModifiers.Control)))')
+          edit('tests/browser/unified-objects.spec.mjs','await point(page,130,210,true);','await point(page,90,210,true); // Use unobstructed text, not the rotation handle above the current selection.')
+          edit('docs/object-editing.md','Hold Shift for 15-degree increments.','Hold Shift for 15-degree increments. Ctrl-click bypasses rotation/resize handles to select an underlying object when a handle overlaps it.')
+          PY
+          git diff --check
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src docs tests
+          test "$(git write-tree)" = '72dd768f6dc684942a3c736052ac6a559593e046'
+          git commit -m 'fix: let Ctrl-click select native objects beneath rotation handles'
+          git push origin HEAD:feat/rotation-snapping-0.5.3
