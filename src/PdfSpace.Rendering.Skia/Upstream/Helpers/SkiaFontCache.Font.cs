@@ -274,6 +274,7 @@ namespace PdfSpace.Rendering.Skia.Helpers
 
         private static string? GetTrueTypeFontFontName(string? fontName)
         {
+            if (string.IsNullOrEmpty(fontName)) return null;
             TrueTypeFont trueTypeFont = SystemFontFinder.Instance.GetTrueTypeFont(fontName);
             return trueTypeFont?.TableRegister?.NameTable?.FontFamilyName;
         }

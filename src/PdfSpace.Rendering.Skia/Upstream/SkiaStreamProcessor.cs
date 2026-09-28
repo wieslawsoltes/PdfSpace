@@ -89,7 +89,7 @@ internal partial class SkiaStreamProcessor : BaseStreamProcessor<SKPicture>
     /// </summary>
     private SKPath? _textClipPath;
 
-    private SKCanvas _canvas;
+    private SKCanvas _canvas = null!; // Assigned by Process before operation dispatch.
 
     public SkiaStreamProcessor(
         int pageNumber,

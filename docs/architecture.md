@@ -37,7 +37,7 @@ Annotation coordinates are PDF points with a top-left origin in the logical sour
 
 ## Rendering
 
-PdfPig parses the document; PdfPig.Rendering.Skia produces an `SKPicture` for a page. `PdfRenderer` owns parsed sources and an LRU of pictures with a default capacity of twelve. The document viewport and thumbnail view share a renderer. Offscreen pages are not painted. Each document tab owns its own renderer and releases it when closed.
+PdfPig parses the document; The source-pinned `PdfSpace.Rendering.Skia` adaptation produces an `SKPicture` for a page. `PdfRenderer` owns parsed sources and an LRU of pictures with a default capacity of twelve. The document viewport and thumbnail view share a renderer. Offscreen pages are not painted. Each document tab owns its own renderer and releases it when closed.
 
 Skia paints the preview source, then workspace annotations and form appearances. A preview-only source copy excludes supported imported objects represented by these overlays so they are not painted twice. It never replaces the editable original source bytes.
 

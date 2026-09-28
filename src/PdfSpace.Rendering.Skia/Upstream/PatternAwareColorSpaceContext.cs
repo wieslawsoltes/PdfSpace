@@ -57,7 +57,7 @@ internal sealed class PatternAwareColorSpaceContext : IColorSpaceContext
 
     public void SetStrokingColor(double[] operands, NameToken? patternName = null)
     {
-        LastStrokingPatternOperands = patternName is not null && operands?.Length > 0
+        LastStrokingPatternOperands = patternName is not null && operands.Length > 0
             ? operands : null;
         _inner.SetStrokingColor(operands, patternName);
     }
@@ -82,7 +82,7 @@ internal sealed class PatternAwareColorSpaceContext : IColorSpaceContext
 
     public void SetNonStrokingColor(double[] operands, NameToken? patternName = null)
     {
-        LastNonStrokingPatternOperands = patternName is not null && operands?.Length > 0
+        LastNonStrokingPatternOperands = patternName is not null && operands.Length > 0
             ? operands : null;
         _inner.SetNonStrokingColor(operands, patternName);
     }

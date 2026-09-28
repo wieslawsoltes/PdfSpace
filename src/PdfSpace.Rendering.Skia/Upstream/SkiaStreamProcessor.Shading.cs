@@ -256,6 +256,7 @@ internal partial class SkiaStreamProcessor
             {
                 paint.Style = SKPaintStyle.Stroke;
                 paint.StrokeWidth = (float)currentState.LineWidth;
+                paint.StrokeMiter = (float)currentState.MiterLimit;
                 paint.StrokeJoin = currentState.JoinStyle.ToSKStrokeJoin();
                 paint.StrokeCap = currentState.CapStyle.ToSKStrokeCap();
                 dash = currentState.LineDashPattern.ToSKPathEffect();

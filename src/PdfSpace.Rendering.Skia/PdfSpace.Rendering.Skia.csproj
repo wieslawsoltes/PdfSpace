@@ -13,6 +13,6 @@
     <PackageReference Include="PdfPig.Filters.Jpx.OpenJpeg" Version="0.1.16" />
     <PackageReference Include="SkiaSharp" Version="3.119.4" />
     <PackageReference Include="SkiaSharp.HarfBuzz" Version="3.119.4" />
-    <None Update="LICENSE*;NOTICE*;UPSTREAM.json" Pack="true" PackagePath="/" />
+    <None Update="LICENSE*;NOTICE*;UPSTREAM.json;ADAPTATIONS.md" Pack="true" PackagePath="/" />
   </ItemGroup>
 </Project>

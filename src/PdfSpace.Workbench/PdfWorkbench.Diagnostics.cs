@@ -44,6 +44,8 @@ public sealed partial class PdfWorkbench
             json.WriteEndArray();
             json.WriteNumber("nativeObjects", _pageObjects.Length);
             json.WriteNumber("objectIndexBuilds", _objectIndexBuilds);
+            json.WriteNumber("objectHitBoundsTested", Viewport.LastObjectHitTestCount);
+            json.WriteNumber("visibleObjectOutlines", Viewport.VisibleObjectOutlineCount);
             json.WriteStartArray("selectedObjects");
             foreach (var i in _selectedObjects)
                 json.WriteNumberValue(i);
@@ -60,6 +62,18 @@ public sealed partial class PdfWorkbench
                 json.WriteNumber("width", item.Bounds.Width);
                 json.WriteNumber("height", item.Bounds.Height);
                 json.WriteBoolean("editable", item.Editable);
+                void PaintNumber(string name, double? value) { if (value is { } n) json.WriteNumber(name, n); else json.WriteNull(name); }
+                PaintNumber("fillOpacity", item.Paint.FillOpacity);
+                PaintNumber("strokeOpacity", item.Paint.StrokeOpacity);
+                PaintNumber("strokeWidth", item.Paint.StrokeWidth);
+                PaintNumber("miterLimit", item.Paint.MiterLimit);
+                PaintNumber("dashPhase", item.Paint.Dash?.Phase);
+                json.WriteString("blend", item.Paint.BlendMode?.ToString());
+                json.WriteString("lineCap", item.Paint.LineCap?.ToString());
+                json.WriteString("lineJoin", item.Paint.LineJoin?.ToString());
+                if (item.Paint.Dash is { } dash)
+                { json.WriteStartArray("dash"); foreach (var length in dash.Lengths) json.WriteNumberValue(length); json.WriteEndArray(); }
+                else json.WriteNull("dash");
                 json.WriteEndObject();
             }
 

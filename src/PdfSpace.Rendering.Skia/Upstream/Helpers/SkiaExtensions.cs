@@ -194,52 +194,25 @@ namespace PdfSpace.Rendering.Skia.Helpers
 
         public static SKPathEffect? ToSKPathEffect(this LineDashPattern lineDashPattern)
         {
-            if (lineDashPattern.Phase == 0 && !(lineDashPattern.Array?.Count > 0))
+            // PdfSpace fix: an odd PDF pattern repeats twice to retain alternating
+            // on/off parity. Dropping its last interval changes the document.
+            var intervals = lineDashPattern.Array;
+            if (intervals is null || intervals.Count == 0) return null;
+            if (intervals.Count > 65536) throw new InvalidOperationException("Excessive dash interval count.");
+            var size = intervals.Count * (intervals.Count % 2 == 0 ? 1 : 2);
+            var pattern = new float[size];
+            double sum = 0;
+            for (var i = 0; i < size; i++)
             {
-                return null;
+                var value = intervals[i % intervals.Count];
+                if (!double.IsFinite(value) || value < 0 || value > float.MaxValue)
+                    throw new InvalidOperationException("Invalid dash interval.");
+                pattern[i] = (float)value;
+                sum += value;
             }
-
-            int size = lineDashPattern.Array.Count;
-            switch (size)
-            {
-                case 1:
-                    {
-                        var v = (float)lineDashPattern.Array[0];
-                        if (Math.Abs(v) < float.Epsilon)
-                        {
-                            v = OneOver72; // TODO - Add tests
-                        }
-                        return SKPathEffect.CreateDash([v, v], lineDashPattern.Phase);
-                    }
-                case > 0:
-                    {
-                        // Skia: The intervals must have an even number of entries.
-                        // See 'PostScript Language Reference - third edition.pdf'
-                        // p175 for odd number of entries
-                        if (size % 2 != 0)
-                        {
-                            size--; // Ignore last entry
-                        }
-
-                        float[] pattern = new float[size];
-                        for (int i = 0; i < size; ++i)
-                        {
-                            var v = (float)lineDashPattern.Array[i];
-                            if (Math.Abs(v) < float.Epsilon)
-                            {
-                                pattern[i] = OneOver72; // See APISmap1.pdf
-                            }
-                            else
-                            {
-                                pattern[i] = v;
-                            }
-                        }
-
-                        return SKPathEffect.CreateDash(pattern, lineDashPattern.Phase);
-                    }
-                default:
-                    return SKPathEffect.CreateDash([0, 0], lineDashPattern.Phase);
-            }
+            if (sum <= 0 || sum > float.MaxValue) throw new InvalidOperationException("Invalid dash cycle.");
+            // Zero-length on intervals are meaningful, e.g. round-cap dotted lines.
+            return SKPathEffect.CreateDash(pattern, lineDashPattern.Phase);
         }
 
         public static SKPaintStyle? ToSKPaintStyle(this TextRenderingMode textRenderingMode)

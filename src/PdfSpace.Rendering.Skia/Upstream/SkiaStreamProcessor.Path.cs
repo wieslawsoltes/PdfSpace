@@ -149,6 +149,7 @@ namespace PdfSpace.Rendering.Skia
 
         private void PaintStrokePath(CurrentGraphicsState currentState)
         {
+            if (_currentPath is null) return;
             if (currentState.CurrentStrokingColor?.ColorSpace == ColorSpace.Pattern)
             {
                 if (currentState.CurrentStrokingColor is not PatternColor pattern)
@@ -159,11 +160,11 @@ namespace PdfSpace.Rendering.Skia
                 switch (pattern.PatternType)
                 {
                     case PatternType.Tiling:
-                        RenderTilingPattern(_currentPath, pattern as TilingPatternColor, true);
+                        RenderTilingPattern(_currentPath, pattern as TilingPatternColor ?? throw new InvalidOperationException("Invalid tiling pattern type."), true);
                         break;
 
                     case PatternType.Shading:
-                        RenderShadingPattern(_currentPath, pattern as ShadingPatternColor, true);
+                        RenderShadingPattern(_currentPath, pattern as ShadingPatternColor ?? throw new InvalidOperationException("Invalid shading pattern type."), true);
                         break;
                 }
             }
@@ -176,7 +177,7 @@ namespace PdfSpace.Rendering.Skia
                     // the inner draw onto the (transparent) layer.
                     var innerPaint = _paintCache.GetPaint(currentState.CurrentStrokingColor, currentState.AlphaConstantStroking, true,
                         (float)currentState.LineWidth, currentState.JoinStyle, currentState.CapStyle,
-                        currentState.LineDashPattern, BlendMode.Normal);
+                        currentState.LineDashPattern, BlendMode.Normal, miterLimit: currentState.MiterLimit);
                     var path = _currentPath;
                     DrawWithSoftMask(softMask!, currentState.BlendMode, () => _canvas.DrawPath(path, innerPaint));
                 }
@@ -184,7 +185,7 @@ namespace PdfSpace.Rendering.Skia
                 {
                     var paint = _paintCache.GetPaint(currentState.CurrentStrokingColor, currentState.AlphaConstantStroking, true,
                         (float)currentState.LineWidth, currentState.JoinStyle, currentState.CapStyle,
-                        currentState.LineDashPattern, currentState.BlendMode);
+                        currentState.LineDashPattern, currentState.BlendMode, miterLimit: currentState.MiterLimit);
                     _canvas.DrawPath(_currentPath, paint);
                 }
             }
@@ -229,11 +230,11 @@ namespace PdfSpace.Rendering.Skia
                 switch (pattern.PatternType)
                 {
                     case PatternType.Tiling:
-                        RenderTilingPattern(_currentPath, pattern as TilingPatternColor, false);
+                        RenderTilingPattern(_currentPath, pattern as TilingPatternColor ?? throw new InvalidOperationException("Invalid tiling pattern type."), false);
                         break;
 
                     case PatternType.Shading:
-                        RenderShadingPattern(_currentPath, pattern as ShadingPatternColor, false);
+                        RenderShadingPattern(_currentPath, pattern as ShadingPatternColor ?? throw new InvalidOperationException("Invalid shading pattern type."), false);
                         break;
                 }
             }
@@ -341,7 +342,7 @@ namespace PdfSpace.Rendering.Skia
                 var knockoutStroke = _paintCache.GetPaint(currentState.CurrentStrokingColor,
                     currentState.AlphaConstantStroking, true, (float)currentState.LineWidth,
                     currentState.JoinStyle, currentState.CapStyle, currentState.LineDashPattern,
-                    BlendMode.Normal, SKBlendMode.Src);
+                    BlendMode.Normal, SKBlendMode.Src, miterLimit: currentState.MiterLimit);
                 _canvas.DrawPath(_currentPath, knockoutStroke);
             }
             finally

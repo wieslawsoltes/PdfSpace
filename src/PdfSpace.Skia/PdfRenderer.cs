@@ -1,7 +1,7 @@
 using PdfSpace.Core;
 using SkiaSharp;
 using UglyToad.PdfPig;
-using UglyToad.PdfPig.Rendering.Skia;
+using PdfSpace.Rendering.Skia;
 namespace PdfSpace.Skia;
 
 /// <summary>Single-thread-affine renderer. Owns all parsed sources and a bounded LRU picture cache.</summary>

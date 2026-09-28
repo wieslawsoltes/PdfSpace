@@ -26,8 +26,9 @@ namespace PdfSpace.Rendering.Skia.Helpers
     {
         private readonly bool _isAntialias;
 
-        private readonly Dictionary<int, SKPaint> _cache = new();
-        private readonly Dictionary<(bool, BlendMode), SKPaint> _imagePaintCache = new();
+        // PdfSpace fix: retain full keys; hash collisions must never alias paint state.
+        private readonly Dictionary<PaintKey, SKPaint> _cache = new();
+        private readonly Dictionary<(bool, BlendMode, byte), SKPaint> _imagePaintCache = new();
 
 #if DEBUG
         private readonly SKPaint _imageDebugPaint;
@@ -49,25 +50,48 @@ namespace PdfSpace.Rendering.Skia.Helpers
 #endif
         }
 
-        private static int GetPaintKey(IColor color, double alpha, bool stroke, float? strokeWidth, LineJoinStyle? joinStyle,
-            LineCapStyle? capStyle, LineDashPattern? dashPattern, BlendMode blendMode)
+        private readonly record struct PaintKey(SKColor Color, bool Stroke, float? Width,
+            LineJoinStyle? Join, LineCapStyle? Cap, DashKey Dash, BlendMode Blend,
+            SKBlendMode? Override, double Miter);
+
+        // Avoid allocating for cache hits. Copy dash intervals only when storing a new key.
+        private readonly struct DashKey : IEquatable<DashKey>
         {
-            return HashCode.Combine(color, alpha, stroke, strokeWidth, joinStyle, capStyle, GetHash(dashPattern), blendMode);
+            private readonly IReadOnlyList<double>? _lengths;
+            private readonly int _phase;
+            public DashKey(LineDashPattern? pattern)
+            { _lengths = pattern?.Array; _phase = pattern?.Phase ?? 0; }
+            private DashKey(IReadOnlyList<double>? lengths, int phase)
+            { _lengths = lengths; _phase = phase; }
+            public DashKey Snapshot()
+            {
+                if (_lengths is null || _lengths.Count == 0) return this;
+                var copy = new double[_lengths.Count];
+                for (var i = 0; i < copy.Length; i++) copy[i] = _lengths[i];
+                return new(copy, _phase);
+            }
+            public bool Equals(DashKey other)
+            {
+                var count = _lengths?.Count ?? 0;
+                if (_phase != other._phase || count != (other._lengths?.Count ?? 0)) return false;
+                for (var i = 0; i < count; i++) if (_lengths![i] != other._lengths![i]) return false;
+                return true;
+            }
+            public override bool Equals(object? other) => other is DashKey key && Equals(key);
+            public override int GetHashCode()
+            {
+                var hash = new HashCode(); hash.Add(_phase);
+                if (_lengths is not null) for (var i = 0; i < _lengths.Count; i++) hash.Add(_lengths[i]);
+                return hash.ToHashCode();
+            }
         }
 
         public SKPaint GetPaint(IColor? color, double alpha, bool stroke, float? strokeWidth, LineJoinStyle? joinStyle,
-            LineCapStyle? capStyle, LineDashPattern? dashPattern, BlendMode blendMode, SKBlendMode? skBlendModeOverride = null)
+            LineCapStyle? capStyle, LineDashPattern? dashPattern, BlendMode blendMode, SKBlendMode? skBlendModeOverride = null, double miterLimit = 10)
         {
             color ??= RGBColor.Black;
-            var key = GetPaintKey(color, alpha, stroke, strokeWidth, joinStyle, capStyle, dashPattern, blendMode);
-
-            if (skBlendModeOverride.HasValue)
-            {
-                // The override is a raw Skia blend mode that has no PDF BlendMode equivalent (e.g.
-                // SKBlendMode.Src for the knockout stroke of an atomic fill+stroke). Fold it into the
-                // key so it never aliases a normal cached paint.
-                key = HashCode.Combine(key, skBlendModeOverride.Value);
-            }
+            var key = new PaintKey(color.ToSKColor(alpha), stroke, strokeWidth, joinStyle,
+                capStyle, new DashKey(dashPattern), blendMode, skBlendModeOverride, miterLimit);
 
             if (_cache.TryGetValue(key, out var paint))
             {
@@ -77,7 +101,7 @@ namespace PdfSpace.Rendering.Skia.Helpers
             paint = new SKPaint()
             {
                 IsAntialias = _isAntialias,
-                Color = color.ToSKColor(alpha),
+                Color = key.Color,
                 Style = stroke ? SKPaintStyle.Stroke : SKPaintStyle.Fill,
                 BlendMode = skBlendModeOverride ?? blendMode.ToSKBlendMode()
             };
@@ -85,36 +109,25 @@ namespace PdfSpace.Rendering.Skia.Helpers
             if (stroke)
             {
                 // Careful - we assume they all have values if stroke!
-                paint.StrokeWidth = strokeWidth.Value;
-                paint.StrokeJoin = joinStyle.Value.ToSKStrokeJoin();
-                paint.StrokeCap = capStyle.Value.ToSKStrokeCap();
-                paint.PathEffect = dashPattern.Value.ToSKPathEffect();
+                paint.StrokeWidth = (strokeWidth ?? throw new ArgumentException("Missing stroke width."));
+                paint.StrokeJoin = (joinStyle ?? throw new ArgumentException("Missing line join.")).ToSKStrokeJoin();
+                paint.StrokeCap = (capStyle ?? throw new ArgumentException("Missing line cap.")).ToSKStrokeCap();
+                paint.StrokeMiter = (float)miterLimit;
+                paint.PathEffect = (dashPattern ?? throw new ArgumentException("Missing dash pattern.")).ToSKPathEffect();
             }
 
-            _cache[key] = paint;
+            _cache[key with { Dash = key.Dash.Snapshot() }] = paint;
 
             return paint;
         }
 
-        private static int GetHash(LineDashPattern? dashPattern)
+        public SKPaint GetPaint(IPdfImage pdfImage, BlendMode blendMode, double alpha)
         {
-            if (!dashPattern.HasValue)
-            {
-                return 0;
-            }
-
-            int key = dashPattern.Value.Phase;
-            for (int n = 0; n < dashPattern.Value.Array.Count; n++)
-            {
-                key = (key * 31) ^ dashPattern.Value.Array[n].GetHashCode();
-            }
-            return key;
-        }
-
-        public SKPaint GetPaint(IPdfImage pdfImage, BlendMode blendMode)
-        {
-            // For non-Normal blend modes, use general cache with ValueTuple key
-            var key = (pdfImage.Interpolate, blendMode);
+            // PDF nonstroking alpha also applies to non-stencil images, in addition
+            // to any per-image or graphics-state soft mask. Key by the actual byte
+            // opacity used by Skia so cache hits cannot reuse another image's alpha.
+            var opacity = (byte)Math.Round(Math.Clamp(double.IsFinite(alpha) ? alpha : 1, 0, 1) * 255);
+            var key = (pdfImage.Interpolate, blendMode, opacity);
 
             if (_imagePaintCache.TryGetValue(key, out var paint))
             {
@@ -124,6 +137,7 @@ namespace PdfSpace.Rendering.Skia.Helpers
             paint = new SKPaint
             {
                 IsAntialias = pdfImage.Interpolate,
+                Color = SKColors.White.WithAlpha(opacity),
                 BlendMode = blendMode.ToSKBlendMode()
             };
             

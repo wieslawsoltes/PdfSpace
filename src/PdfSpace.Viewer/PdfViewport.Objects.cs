@@ -9,6 +9,14 @@ public sealed partial class PdfViewport
     private int[] _objectSelection = [];
     private Dictionary<int, NativeObjectTarget> _objectLookup = [];
     private HashSet<int> _objectSelectionSet = [];
+    private SpatialBoundsIndex _objectSpatial = SpatialBoundsIndex.Empty;
+    private Dictionary<int, int> _objectOrdinals = [];
+    private readonly List<int> _visibleObjects = [];
+    private readonly List<int> _marqueeCandidates = [];
+    public int LastObjectHitTestCount { get; private set; }
+    public int VisibleObjectOutlineCount { get; private set; }
+    private int[] _objectSelectionOrdinals = [];
+    private readonly List<int> _drawObjects = [];
     private RectD _objectSelectionBounds;
     private RectD _objectInitial;
     private RectD? _objectPreview;
@@ -27,9 +35,19 @@ public sealed partial class PdfViewport
     public void SetNativeObjects(NativeObjectTarget[] targets)
     {
         ArgumentNullException.ThrowIfNull(targets);
-        _objectTargets = targets;
-        _objectLookup = targets.ToDictionary(target => target.Index);
+        // Validate the replacement before touching the active selection.
+        var copy = targets.ToArray();
+        var lookup = copy.ToDictionary(target => target.Index);
+        var ordinals = copy.Select((target, ordinal) => (target.Index, ordinal)).ToDictionary(p => p.Index, p => p.ordinal);
+        var spatial = new SpatialBoundsIndex(copy.Select(t => t.Bounds).ToArray());
+        _objectTargets = copy;
+        _objectLookup = lookup;
+        _objectOrdinals = ordinals;
+        _objectSpatial = spatial;
+        _visibleObjects.Clear();
+        _marqueeCandidates.Clear();
         _objectSelection = [];
+        _objectSelectionOrdinals = [];
         _objectSelectionSet.Clear();
         _objectSelectionBounds = default;
         _objectPreview = null;
@@ -41,6 +59,7 @@ public sealed partial class PdfViewport
         ArgumentNullException.ThrowIfNull(indices);
         _objectSelection = indices.Distinct().Where(_objectLookup.ContainsKey).Order().ToArray();
         _objectSelectionSet = new(_objectSelection);
+        _objectSelectionOrdinals = _objectSelection.Select(index => _objectOrdinals[index]).Order().ToArray();
         _objectSelectionBounds = default;
         for (var index = 0; index < _objectSelection.Length; index++)
         {
@@ -98,7 +117,9 @@ public sealed partial class PdfViewport
             }
         }
 
-        var hit = _objectTargets.Reverse().FirstOrDefault(t => t.Bounds.Inflate(3 / Zoom).Contains(_start));
+        var hitOrdinal = _objectSpatial.HitTest(_start, 3 / Zoom, out var testedBounds);
+        LastObjectHitTestCount = testedBounds;
+        var hit = hitOrdinal < 0 ? null : _objectTargets[hitOrdinal];
         if (hit is null)
         {
             _marqueeBase = additive ? _objectSelection.ToArray() : [];
@@ -180,7 +201,10 @@ public sealed partial class PdfViewport
         try
         {
             if (gesture == Gesture.ObjectMarquee && rectangle is { } selection)
-                SelectNativeObjects(marqueeBase.Concat(_objectTargets.Where(t => selection.Intersects(t.Bounds)).Select(t => t.Index)));
+            {
+                _objectSpatial.Query(selection, _marqueeCandidates);
+                SelectNativeObjects(marqueeBase.Concat(_marqueeCandidates.Select(i => _objectTargets[i].Index)));
+            }
             else if (gesture == Gesture.ObjectCrop && rectangle is { Width: > 1, Height: > 1 } crop)
                 NativeObjectsCropped?.Invoke(crop);
             else if (gesture == Gesture.ObjectInsert && rectangle is { Width: > 1, Height: > 1 } insertion)
@@ -267,8 +291,29 @@ public sealed partial class PdfViewport
         {
             Color = SKColors.White
         };
-        foreach (var item in _objectTargets)
+        var clip = canvas.LocalClipBounds;
+        _objectSpatial.Query(new RectD(clip.Left, clip.Top, Math.Max(0, clip.Width), Math.Max(0, clip.Height)).Inflate(8 / Zoom), _visibleObjects);
+        // A selected preview or control point can enter the view even when its
+        // original object's bounds lie outside the clip. Keep those candidates.
+        var candidates = _visibleObjects;
+        if (_objectPreview is not null || EditObjectPoints)
         {
+            _drawObjects.Clear();
+            var i = 0; var j = 0;
+            while (i < _visibleObjects.Count || j < _objectSelectionOrdinals.Length)
+            {
+                var visible = i < _visibleObjects.Count ? _visibleObjects[i] : int.MaxValue;
+                var selected = j < _objectSelectionOrdinals.Length ? _objectSelectionOrdinals[j] : int.MaxValue;
+                _drawObjects.Add(Math.Min(visible, selected));
+                if (visible <= selected) i++;
+                if (selected <= visible) j++;
+            }
+            candidates = _drawObjects;
+        }
+        VisibleObjectOutlineCount = candidates.Count;
+        foreach (var ordinal in candidates)
+        {
+            var item = _objectTargets[ordinal];
             var selected = _objectSelectionSet.Contains(item.Index);
             line.Color = selected ? new SKColor(20, 115, 230) : new SKColor(20, 115, 230, 65);
             var bounds = item.Bounds;

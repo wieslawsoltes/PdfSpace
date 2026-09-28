@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.5.1-alpha.1
+
+- Added native per-paint opacity and sixteen PDF blend names, including text objects whose internal graphics state changes between showing operations. Preserve masks and following text-state side effects.
+- Added effective/mixed paint metadata and a custom object appearance inspector for opacity, blend, cap, join, miter, dash lengths and integer phase.
+- Added ordered spatial BVH hit testing, marquee selection and outline culling with retained paint order and allocation-free warmed queries.
+- Added the separately licensed/source-pinned PdfSpace.Rendering.Skia package. Correct image nonstroking alpha, miter limits, complete odd dash cycles and cache-key equality; retain Apache-2.0 provenance and notices.
+- Added native, independent-renderer and real browser export regressions; document exact group-opacity, fractional-phase and bounding-box-picking boundaries.
+
 ## 0.5.0-alpha.1 — 2026-09-28
 
 - Unified native object selection and batch editing across text, vector paths, images, shading and Form groups.

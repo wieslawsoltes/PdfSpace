@@ -413,12 +413,12 @@ namespace PdfSpace.Rendering.Skia.Helpers
             var streamDictionary = pdfImage.ImageDictionary;
             
             // Only activate when /DecodeParms /Colors disagrees with the colour space.
-            if (!streamDictionary.TryGet(NameToken.DecodeParms, out DictionaryToken? decodeParams) || decodeParams is null)
+            if (!streamDictionary.TryGet(NameToken.DecodeParms, out DictionaryToken decodeParams) || decodeParams is null)
             {
                 return false;
             }
 
-            if (!decodeParams.TryGet(NameToken.Colors, out NumericToken? colorsToken) || colorsToken is null
+            if (!decodeParams.TryGet(NameToken.Colors, out NumericToken colorsToken) || colorsToken is null
                 || colorsToken.Int == actualComponents)
             {
                 return false;

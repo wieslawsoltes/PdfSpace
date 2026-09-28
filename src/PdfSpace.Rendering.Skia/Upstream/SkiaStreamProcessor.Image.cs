@@ -42,7 +42,7 @@ namespace PdfSpace.Rendering.Skia
                 return;
             }
 
-            if (pdfImage.Bounds.Width == 0 || pdfImage.Bounds.Height == 0)
+            if (pdfImage.BoundingBox.Width == 0 || pdfImage.BoundingBox.Height == 0)
             {
                 return;
             }
@@ -68,13 +68,13 @@ namespace PdfSpace.Rendering.Skia
                     using SKImage image = SKImage.FromBitmap(bitmap);
                     if (TryGetActiveSoftMask(out var softMask))
                     {
-                        var innerPaint = _paintCache.GetPaint(pdfImage, BlendMode.Normal);
+                        var innerPaint = _paintCache.GetPaint(pdfImage, BlendMode.Normal, currentState.AlphaConstantNonStroking);
                         DrawWithSoftMask(softMask!, currentState.BlendMode,
                             () => _canvas.DrawImage(image, new SKRect(0, 0, 1, 1), SKSamplingOptions.Default, innerPaint));
                     }
                     else
                     {
-                        var imagePaint = _paintCache.GetPaint(pdfImage, currentState.BlendMode);
+                        var imagePaint = _paintCache.GetPaint(pdfImage, currentState.BlendMode, currentState.AlphaConstantNonStroking);
                         _canvas.DrawImage(image, new SKRect(0, 0, 1, 1), SKSamplingOptions.Default, imagePaint);
                     }
                 }

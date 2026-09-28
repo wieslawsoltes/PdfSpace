@@ -128,11 +128,11 @@ namespace PdfSpace.Rendering.Skia
                         switch (pattern.PatternType)
                         {
                             case PatternType.Tiling:
-                                RenderTilingPattern(transformedPath, pattern as TilingPatternColor, false);
+                                RenderTilingPattern(transformedPath, pattern as TilingPatternColor ?? throw new InvalidOperationException("Invalid tiling pattern type."), false);
                                 break;
 
                             case PatternType.Shading:
-                                RenderShadingPattern(transformedPath, pattern as ShadingPatternColor, false);
+                                RenderShadingPattern(transformedPath, pattern as ShadingPatternColor ?? throw new InvalidOperationException("Invalid shading pattern type."), false);
                                 break;
                         }
                     }
@@ -164,7 +164,7 @@ namespace PdfSpace.Rendering.Skia
                     {
                         var innerStrokePaint = _paintCache.GetPaint(strokingColor, currentState.AlphaConstantStroking, true,
                             (float)currentState.LineWidth, currentState.JoinStyle, currentState.CapStyle,
-                            currentState.LineDashPattern, BlendMode.Normal);
+                            currentState.LineDashPattern, BlendMode.Normal, miterLimit: currentState.MiterLimit);
                         var glyphStrokePath = transformedPath;
                         DrawWithSoftMask(softMask!, currentState.BlendMode, () => _canvas.DrawPath(glyphStrokePath, innerStrokePaint));
                     }
@@ -172,7 +172,7 @@ namespace PdfSpace.Rendering.Skia
                     {
                         var strokePaint = _paintCache.GetPaint(strokingColor, currentState.AlphaConstantStroking, true,
                             (float)currentState.LineWidth, currentState.JoinStyle, currentState.CapStyle,
-                            currentState.LineDashPattern, currentState.BlendMode);
+                            currentState.LineDashPattern, currentState.BlendMode, miterLimit: currentState.MiterLimit);
                         _canvas.DrawPath(transformedPath, strokePaint);
                     }
                 }
@@ -307,7 +307,7 @@ namespace PdfSpace.Rendering.Skia
                 {
                     var innerStrokePaint = _paintCache.GetPaint(strokingColor, currentState.AlphaConstantStroking, true,
                         glyphSpaceLineWidth, currentState.JoinStyle, currentState.CapStyle,
-                        currentState.LineDashPattern, BlendMode.Normal);
+                        currentState.LineDashPattern, BlendMode.Normal, miterLimit: currentState.MiterLimit);
                     DrawWithSoftMask(softMask!, currentState.BlendMode, () =>
                     {
                         using var skFont = drawTypeface.Typeface.ToFont(1f);
@@ -318,7 +318,7 @@ namespace PdfSpace.Rendering.Skia
                 {
                     var strokePaint = _paintCache.GetPaint(strokingColor, currentState.AlphaConstantStroking, true,
                         glyphSpaceLineWidth, currentState.JoinStyle, currentState.CapStyle,
-                        currentState.LineDashPattern, currentState.BlendMode);
+                        currentState.LineDashPattern, currentState.BlendMode, miterLimit: currentState.MiterLimit);
 
                     using (var skFont = drawTypeface.Typeface.ToFont(1f))
                     {

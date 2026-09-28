@@ -1,6 +1,6 @@
 # Embedding the reusable components
 
-All eleven libraries are packable with `dotnet pack`; the application itself is not. The Uno UI libraries contain browser and desktop assets. Use the same Uno/Skia dependency versions as the host.
+All twelve libraries are packable with `dotnet pack`; the application itself is not. The Uno UI libraries contain browser and desktop assets. Use the same Uno/Skia dependency versions as the host.
 
 ## Headless editing
 
@@ -119,3 +119,7 @@ session.Execute("Move native paths", snapshot =>
 ```
 
 Refresh descriptors after any document mutation or undo. Never reuse a descriptor from a different page or snapshot. A clipboard payload owns serialized source/resource data until the host releases it; propagate its sensitivity flag. The viewer's object-target records contain detached geometry and no parsed PDF handles. Selection membership and union bounds are cached independently from PDF object discovery.
+
+## PDF rendering adaptation
+
+`PdfSpace.Rendering.Skia` is an independently packable Apache-2.0 source adaptation with an isolated namespace; other original PdfSpace packages remain MIT. `PdfSpace.Skia` references it transitively. A custom consumer must retain its included upstream license/notice. See [native appearance editing](object-appearance.md) for APIs and renderer limitations.
