@@ -45,3 +45,9 @@ The source hash, page identity, scope path, operator range, native fingerprint a
 ## Compatibility boundary
 
 Native text objects, paths, XObject images, Form invocations and shading placements are supported. This is not full Adobe Acrobat or arbitrary PDF compatibility. Inline-image streams remain blocked by the underlying round-trip parser. Clipping text, paths that themselves mutate clipping, interleaved text/graphics, singular transforms and signed/XFA source editing are guarded. Original complex transparency, pattern and clipping data are preserved, not exposed as complete specialist authoring tools. Shading bounds without an explicit BBox conservatively use the page extent. Image-mask/soft-mask authoring, arbitrary cross-scope z-order, full complex-script paragraph shaping and incremental signature-preserving writes remain outside this release.
+
+## Validation and conservative boundaries
+
+Regression fixtures verify native mixed transforms, shared-resource isolation, path nodes and appearance, state-preserving deletion/reordering, grouping, clipboard resources and clipping, explicit Unicode block layout, and exact save/reopen behavior. A copied path records its real numeric clipping operands. Shared inherited graphics-state operations are deep-cloned before resource rebinding. Copies inheriting text clipping or a clip built under interleaved transforms fail explicitly rather than broadening the visible region. Ungroup keeps the actual Form BBox and rejects unexpected non-placement operators.
+
+After a stacking-order change, selection is cleared instead of silently retaining indices that now refer to different objects. Already-front/back arrangements preserve source identity and do not add an undo entry. Object-index fingerprints access operator ranges directly; they do not repeatedly enumerate the prefix of the complete content stream.

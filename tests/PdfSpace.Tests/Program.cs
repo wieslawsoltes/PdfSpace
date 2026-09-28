@@ -13,9 +13,17 @@ if (args is ["--verify-browser-objects", var objectsDirectory]) { BrowserObjectV
 
 if (args is ["--verify-browser-photos", var photoDirectory]) { BrowserPhotoVerification.Run(photoDirectory); return; }
 
+if (args is ["--verify-browser-mixed", var mixedDirectory]) { BrowserMixedObjectVerification.Run(mixedDirectory); return; }
+
 var passed = 0;
 void Check(bool condition, string name) { if (!condition) throw new Exception("FAILED: " + name); Console.WriteLine("PASS " + name); passed++; }
 void Reject(Action action, string name) { try { action(); } catch { Check(true, name); return; } throw new Exception("FAILED: " + name); }
+if (args is ["--test-unified-objects"])
+{
+    UnifiedObjectTests.Run(Check, Reject);
+    Console.WriteLine($"{passed} unified checks passed.");
+    return;
+}
 var session = new EditorSession(new PdfWorkspace());
 Check(!session.IsDirty, "new session is clean");
 var note = new Annotation { Kind = AnnotationKind.Note, Text = "Review the material choice", Bounds = new(100, 100, 24, 24) };
@@ -97,4 +105,5 @@ LayoutIndexTests.Run(Check, Reject);
 SearchCacheTests.Run(Check, Reject);
 PhotoImportTests.Run(Check, Reject);
 HistoryMemoryTests.Run(Check, Reject);
+UnifiedObjectTests.Run(Check, Reject);
 Console.WriteLine($"\n{passed} engine checks passed.");

@@ -12,7 +12,7 @@ namespace PdfSpace.Pdf;
 internal sealed class PdfObjectScanner
 {
     internal sealed record StateCommand(COperator Operation, PdfDictionary Resources, PdfAffineMatrix Matrix, StateCommand? Previous);
-    internal sealed record Clip(string Operators, PdfAffineMatrix Matrix, Clip? Previous);
+    internal sealed record Clip(string Operators, PdfAffineMatrix Matrix, Clip? Previous, bool Reproducible = true);
     internal sealed record Item(PdfPageObject Object, CSequence Content, PdfDictionary Resources, StateCommand? State, Clip? Clip, PdfAffineMatrix EndMatrix, bool HasSideEffects);
     internal readonly List<Item> Items = [];
     internal readonly Dictionary<string, (Clip? Clip, PdfAffineMatrix Matrix)> ScopeEnds = [];
@@ -69,6 +69,7 @@ internal sealed class PdfObjectScanner
         var textValue = new StringBuilder();
         var textSafe = true;
         var textSides = false;
+        var textClips = false;
         var pathNodes = new List<PdfPathNode>();
         var pathText = new StringBuilder();
         var pathSafe = true;
@@ -100,6 +101,7 @@ internal sealed class PdfObjectScanner
                 textValue.Clear();
                 textSafe = mode < 4;
                 textSides = false;
+                textClips = false;
             }
 
             if (StateOps.Contains(op.Name))
@@ -119,6 +121,7 @@ internal sealed class PdfObjectScanner
             if (op.Name is "Tj" or "TJ" or "'" or "\"")
             {
                 _sequence++;
+                textClips |= mode >= 4;
                 if (_letters.TryGetValue(_sequence, out var letters))
                 {
                     foreach (var letter in letters.Where(l => (int)l.RenderingMode != 3))
@@ -146,6 +149,7 @@ internal sealed class PdfObjectScanner
             {
                 if (textPoints.Count > 0)
                     Add(textStart, index, PdfPageObjectKind.Text, Bounds(textPoints), textMatrix, matrix, textState, textClip, textSafe, "Clipping or interleaved graphics inside this text object require specialized editing.", textValue.ToString(), [], textSides);
+                if (textClips) clip = new("", textMatrix, clip, Reproducible: false);
                 textStart = -1;
             }
 
@@ -167,7 +171,7 @@ internal sealed class PdfObjectScanner
                 pathSafe &= matrix == startMatrix && textStart < 0;
                 var values = op.Operands.Select(N).ToArray();
                 pathNodes.Add(new(op.Name, values));
-                pathText.Append(op).Append('\n');
+                pathText.Append(string.Join(" ", values.Select(F))).Append(' ').Append(op.Name).Append('\n');
                 Append(shape, op.Name, values, matrix);
             }
             else if (start >= 0 && op.Name is "W" or "W*")
@@ -177,7 +181,7 @@ internal sealed class PdfObjectScanner
             else if (start >= 0 && (Paint.Contains(op.Name) || op.Name == "n"))
             {
                 if (clips)
-                    clip = new(pathText + (scope.Content.Skip(start).Take(index - start + 1).OfType<COperator>().Any(o => o.Name == "W*") ? "W* n\n" : "W n\n"), startMatrix, clip);
+                    clip = new(pathText + (scope.Content.Skip(start).Take(index - start + 1).OfType<COperator>().Any(o => o.Name == "W*") ? "W* n\n" : "W n\n"), startMatrix, clip, Reproducible: pathSafe);
                 if (Paint.Contains(op.Name))
                 {
                     var b = shape.TightBounds;

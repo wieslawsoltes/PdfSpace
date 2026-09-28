@@ -133,6 +133,9 @@ public static partial class PdfObjectEditor
         if (group?.Elements.GetBoolean("/PdfSpaceGroup") != true || group.Stream is null || group.Elements.ContainsKey("/Group") || group.Elements.ContainsKey("/Matrix"))
             throw new NotSupportedException("Only PdfSpace groups can be ungrouped without changing transparency or clipping semantics. Original Form contents remain individually editable.");
         var body = PdfContentGraph.Parse(group.Stream.UnfilteredValue);
+        if (body.OfType<COperator>().Any(operation => operation.Name is not ("q" or "Q" or "cm" or "Do")))
+            throw new NotSupportedException("This group contains non-placement operators and cannot be safely ungrouped.");
+        var box = PdfObjects.Rectangle(group.Elements["/BBox"]);
         var groupResources = PdfObjects.Dictionary(group.Elements["/Resources"])!;
         foreach (var drawing in body.OfType<COperator>().Where(o => o.Name == "Do"))
         {
@@ -141,7 +144,7 @@ public static partial class PdfObjectEditor
             drawing.Operands[0] = new CName(PdfContentGraph.AddResource(native, resources, "/XObject", child));
         }
 
-        Replace(content, item, "q\n", Encoding.Latin1.GetString(PdfContentGraph.Serialize(body)), "Q\n", false);
+        Replace(content, item, $"q\n{F(box.X1)} {F(box.Y1)} {F(box.Width)} {F(box.Height)} re W n\n", Encoding.Latin1.GetString(PdfContentGraph.Serialize(body)), "Q\n", false);
     }));
     private static PdfWorkspace InsertNative(PdfWorkspace workspace, int pageIndex, Func<PdfDocument, PdfPage, PdfDictionary, PdfAffineMatrix, string> draw, bool sensitive = false)
     {

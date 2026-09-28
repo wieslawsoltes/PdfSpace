@@ -113,7 +113,10 @@ public static partial class PdfObjectEditor
         PdfContentGraph.Insert(content, item.Object.End + 1, "q\n" + Matrix(matrix) + name + " Do\nQ\n");
     }));
     /// <summary>Reorders within the same native scope and clipping context, preserving original graphics state.</summary>
-    public static PdfWorkspace Arrange(PdfWorkspace workspace, IReadOnlyList<PdfPageObject> objects, PdfObjectOrder order) => Edit(workspace, objects, (native, selected, scanner) =>
+    public static PdfWorkspace Arrange(PdfWorkspace workspace, IReadOnlyList<PdfPageObject> objects, PdfObjectOrder order)
+    {
+        var changed = false;
+        return Edit(workspace, objects, (native, selected, scanner) =>
     {
         if (!Enum.IsDefined(order))
             throw new ArgumentOutOfRangeException(nameof(order));
@@ -139,6 +142,7 @@ public static partial class PdfObjectEditor
             throw new NotSupportedException("The destination has a different clipping context; moving there could hide content.");
         var at = order == PdfObjectOrder.Front ? selected[0].Content.Count : order == PdfObjectOrder.Back ? 0 : backward ? anchor.Object.Start : anchor.Object.End + 1;
         var matrixAt = order == PdfObjectOrder.Front ? scanner.ScopeEnds[scope].Matrix : order == PdfObjectOrder.Back ? scanner.ScopeStarts[scope].Matrix : backward ? anchor.Object.LocalToPage : anchor.EndMatrix;
+        changed = true;
         var drawings = new StringBuilder();
         var resources = PdfContentGraph.Resources(native.Pages[selected[0].Object.SourcePage - 1]);
         PdfContentGraph.Edit(native, native.Pages[selected[0].Object.SourcePage - 1], scope, (content, local) =>
@@ -171,7 +175,8 @@ public static partial class PdfObjectEditor
             foreach (var op in output)
                 content.Add(op);
         });
-    });
+    }, hasChanges: () => changed);
+    }
     public static PdfWorkspace SetAppearance(PdfWorkspace workspace, IReadOnlyList<PdfPageObject> objects, PdfObjectAppearance appearance)
     {
         ArgumentNullException.ThrowIfNull(appearance);
@@ -228,7 +233,7 @@ public static partial class PdfObjectEditor
 
     // Internal edit callbacks receive re-read objects, not client-supplied geometry/state.
     private static PdfWorkspace Edit(PdfWorkspace workspace, IReadOnlyList<PdfPageObject> objects, Action<PdfDocument, Item[]> action) => Edit(workspace, objects, (native, items, _) => action(native, items));
-    private static PdfWorkspace Edit(PdfWorkspace workspace, IReadOnlyList<PdfPageObject> objects, Action<PdfDocument, Item[], PdfObjectScanner> action, bool commit = true)
+    private static PdfWorkspace Edit(PdfWorkspace workspace, IReadOnlyList<PdfPageObject> objects, Action<PdfDocument, Item[], PdfObjectScanner> action, bool commit = true, Func<bool>? hasChanges = null)
     {
         ArgumentNullException.ThrowIfNull(objects);
         if (objects.Count is < 1 or > 1000)
@@ -256,7 +261,7 @@ public static partial class PdfObjectEditor
             return item;
         }).ToArray();
         action(native, actual, scanner);
-        return commit ? PdfContentGraph.Commit(workspace, source, first.PageId, first.SourcePage, native) : workspace;
+        return commit && (hasChanges?.Invoke() ?? true) ? PdfContentGraph.Commit(workspace, source, first.PageId, first.SourcePage, native) : workspace;
     }
 
     private static string Key(PdfPageObject o) => o.ScopePath + ":" + o.Start + ":" + o.End;
@@ -355,6 +360,8 @@ public static partial class PdfObjectEditor
                 clips.Push(clip);
             foreach (var clip in clips)
             {
+                if (!clip.Reproducible)
+                    throw new NotSupportedException("This object inherits text or interleaved clipping that cannot be copied independently. Its original clipping remains preserved when moved in place.");
                 var transform = item.Object.LocalToPage.Inverse() * clip.Matrix;
                 Append(body, Matrix(transform) + clip.Operators + Matrix(transform.Inverse()));
             }
@@ -362,7 +369,10 @@ public static partial class PdfObjectEditor
 
         while (commands.TryPop(out var node))
         {
-            var op = node.Operation.Clone();
+            // COperator.Clone is shallow: rewriting its operands would corrupt
+            // the shared scanner state used to capture subsequent objects.
+            var originalState = new CSequence { node.Operation };
+            var op = (COperator)PdfContentGraph.Parse(originalState.ToContent())[0];
             var category = op.Name switch
             {
                 "Tf" => "/Font",
