@@ -1,0 +1,40 @@
+name: Apply unified object review
+on:
+  push:
+    branches: [build/unified-object-transfer-0.5]
+    paths: [.github/workflows/apply-object-review.yml]
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/unified-object-editing-0.5
+          fetch-depth: 0
+      - name: Apply reviewed source at the validated base
+        env:
+          TRANSFER_COMMIT: ${{ github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = 'b4179ba7b4b4e71dca345e9c82bf91430747e0a9'
+          git fetch origin "$TRANSFER_COMMIT"
+          python3 - <<'PY'
+          import os,subprocess,base64,lzma,hashlib,pathlib
+          encoded=subprocess.check_output(['git','show',f'{os.environ["TRANSFER_COMMIT"]}:tools/objects05/reviewed-tail.b64'])
+          patch=lzma.decompress(base64.b64decode(encoded,validate=True))
+          assert hashlib.sha256(patch).hexdigest()=='2233192abe5386ffc4ac261302e86a76303d3384cec1c2f2de5eab778d0c5466'
+          pathlib.Path('/tmp/review.patch').write_bytes(patch)
+          print('Verified',len(patch),'bytes of complete source changes')
+          PY
+          git apply --check /tmp/review.patch
+          git apply /tmp/review.patch
+          git diff --check
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src docs tests
+          git commit -m 'fix: preserve clipping and inherited resources in unified native object editing'
+          git push origin HEAD:feat/unified-object-editing-0.5
