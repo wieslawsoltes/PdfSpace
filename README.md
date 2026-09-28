@@ -15,6 +15,10 @@ PdfSpace is an independent, local-first PDF application built in **C# with Uno P
 
 > **0.5.1-alpha.1:** functional PDF workflows, not complete or pixel-identical Adobe Acrobat compatibility. PdfSpace has original branding and icons and is not affiliated with Adobe. Review the [save and security boundaries](docs/compatibility.md) before processing important documents.
 
+## Object appearance in 0.5.1
+
+Native opacity/blending, stroke caps/joins/miter and dash editing are available under **Edit → Edit objects → Object appearance**. Dense pages use a reusable ordered spatial index for picking and visible selection outlines. The source-pinned Apache-2.0 renderer fixes image alpha, odd dash patterns and miter rendering. See [appearance, architecture and precise compatibility limits](docs/object-appearance.md).
+
 ## Native object editing in 0.5
 
 **Edit objects** selects native text, paths, images, shading and Form groups directly on the page. Mixed selections support drag/resize/nudge, align/distribute, crop, stacking, grouping, copy/paste across documents, and one-transaction undo. Path controls edit real geometry and fill/stroke; explicit replacement text blocks wrap into a chosen box with overflow checks. Source-run text and native image editing remain available. [Object editing guide and exact limits](docs/object-editing.md).
@@ -69,7 +73,7 @@ The **Bookmarks** panel separates original PDF outlines from editable workspace 
 
 Form-data files are unencrypted. Document URLs and scripts are never followed or executed. See the [form-data and navigation guide](docs/form-data-and-navigation.md) for formats, defensive limits and embedding examples.
 
-## Eleven reusable libraries
+## Twelve reusable libraries
 
 | Package | Responsibility |
 |---|---|
@@ -121,14 +125,11 @@ Open `http://127.0.0.1:4173/PdfSpace/`. The asset scripts verify upstream font/r
 
 ```bash
 mkdir -p artifacts/fixtures
-cp artifacts/engine/*.pdf artifacts/engine/scanned.png artifacts/fixtures/
+cp artifacts/engine/*.pdf artifacts/engine/*.png artifacts/engine/*.jpg artifacts/fixtures/
 npm ci --ignore-scripts
 npx playwright install chromium
 npm run test:browser
-dotnet run --project tests/PdfSpace.Tests -c Release -- \
-  --verify-browser-security artifacts/browser-exports
-dotnet run --project tests/PdfSpace.Tests -c Release -- \
-  --verify-browser-ocr artifacts/browser-exports
+bash scripts/verify-browser-exports.sh artifacts/browser-exports
 ```
 
 UI tests use real pointer, keyboard, file-picker and download/reopen interactions. `?test=1` enables read-only diagnostics, not a document-mutation API. The security-provider contract also has dedicated boundary tests. CI retains screenshots, reports and failure traces.
@@ -141,8 +142,4 @@ UI tests use real pointer, keyboard, file-picker and download/reopen interaction
 
 ## License
 
-PdfSpace source is [MIT licensed](LICENSE). Dependencies and fonts retain their upstream licenses. Adobe and Acrobat are trademarks of their respective owners; Adobe proprietary code, branding and assets are not included.
-
-### Object appearance (0.5.1)
-
-Native opacity/blending, stroke caps/joins/miter and dash editing are available under **Edit → Edit objects → Object appearance**. Dense pages use a reusable ordered spatial index for picking and visible selection outlines. The source-pinned Apache-2.0 renderer fixes image alpha, odd dash patterns and miter rendering. See [appearance, architecture and precise compatibility limits](docs/object-appearance.md).
+Original PdfSpace source is [MIT licensed](LICENSE). The source-pinned `src/PdfSpace.Rendering.Skia` derivative is [Apache-2.0 licensed](src/PdfSpace.Rendering.Skia/LICENSE.txt), with original copyrights, notices and modification records retained. Dependencies and fonts retain their upstream licenses. Adobe and Acrobat are trademarks of their respective owners; Adobe proprietary code, branding and assets are not included.
