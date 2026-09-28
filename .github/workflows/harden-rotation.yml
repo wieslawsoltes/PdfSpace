@@ -1,0 +1,45 @@
+name: Harden rotation arithmetic
+on:
+  push:
+    branches: [build/rotation-snapping-0.5.3]
+    paths: [.github/workflows/harden-rotation.yml]
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/rotation-snapping-0.5.3
+          fetch-depth: 0
+      - name: Apply exact reviewed arithmetic fixes
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = 'eb78ae56cab8e2e5f53f98f31cc83146236194f2'
+          python3 - <<'PY'
+          from pathlib import Path
+          path=Path('src/PdfSpace.Layout/SelectionRotation.cs');text=path.read_text()
+          old='return snapStep == 0 ? angle : Math.Round(angle / snapStep, MidpointRounding.AwayFromZero) * snapStep;'
+          new='''if (snapStep == 0) return angle;
+                  var steps = angle / snapStep;
+                  // A subnormal step is far below the precision of the measured angle.
+                  // Avoid overflowing its quotient and keep the finite unsnapped value.
+                  if (!double.IsFinite(steps)) return angle;
+                  return Math.IEEERemainder(Math.Round(steps, MidpointRounding.AwayFromZero) * snapStep, 360);'''
+          assert old in text;path.write_text(text.replace(old,new))
+          path=Path('tests/PdfSpace.Tests/ObjectManipulationTests.cs');text=path.read_text()
+          anchor='        reject(() => SelectionRotation.DeltaDegrees(center, start, new(double.NaN, 0)), "rotation rejects nonfinite pointer values");'
+          add='''        check(Math.Abs(SelectionRotation.DeltaDegrees(center, start, point, double.Epsilon) - 37) < 1e-9, "subnormal rotation steps cannot produce infinite angles");
+                  check(Math.Abs(SelectionRotation.DeltaDegrees(default, new(1, 0), beforeWrap, 100) + 160) < 1e-9, "arbitrary snapped rotation steps retain a normalized signed angle");
+          '''
+          assert anchor in text;path.write_text(text.replace(anchor,add+anchor))
+          PY
+          git diff --check
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/PdfSpace.Layout/SelectionRotation.cs tests/PdfSpace.Tests/ObjectManipulationTests.cs
+          git commit -m 'fix: normalize snapped angles and keep subnormal steps finite'
+          git push origin HEAD:feat/rotation-snapping-0.5.3
