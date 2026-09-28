@@ -107,6 +107,7 @@ public sealed partial class PdfWorkbench : UserControl, IDisposable
     {
         UpdateTabs(); RefreshNativeImages(); UpdateChrome(); RefreshRight(); (_organizerHost.Content as PdfThumbnailView)?.Invalidate();
     }
+    private PdfWorkspace? _chromeDocument;
     private void UpdateChrome()
     {
         if (_active is null) return;
@@ -115,8 +116,12 @@ public sealed partial class PdfWorkbench : UserControl, IDisposable
         _undo.IsEnabled = Session.CanUndo; _redo.IsEnabled = Session.CanRedo;
         foreach (var (tool, button) in _toolButtons) button.Select(Session.Tool == tool);
         _selectionBar.Visibility = Session.SelectedAnnotation is not null && !_home && _mode != "Organize pages" ? Visibility.Visible : Visibility.Collapsed;
-        _documentInfo.Text = $"{Session.Document.Pages.Length} pages  ·  {Session.Document.AnnotationCount} annotations  ·  Local only";
-        (_rightHost.Content as Grid)?.InvalidateMeasure(); StateChanged?.Invoke();
+        if (!ReferenceEquals(_chromeDocument, Session.Document))
+        {
+            _chromeDocument = Session.Document;
+            _documentInfo.Text = $"{Session.Document.Pages.Length} pages  ·  {Session.Document.AnnotationCount} annotations  ·  Local only";
+        }
+        StateChanged?.Invoke();
     }
     private void SetMode(string mode)
     { _mode = mode; _home = false; _leftOpen = true; BuildLeft(); UpdateModeVisibility(); AdaptLayout(); }

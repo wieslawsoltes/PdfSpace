@@ -1,8 +1,6 @@
-using System.IO.Compression;
 using PdfSharp.Pdf;
 using PdfSharp.Pdf.Content.Objects;
 using PdfSpace.Core;
-using SkiaSharp;
 namespace PdfSpace.Pdf;
 
 /// <summary>One painted occurrence, not a shared PDF image resource. Coordinates are source logical points.</summary>
@@ -17,7 +15,7 @@ public static class PdfImageEditor
     {
         var state = workspace.Pages[pageIndex]; if (state.SourceId is not { } id) return [];
         var source = workspace.Sources.First(s => s.Id == id); using var native = PdfDocumentEngine.OpenNative(source.Bytes);
-        var inspection = PdfDocumentEngine.Inspect(source.Bytes); var locked = inspection.SignatureFields > 0 || inspection.HasXfa;
+        var inspection = PdfDocumentEngine.Inspect(native); var locked = inspection.SignatureFields > 0 || inspection.HasXfa;
         var page = native.Pages[state.SourcePage - 1]; var logical = LogicalMatrix(new SourceGeometry(page));
         var images = new List<PdfImageOccurrence>(); var hash = PdfContentGraph.Hash(source.Bytes);
         foreach (var scope in PdfContentGraph.Read(page))
@@ -62,6 +60,32 @@ public static class PdfImageEditor
         Transform(workspace, target, PdfAffineMatrix.Around(target.Bounds.Center, PdfAffineMatrix.Scale(horizontal ? -1 : 1, horizontal ? 1 : -1)));
     public static PdfWorkspace Delete(PdfWorkspace workspace, PdfImageOccurrence target) =>
         Mutate(workspace, target, (native, content, resources) => content.RemoveAt(target.OperatorIndex));
+    /// <summary>Adds an offset drawing occurrence sharing the encoded image resource. Existing clipping stays in force.</summary>
+    public static PdfWorkspace Duplicate(PdfWorkspace workspace, PdfImageOccurrence target, PointD offset)
+    {
+        if (!double.IsFinite(offset.X) || !double.IsFinite(offset.Y)) throw new ArgumentException("Image offset must be finite.");
+        ValidateBounds(target.Bounds.Translate(offset));
+        var delta = target.UnitToPage.Inverse() * PdfAffineMatrix.Translate(offset.X, offset.Y) * target.UnitToPage;
+        return Mutate(workspace, target, (_, content, _) =>
+        {
+            var drawing = ((COperator)content[target.OperatorIndex]).Clone();
+            var position = target.OperatorIndex + 1;
+            PdfContentGraph.Insert(content, position, "q\n" + delta.Operator + "Q\n");
+            content.Insert(position + 2, drawing);
+        });
+    }
+
+    /// <summary>Restores the raster's aspect ratio while retaining its center, width and affine orientation.</summary>
+    public static PdfWorkspace RestoreAspectRatio(PdfWorkspace workspace, PdfImageOccurrence target)
+    {
+        if (target.PixelWidth <= 0 || target.PixelHeight <= 0) throw new InvalidDataException("Invalid raster dimensions.");
+        var xLength = Math.Sqrt(target.UnitToPage.A * target.UnitToPage.A + target.UnitToPage.B * target.UnitToPage.B);
+        var yLength = Math.Sqrt(target.UnitToPage.C * target.UnitToPage.C + target.UnitToPage.D * target.UnitToPage.D);
+        var factor = xLength * target.PixelHeight / (target.PixelWidth * yLength);
+        if (!double.IsFinite(factor) || factor <= 0) throw new InvalidDataException("Invalid image aspect ratio.");
+        var unitDelta = PdfAffineMatrix.Around(new PointD(.5, .5), PdfAffineMatrix.Scale(1, factor));
+        return Transform(workspace, target, target.UnitToPage * unitDelta * target.UnitToPage.Inverse());
+    }
     public static PdfWorkspace Replace(PdfWorkspace workspace, PdfImageOccurrence target, byte[] encodedImage) =>
         Mutate(workspace, target, (native, content, resources) =>
         {
@@ -76,7 +100,7 @@ public static class PdfImageEditor
         using var native = source is null ? new PdfDocument() : PdfDocumentEngine.OpenNative(source.Bytes);
         if (source is not null)
         {
-            var info = PdfDocumentEngine.Inspect(source.Bytes);
+            var info = PdfDocumentEngine.Inspect(native);
             if (info.SignatureFields > 0 || info.HasXfa) throw new NotSupportedException("Signed/certified and XFA sources cannot be edited.");
         }
         var page = source is null ? native.AddPage() : native.Pages[state.SourcePage - 1];
@@ -122,33 +146,15 @@ public static class PdfImageEditor
         if (!bounds.IsFinite || bounds.Width is < .01 or > 100000 || bounds.Height is < .01 or > 100000 || Math.Abs(bounds.X) > 100000 || Math.Abs(bounds.Y) > 100000)
             throw new ArgumentOutOfRangeException(nameof(bounds), "Image bounds must be finite with positive dimensions within 100,000 points.");
     }
-    private static PdfDictionary CreateImage(PdfDocument native, byte[] encoded)
+    private static PdfDictionary CreateImage(PdfDocument native, byte[] encoded) => PdfRasterImage.Create(native, encoded);
+
+    /// <summary>Creates an image-only PDF, preserving supported JPEG compression and normalizing EXIF orientation.</summary>
+    public static PdfWorkspace OpenImage(byte[] encodedImage, string name, int dpi = 150)
     {
-        ArgumentNullException.ThrowIfNull(encoded);
-        if (encoded.Length is 0 or > 32 * 1024 * 1024) throw new InvalidDataException("Replacement image must be at most 32 MB.");
-        using var data = SKData.CreateCopy(encoded); using var codec = SKCodec.Create(data) ?? throw new InvalidDataException("Unsupported or damaged image.");
-        var info = codec.Info;
-        if (info.Width <= 0 || info.Height <= 0 || info.Width > 8192 || info.Height > 8192 || (long)info.Width * info.Height > 16_000_000)
-            throw new InvalidDataException("Image exceeds the 16 megapixel or 8192-pixel dimension limit.");
-        if (codec.EncodedOrigin != SKEncodedOrigin.TopLeft) throw new NotSupportedException("Normalize the image orientation before inserting or replacing it.");
-        using var bitmap = new SKBitmap(new SKImageInfo(info.Width, info.Height, SKColorType.Rgba8888, SKAlphaType.Unpremul));
-        if (codec.GetPixels(bitmap.Info, bitmap.GetPixels()) != SKCodecResult.Success) throw new InvalidDataException("Image decoding failed.");
-        var pixels = bitmap.GetPixelSpan(); var rgb = new byte[checked(info.Width * info.Height * 3)]; var alpha = new byte[checked(info.Width * info.Height)]; var hasAlpha = false;
-        for (var y = 0; y < info.Height; y++)
-            for (var x = 0; x < info.Width; x++)
-            {
-                var i = y * info.Width + x; var p = y * bitmap.RowBytes + x * 4;
-                rgb[i * 3] = pixels[p]; rgb[i * 3 + 1] = pixels[p + 1]; rgb[i * 3 + 2] = pixels[p + 2];
-                alpha[i] = pixels[p + 3]; hasAlpha |= alpha[i] != 255;
-            }
-        PdfDictionary Image(byte[] bytes, string colorSpace)
-        {
-            var image = new PdfDictionary(native); image.Elements.SetName("/Type", "/XObject"); image.Elements.SetName("/Subtype", "/Image");
-            image.Elements.SetInteger("/Width", info.Width); image.Elements.SetInteger("/Height", info.Height); image.Elements.SetInteger("/BitsPerComponent", 8); image.Elements.SetName("/ColorSpace", colorSpace);
-            using var output = new MemoryStream(); using (var deflate = new ZLibStream(output, CompressionLevel.Optimal, true)) deflate.Write(bytes);
-            image.CreateStream(output.ToArray()); image.Elements.SetName("/Filter", "/FlateDecode"); native.Internals.AddObject(image); return image;
-        }
-        var result = Image(rgb, "/DeviceRGB"); if (hasAlpha) result.Elements["/SMask"] = Image(alpha, "/DeviceGray").Reference!;
-        return result;
+        if (dpi is < 72 or > 600) throw new ArgumentOutOfRangeException(nameof(dpi), "Image resolution must be 72–600 DPI.");
+        var (width, height) = PdfRasterImage.Dimensions(encodedImage);
+        var page = new PdfPageState { Width = width * 72d / dpi, Height = height * 72d / dpi };
+        return Insert(new PdfWorkspace { Title = Path.GetFileNameWithoutExtension(name) + ".pdf", Pages = [page] }, 0,
+            encodedImage, new RectD(0, 0, page.Width, page.Height));
     }
 }

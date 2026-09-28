@@ -217,6 +217,16 @@ public sealed partial class PdfWorkbench
         content.Children.Add(Paragraph(Session.Document.Title, 14, "#333333"));
         content.Children.Add(Paragraph($"{Session.Document.Pages.Length} pages\n{Session.Document.Sources.Sum(s => s.Bytes.Length) / 1024.0:F0} KB of original source data\n{Session.Page.Width:F1} × {Session.Page.Height:F1} pt\nRotation: {Session.Page.Rotation}°", 12));
         content.Children.Add(new PdfCommandButton("Edit document information", PdfIconKind.Edit, () => Run(EditInfoAsync)));
+        content.Children.Add(Paragraph($"Undo: {Session.UndoCount} · Redo: {Session.RedoCount}\nRetained source buffers: {Session.RetainedSourceBytes / (1024d * 1024):F1} MiB\nHistory source budget: {Session.HistoryOptions.MaximumSourceBytes / (1024d * 1024):F0} MiB", 11));
+        content.Children.Add(new PdfCommandButton("Clear undo history", PdfIconKind.Trash, () => Run(async () =>
+        {
+            var context = _active; var revision = context.Session.Revision;
+            if (await _dialogs.ConfirmAsync("Clear undo and redo history?", "Releases historical source buffers. Your current document is unchanged, but these edits can no longer be undone. This does not save, redact or sanitize the document.", "Clear history") && _active == context)
+            {
+                if (context.Session.Revision != revision) throw new InvalidOperationException("The document changed while confirming. Review its changes before clearing history.");
+                context.Session.ClearHistory(); RefreshRight(); ShowStatus("Undo history released. Current document and save state unchanged.");
+            }
+        })) { IsEnabled = Session.CanUndo || Session.CanRedo });
         if (Session.SelectedAnnotation is { } annotation)
         {
             content.Children.Add(PdfTheme.Divider()); content.Children.Add(PdfTheme.Text("ANNOTATION", 10, "#777777", true)); content.Children.Add(Paragraph(annotation.Kind.ToString(), 14, "#333333"));

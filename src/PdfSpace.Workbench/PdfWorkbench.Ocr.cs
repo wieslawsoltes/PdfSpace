@@ -40,7 +40,7 @@ public sealed partial class PdfWorkbench
         _leftPanel.Add("Create PDF from image", PdfIconKind.Image, () => Run(async () =>
         {
             var file = await _storage.OpenImageAsync(); if (file is null) return;
-            AddDocument(PdfDocumentEngine.PrepareWorkspace(PdfImageImporter.Open(file.Bytes, file.Name)));
+            AddDocument(PdfImageEditor.OpenImage(file.Bytes, file.Name));
             FitOcrPageWhenReady(Viewport); ShowStatus("Image imported at 150 DPI. Run Recognize current page to add searchable text.");
         }));
         _leftPanel.Add("Open scanned example", PdfIconKind.File, () =>
