@@ -1,0 +1,40 @@
+name: Materialize native object editing
+on:
+  push:
+    branches: [build/native-object-transfer-0.4]
+    paths: [.github/workflows/materialize-native-objects.yml]
+permissions:
+  contents: write
+jobs:
+  materialize:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/native-object-editing-0.4
+          fetch-depth: 0
+      - name: Verify and apply source patch
+        env:
+          TRANSFER_COMMIT: ${{ github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = '73e062858337e7fcf8baf3d03d41fbdfe8d8545e'
+          git fetch origin "$TRANSFER_COMMIT"
+          python3 - <<'PY'
+          import os,subprocess,base64,lzma,hashlib,pathlib
+          chunks=[subprocess.check_output(['git','show',f'{os.environ["TRANSFER_COMMIT"]}:tools/native04/{i}.b64']).decode().strip() for i in range(1,5)]
+          patch=lzma.decompress(base64.b64decode(''.join(chunks),validate=True))
+          assert hashlib.sha256(patch).hexdigest()=='82d911a6a9615fb0fd21415fc75b35a95e2f5343185cdcaa9d37ba7b1831085c'
+          pathlib.Path('/tmp/native04.patch').write_bytes(patch)
+          print('Verified source patch:',len(patch),'bytes')
+          PY
+          git apply --check /tmp/native04.patch
+          git apply /tmp/native04.patch
+          git diff --check
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'feat: native PDF object editing, Unicode replacement and indexed rendering/search'
+          git push origin HEAD:feat/native-object-editing-0.4
