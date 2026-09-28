@@ -34,6 +34,8 @@ public sealed partial class PdfWorkbench
             json.WriteStartArray("ocrText");
             foreach (var text in Session.Document.Pages.SelectMany(page => page.Ocr?.Words ?? []).Take(500)) json.WriteStringValue(text.Text);
             json.WriteEndArray();
+            json.WriteNumber("nativeImages", _nativeImages.Length); json.WriteNumber("selectedImage", _imageSelection);
+            if ((uint)_imageSelection < _nativeImages.Length) { var image = _nativeImages[_imageSelection]; json.WriteStartObject("imageBounds"); json.WriteNumber("x", image.Bounds.X); json.WriteNumber("y", image.Bounds.Y); json.WriteNumber("width", image.Bounds.Width); json.WriteNumber("height", image.Bounds.Height); json.WriteEndObject(); }
             json.WriteStartArray("controls");
             void Visit(DependencyObject node, bool visible)
             {

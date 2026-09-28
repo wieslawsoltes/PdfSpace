@@ -13,7 +13,13 @@
 
 PdfSpace is an independent, local-first PDF application built in **C# with Uno Platform and SkiaSharp**. The browser runs a real Uno WebAssembly application with the same document, editing and rendering libraries as the desktop host. An Acrobat-inspired shell brings together document tabs, floating quick tools, comments, form preparation, original-text editing, protection, redaction and page organization.
 
-> **0.3.0-alpha.1:** functional PDF workflows, not complete or pixel-identical Adobe Acrobat compatibility. PdfSpace has original branding and icons and is not affiliated with Adobe. Review the [save and security boundaries](docs/compatibility.md) before processing important documents.
+> **0.4.0-alpha.1:** functional PDF workflows, not complete or pixel-identical Adobe Acrobat compatibility. PdfSpace has original branding and icons and is not affiliated with Adobe. Review the [save and security boundaries](docs/compatibility.md) before processing important documents.
+
+## Existing-PDF editing and performance in 0.4
+
+Edit a specific native image placement: select, move, resize, rotate, flip, replace, insert or delete without modifying its other shared uses. Supported original text inside nested Form XObjects can now be changed, with explicit Unicode font replacement for independent horizontal runs. No white-cover or page-rasterization editing simulation is used. [Native object workflows and limits](docs/native-object-editing.md).
+
+The viewer now uses indexed page geometry instead of repeatedly arranging the entire document. Per-document bounded search indexes, constant-time picture LRU touches, bounded parsed-source caches and one-parse-per-source page assembly reduce repeated work. [Performance design and reproducible measurements](docs/performance.md).
 
 ## Scan & OCR in 0.3
 

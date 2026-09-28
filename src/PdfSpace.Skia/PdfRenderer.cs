@@ -10,6 +10,10 @@ public sealed class PdfRenderer : IDisposable
     private readonly Dictionary<Guid, PdfDocument> _documents = [];
     private readonly Dictionary<(Guid, int), SKPicture> _pictures = [];
     private readonly LinkedList<(Guid, int)> _lru = [];
+    private readonly Dictionary<(Guid, int), LinkedListNode<(Guid, int)>> _nodes = [];
+    private readonly LinkedList<Guid> _sourceLru = [];
+    public int SourceCacheCapacity { get; init; } = 4;
+    public int CachedSourceCount => _documents.Count;
     private bool _disposed;
     public SKTypeface Typeface { get; set; } = SKTypeface.Default;
     public int CacheCapacity { get; init; } = 12;
@@ -18,15 +22,19 @@ public sealed class PdfRenderer : IDisposable
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         var id = page.SourceId!.Value; var key = (id, page.SourcePage);
-        if (_pictures.TryGetValue(key, out var cached)) { _lru.Remove(key); _lru.AddLast(key); return cached; }
+        if (_pictures.TryGetValue(key, out var cached)) { _lru.Remove(_nodes[key]); _lru.AddLast(_nodes[key]); return cached; }
         if (!_documents.TryGetValue(id, out var pdf))
         {
-            pdf = PdfDocument.Open((workspace.Sources.First(s => s.Id == id).PreviewBytes ?? workspace.Sources.First(s => s.Id == id).Bytes), SkiaRenderingParsingOptions.Instance);
+            var source = workspace.Sources.First(s => s.Id == id);
+            pdf = PdfDocument.Open(source.PreviewBytes ?? source.Bytes, SkiaRenderingParsingOptions.Instance);
             pdf.AddSkiaPageFactory(); _documents.Add(id, pdf);
         }
+        _sourceLru.Remove(id); _sourceLru.AddLast(id);
+        while (_documents.Count > Math.Max(1, SourceCacheCapacity))
+        { var oldId = _sourceLru.First!.Value; _sourceLru.RemoveFirst(); _documents.Remove(oldId, out var oldSource); oldSource?.Dispose(); }
         var picture = pdf.GetPage<SKPicture>(page.SourcePage);
-        _pictures.Add(key, picture); _lru.AddLast(key);
-        while (_pictures.Count > Math.Max(1, CacheCapacity)) { var first = _lru.First!.Value; _lru.RemoveFirst(); _pictures.Remove(first, out var old); old?.Dispose(); }
+        _pictures.Add(key, picture); _nodes[key] = _lru.AddLast(key);
+        while (_pictures.Count > Math.Max(1, CacheCapacity)) { var first = _lru.First!.Value; _lru.RemoveFirst(); _nodes.Remove(first); _pictures.Remove(first, out var old); old?.Dispose(); }
         return picture;
     }
     public static SKRect Rect(RectD r) => new((float)r.X, (float)r.Y, (float)r.Right, (float)r.Bottom);
@@ -80,13 +88,13 @@ public sealed class PdfRenderer : IDisposable
     {
         var ids = workspace.Sources.Select(source => source.Id).ToHashSet();
         foreach (var key in _pictures.Keys.Where(key => !ids.Contains(key.Item1)).ToArray())
-        { _pictures.Remove(key, out var picture); picture?.Dispose(); _lru.Remove(key); }
+        { _pictures.Remove(key, out var picture); picture?.Dispose(); if (_nodes.Remove(key, out var node)) _lru.Remove(node); }
         foreach (var id in _documents.Keys.Where(id => !ids.Contains(id)).ToArray())
-        { _documents.Remove(id, out var document); document?.Dispose(); }
+        { _documents.Remove(id, out var document); _sourceLru.Remove(id); document?.Dispose(); }
     }
     public void Dispose()
     {
         if (_disposed) return; _disposed = true;
-        foreach (var p in _pictures.Values) p.Dispose(); foreach (var d in _documents.Values) d.Dispose(); _pictures.Clear(); _documents.Clear(); _lru.Clear();
+        foreach (var p in _pictures.Values) p.Dispose(); foreach (var d in _documents.Values) d.Dispose(); _pictures.Clear(); _documents.Clear(); _lru.Clear(); _nodes.Clear(); _sourceLru.Clear();
     }
 }

@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.4.0-alpha.1 — 2026-09-28
+
+- Native image occurrence editing: direct selection/move/resize, precise geometry, rotation/reflection, replacement, insertion and deletion; copy-on-write nested Form-XObject/resource isolation.
+- Source text editing in nested forms, with explicit searchable Unicode font replacement for independent horizontal runs; strict stale-target, encoding and text-positioning guards.
+- Indexed viewport geometry and visibility, bounded reusable per-document search with whole-word mode, O(1) picture-cache LRU touches and independently bounded parsed-source caches.
+- Source parsing reused during page reassembly; only edited sources are rehydrated after native mutations.
+- Original shared-object sample, isolation/Unicode/cache/layout regressions, real browser editing tests and native verification of browser downloads.
+- Linux HarfBuzz native dependency declared for system-font fallback rendering in engine tests.
+
+This remains a bounded native-object editor, not a general paragraph layout, image-mask, print-production or signature-preserving incremental PDF writer.
+
+
 ## 0.3.0-alpha.1 — 2026-09-27
 
 - Add local Scan & OCR, English/Polish/German recognition, page ranges, cancellation and atomic snapshot application.

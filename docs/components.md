@@ -98,3 +98,7 @@ Inject a platform provider as the optional fourth `PdfWorkbench` constructor arg
 ## OCR engine injection
 
 Pass an `IOcrEngine` as the optional fifth `PdfWorkbench` constructor argument. The browser host supplies `BrowserOcrEngine` and its self-hosted assets; desktop uses `TesseractProcessEngine`. A reusable host without an injected engine reports OCR unavailable rather than pretending to recognize text. See [OCR integration](ocr.md).
+
+## Native object editing and indexed viewing (0.4)
+
+`PdfImageEditor`, `PdfTextEditor.ReplaceWithFont` and `PdfAffineMatrix` expose native occurrence editing without the workbench. `PdfViewport` receives immutable `NativeImageTarget` geometry from the host and raises edit requests; it does not parse native objects itself. `PageLayoutIndex` is independently usable without Uno or Skia. `PdfSearchIndex` provides bounded per-document text caching. See [native object examples](native-object-editing.md) and [performance ownership](performance.md).

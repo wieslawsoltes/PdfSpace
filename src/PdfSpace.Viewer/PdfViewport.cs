@@ -13,7 +13,7 @@ public sealed partial class PdfViewport : UserControl, IDisposable
     private readonly DrawingCanvas _canvas = new();
     private readonly Canvas _overlay = new();
     private readonly EditorSession _session;
-    private PagePlacement[] _placements = [];
+    private readonly PageLayoutIndex _layout;
     private bool _disposed;
     private double _scroll, _pan;
     private PageLayoutMode _mode;
@@ -36,7 +36,7 @@ public sealed partial class PdfViewport : UserControl, IDisposable
     public event Action<Point>? ContextRequested;
     public PdfViewport(EditorSession session)
     {
-        _session = session; IsTabStop = true; HorizontalContentAlignment = HorizontalAlignment.Stretch; VerticalContentAlignment = VerticalAlignment.Stretch;
+        _session = session; _layout = new(session.Document.Pages); IsTabStop = true; HorizontalContentAlignment = HorizontalAlignment.Stretch; VerticalContentAlignment = VerticalAlignment.Stretch;
         AutomationProperties.SetName(this, "PDF document canvas"); AutomationProperties.SetAutomationId(this, "PDF document canvas");
         var root = new Grid(); root.Children.Add(_canvas); root.Children.Add(_overlay); Content = root;
         _canvas.Paint = Paint; _canvas.PointerPressed += Pressed; _canvas.PointerMoved += Moved; _canvas.PointerReleased += Released;
@@ -48,23 +48,23 @@ public sealed partial class PdfViewport : UserControl, IDisposable
         KeyDown += Keyboard;
         session.Changed += DocumentChanged; session.ViewChanged += SessionViewChanged;
     }
-    private void DocumentChanged(object? sender, EventArgs e) { CancelGesture(); Renderer.RetainSources(Session.Document); ClampScroll(); Invalidate(); }
+    private void DocumentChanged(object? sender, EventArgs e) { CancelGesture(); _layout.Update(Session.Document.Pages, _mode); Renderer.RetainSources(Session.Document); ClampScroll(); Invalidate(); }
     private void SessionViewChanged(object? sender, EventArgs e) => Invalidate();
     public void Invalidate() { _canvas.Invalidate(); ViewChanged?.Invoke(); }
-    private PagePlacement[] Arrange(double? scroll = null) => PageLayout.Arrange(Session.Document.Pages, ActualWidth, Zoom, scroll ?? _scroll, _pan, _mode, Session.CurrentPage);
+    private PagePlacement Placement(int index, double? scroll = null) => _layout.Place(index, ActualWidth, Zoom, scroll ?? _scroll, _pan);
+    private int HitPage(PointD screen) => _layout.HitTest(screen, ActualWidth, Zoom, _scroll, _pan, Session.CurrentPage);
     private void ClampScroll()
     {
-        var layout = Arrange(0); var bottom = layout.Length > 0 ? layout.Max(p => p.Bounds.Bottom) : 0;
-        _scroll = Math.Clamp(_scroll, 0, Math.Max(0, bottom - ActualHeight + PageLayout.Gap));
+        _scroll = Math.Clamp(_scroll, 0, Math.Max(0, _layout.TotalHeight(Zoom, Session.CurrentPage) - ActualHeight));
         _pan = Math.Clamp(_pan, -100000, 100000);
     }
     public void Navigate(int index)
     {
         FinishText(true); Session.Navigate(index); _searchHighlight = null;
-        _scroll = _mode == PageLayoutMode.SinglePage ? 0 : Arrange(0).First(p => p.Index == Session.CurrentPage).Bounds.Y - PageLayout.Gap;
+        _scroll = _mode == PageLayoutMode.SinglePage ? 0 : _layout.Top(Session.CurrentPage, Zoom) - PageLayout.Gap;
         ClampScroll(); Invalidate();
     }
-    public void SetLayout(PageLayoutMode mode) { _mode = mode; Navigate(Session.CurrentPage); }
+    public void SetLayout(PageLayoutMode mode) { _mode = mode; _layout.Update(Session.Document.Pages, mode); Navigate(Session.CurrentPage); }
     public void FitPage(bool widthOnly = false)
     {
         var page = Session.Page; var width = Math.Max(100, ActualWidth - 100); var height = Math.Max(100, ActualHeight - 40);
@@ -75,29 +75,29 @@ public sealed partial class PdfViewport : UserControl, IDisposable
     public void ZoomTo(double value) => ZoomAt(value, new(ActualWidth / 2, ActualHeight / 2));
     private void ZoomAt(double value, PointD screen)
     {
-        FinishText(true); var before = Arrange(); var placement = before.FirstOrDefault(p => p.Bounds.Contains(screen));
-        var index = before.Any(p => p.Bounds.Contains(screen)) ? placement.Index : Session.CurrentPage;
-        placement = before.FirstOrDefault(p => p.Index == index);
+        if (!double.IsFinite(value)) throw new ArgumentOutOfRangeException(nameof(value));
+        FinishText(true); var hit = HitPage(screen); var index = hit < 0 ? Session.CurrentPage : hit;
+        var placement = Placement(index);
         var page = Session.Document.Pages[index]; var anchor = placement.ToPage(page, screen, Zoom);
         Zoom = Math.Clamp(value, .1, 8);
-        var after = Arrange().FirstOrDefault(p => p.Index == index); var location = after.ToScreen(page, anchor, Zoom);
+        var after = Placement(index); var location = after.ToScreen(page, anchor, Zoom);
         _pan += screen.X - location.X; _scroll += location.Y - screen.Y; ClampScroll(); Invalidate();
     }
     public void ScrollBy(double delta) { FinishText(true); _scroll += delta; ClampScroll(); UpdateVisiblePage(); Invalidate(); }
     private void UpdateVisiblePage()
     {
         if (_mode == PageLayoutMode.SinglePage) return;
-        var placement = Arrange().OrderBy(p => Math.Abs(p.Bounds.Center.Y - ActualHeight * .42)).FirstOrDefault();
-        if (placement.Index != Session.CurrentPage) Session.Navigate(placement.Index);
+        var index = _layout.NearestPage(_scroll + ActualHeight * .42, Zoom, Session.CurrentPage);
+        if (index >= 0 && index != Session.CurrentPage) Session.Navigate(index);
     }
     public void HighlightSearch(SearchResult result)
-    { Navigate(result.PageIndex); _searchHighlight = result.Bounds; var placement = Arrange().First(p => p.Index == result.PageIndex); var screen = placement.ToScreen(Session.Page, result.Bounds.Center, Zoom); _scroll += screen.Y - ActualHeight * .42; ClampScroll(); Invalidate(); }
-    public RectD PageScreenBounds(int index) => Arrange().FirstOrDefault(p => p.Index == index).Bounds;
+    { Navigate(result.PageIndex); _searchHighlight = result.Bounds; var placement = Placement(result.PageIndex); var screen = placement.ToScreen(Session.Page, result.Bounds.Center, Zoom); _scroll += screen.Y - ActualHeight * .42; ClampScroll(); Invalidate(); }
+    public RectD PageScreenBounds(int index) => Placement(index).Bounds;
     private void Paint(SKCanvas canvas, Size size)
     {
-        canvas.Clear(new SKColor(232, 233, 235)); _placements = Arrange();
+        canvas.Clear(new SKColor(232, 233, 235));
         using var shadow = new SKPaint { Color = new(0, 0, 0, 23) }; using var outline = new SKPaint { Color = new(0, 0, 0, 30), Style = SKPaintStyle.Stroke, StrokeWidth = 1 };
-        foreach (var placement in _placements)
+        foreach (var placement in _layout.Visible(size.Width, size.Height, Zoom, _scroll, _pan, Session.CurrentPage))
         {
             var rect = placement.Bounds; if (!rect.Intersects(new RectD(0, 0, size.Width, size.Height).Inflate(30))) continue;
             var page = Session.Document.Pages[placement.Index];
@@ -118,15 +118,16 @@ public sealed partial class PdfViewport : UserControl, IDisposable
             finally { canvas.Restore(); }
             canvas.DrawRect(PdfRenderer.Rect(rect), outline);
         }
-        if (_scroll > 0 || Arrange(0).LastOrDefault().Bounds.Bottom > size.Height)
+        if (_scroll > 0 || _layout.TotalHeight(Zoom, Session.CurrentPage) > size.Height)
         {
-            var total = Math.Max(size.Height, Arrange(0).Max(p => p.Bounds.Bottom) + 20); var height = Math.Max(32, size.Height * size.Height / total);
+            var total = Math.Max(size.Height, _layout.TotalHeight(Zoom, Session.CurrentPage)); var height = Math.Max(32, size.Height * size.Height / total);
             using var scrollbar = new SKPaint { IsAntialias = true, Color = new(90, 90, 90, 100) };
             canvas.DrawRoundRect(new SKRect((float)size.Width - 9, (float)(_scroll / total * size.Height), (float)size.Width - 3, (float)(_scroll / total * size.Height + height)), 3, 3, scrollbar);
         }
     }
     private void DrawOverlays(SKCanvas canvas, PdfPageState page, int index)
     {
+        DrawNativeImages(canvas, index);
         using var fill = new SKPaint { Color = new(20, 115, 230, 40) }; using var line = new SKPaint { Color = new(20, 115, 230), Style = SKPaintStyle.Stroke, StrokeWidth = (float)(1 / Zoom), IsAntialias = true };
         if (index == Session.CurrentPage && _searchHighlight is { } found) { fill.Color = new(255, 188, 0, 90); canvas.DrawRect(PdfRenderer.Rect(found.Inflate(2)), fill); }
         if (_dragPage == index && _preview is { } preview) AnnotationPainter.Draw(canvas, preview, Renderer.Typeface);

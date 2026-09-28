@@ -68,6 +68,7 @@ jobs:
           npm run test:browser
           dotnet run --project tests/PdfSpace.Tests -c Release -- --verify-browser-security artifacts/browser-exports
           dotnet run --project tests/PdfSpace.Tests -c Release -- --verify-browser-ocr artifacts/browser-exports
+          dotnet run --project tests/PdfSpace.Tests -c Release -- --verify-browser-objects artifacts/browser-exports
       - name: Package reusable libraries
         run: |
           for project in src/*/*.csproj; do

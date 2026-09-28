@@ -1,6 +1,6 @@
 # PDF compatibility and release boundary
 
-## 0.3.0-alpha.1
+## 0.4.0-alpha.1
 
 PdfSpace is an independent Uno/Skia workspace. This release adds interoperable PDF workflows; it does not claim complete Acrobat feature or pixel parity.
 
@@ -8,7 +8,8 @@ PdfSpace is an independent Uno/Skia workspace. This release adds interoperable P
 |---|---|---|
 | Native PDF save | Standard annotations and replies, field values/defaults/properties, new fields, widget deletion, safe links, original page content | A rewritten PDF, not an incremental or byte-for-byte save; signatures and XFA block structured changes |
 | Catalog preservation | Original catalog retained for one source with the original page sequence | Page assembly creates a new catalog; tags, attachments, named destinations and other document-level data are not guaranteed to survive |
-| Text editing | Replace supported top-level text-showing operands using characters already available in the font encoding | No arbitrary reflow, new font embedding, nested form-XObject editing, general image-object editing or complete typography engine |
+| Text editing | Occurrence-isolated page and nested-form text replacement; original-encoding mode; explicit embedded Unicode font for independent horizontal runs | No paragraph reflow, complex-script shaping/bidi, vertical layout, outlined glyph editing or arbitrary font repair |
+| Image editing | Select/move/resize/rotate/flip/replace/insert/delete native image occurrences, including shared nested forms | Not redaction; no image crop/mask editor, inline images, ICC/CMYK-preserving replacement or live pixel deformation |
 | Forms | Text, check boxes, imported radio groups, single-select choices; creation of text/check/dropdown widgets; tooltip, flags, defaults, font size, bounds, maximum length and options | No XFA, JavaScript calculations/validation, multi-select choices, push buttons, certificate fields, general hierarchy editing or complete PDF tab-order semantics |
 | Protection | AES-256 revision-6 output with separate opening/owner passwords and print/copy/edit flags; owner-authorized reopening | Permission flags rely on reader enforcement; not DRM. No certificate-based encryption or signing |
 | Redaction | Explicitly confirmed, separate image-only reconstruction with burned-in marks on all pages | Raster output loses text/search, forms, links and vectors. No selective vector/object redaction. Source documents and workspaces remain unredacted |
@@ -38,7 +39,7 @@ Tab and Shift+Tab navigate supported editable widgets in page/annotation-array o
 
 ## Not implemented
 
-Arbitrary PDF text/image layout editing; general font replacement and paragraph reflow; certificate signing/validation and trusted timestamping; complete PDF accessibility tagging; PDF/A, PDF/X or PDF/UA certification; professional print-production/preflight; complete Office conversion; portfolios/multimedia; cloud identity, audit trails, real-time review and Adobe plug-in compatibility. Visual drawn signatures are not cryptographic signatures.
+Arbitrary PDF layout editing; general font/shaping replacement and paragraph reflow; certificate signing/validation and trusted timestamping; complete PDF accessibility tagging; PDF/A, PDF/X or PDF/UA certification; professional print-production/preflight; complete Office conversion; portfolios/multimedia; cloud identity, audit trails, real-time review and Adobe plug-in compatibility. Visual drawn signatures are not cryptographic signatures.
 
 ## Limits and verification
 
@@ -55,3 +56,7 @@ The viewer exposes original source outline navigation and resolves local legacy/
 ## Scan & OCR (0.3)
 
 Image-only PDF recognition, PNG/JPEG-to-PDF import, English/Polish/German models, per-word confidence review/correction, cancellation, snapshot-safe batch application and native searchable PDF export are implemented. Existing text pages are skipped; mixed text/image-region recognition, automatic deskew, handwriting guarantees, arbitrary languages and complex shaping remain unsupported. Native hosts need Tesseract 5 installed. The browser hosts all pinned code and models itself. See [OCR](ocr.md) for the exact export and resource limits.
+
+## Native objects and performance (0.4)
+
+See [native object editing](native-object-editing.md) for copy-on-write occurrence isolation, encoding and graphics-state limits, and [performance](performance.md) for indexed viewport/search geometry, source reuse, cache bounds and reproducible measurements. These operations retain original bytes in undo/workspaces and must not be mistaken for sanitization.

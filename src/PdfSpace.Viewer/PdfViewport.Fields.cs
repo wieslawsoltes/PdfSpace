@@ -10,7 +10,7 @@ public sealed partial class PdfViewport
         if (!field.CanFill || field.Kind != PdfFieldKind.Text) return;
         FinishText(true);
         _editingField = field;
-        var placement = Arrange().First(item => item.Index == Session.CurrentPage);
+        var placement = Placement(Session.CurrentPage);
         var bounds = PageGeometry.DisplayBounds(Session.Page, field.Bounds);
         var input = new PdfTextField("Fill " + field.Name)
         {
@@ -61,7 +61,7 @@ public sealed partial class PdfViewport
         var target = fields[next];
         Navigate(target.Page);
         Session.SelectField(target.Field.Id);
-        var placement = Arrange().First(item => item.Index == target.Page);
+        var placement = Placement(target.Page);
         var screen = placement.ToScreen(Session.Page, target.Field.Bounds.Center, Zoom);
         if (screen.Y < 35 || screen.Y > ActualHeight - 35) { _scroll += screen.Y - ActualHeight / 2; ClampScroll(); }
         if (target.Field.Kind == PdfFieldKind.Text) BeginFieldText(target.Field);
