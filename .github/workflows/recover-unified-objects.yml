@@ -1,0 +1,46 @@
+name: Recover unified object source
+on:
+  push:
+    branches: [build/unified-object-transfer-0.5]
+    paths: [.github/workflows/recover-unified-objects.yml]
+permissions:
+  contents: read
+jobs:
+  recover:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Recover complete patch records for review only
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/object-recovery
+          python3 - <<'PY'
+          import pathlib,base64,lzma,hashlib,json,subprocess
+          output=pathlib.Path('/tmp/object-recovery')
+          chunks=[pathlib.Path(f'tools/objects05/{i}.b64').read_text().strip() for i in (1,2)]
+          decoder=lzma.LZMADecompressor()
+          partial=decoder.decompress(base64.b64decode(''.join(chunks),validate=True))
+          (output/'partial.patch').write_bytes(partial)
+          boundary=partial.rfind(b'\ndiff --git ')
+          if boundary < 0: raise RuntimeError('No complete patch records recovered')
+          complete=partial[:boundary+1]
+          (output/'complete.patch').write_bytes(complete)
+          report={'baseline':'de634ec3367d82c26be210ff6615490c3f9e9be4','compressed_bytes':30000,'decoded_bytes':len(partial),'complete_bytes':len(complete),'decoder_eof':decoder.eof,'complete_sha256':hashlib.sha256(complete).hexdigest(),'files':[line.decode() for line in complete.splitlines() if line.startswith(b'diff --git ')],'incomplete_file':partial[boundary+1:].splitlines()[0].decode()}
+          (output/'recovery.json').write_text(json.dumps(report,indent=2))
+          print(json.dumps(report,indent=2))
+          subprocess.run(['git','worktree','add','--detach','/tmp/recovered-source',report['baseline']],check=True)
+          subprocess.run(['git','apply','--check',str(output/'complete.patch')],cwd='/tmp/recovered-source',check=True)
+          subprocess.run(['git','apply',str(output/'complete.patch')],cwd='/tmp/recovered-source',check=True)
+          subprocess.run(['git','diff','--check'],cwd='/tmp/recovered-source',check=True)
+          PY
+          cd /tmp/recovered-source
+          zip -qr /tmp/object-recovery/recovered-source.zip . -x .git
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: PdfSpace-object-recovery
+          path: /tmp/object-recovery
