@@ -61,7 +61,10 @@ test('ahead-of-input geometry never clicks the unrelated button beneath stale co
     globalThis.decoyClicks = 0;
     let useRealBounds = false;
     let correctionStarted = false;
+    let pointerOver = false;
     let revision = 0;
+    target.addEventListener('pointerenter', () => { pointerOver = true; });
+    target.addEventListener('pointerleave', () => { pointerOver = false; });
     target.addEventListener('click', () => globalThis.receivedClicks++);
     decoy.addEventListener('click', () => globalThis.decoyClicks++);
     decoy.addEventListener('pointerenter', () => {
@@ -76,7 +79,7 @@ test('ahead-of-input geometry never clicks the unrelated button beneath stale co
         diagnosticRevision: ++revision,
         controls: [{ name: 'Verified command', enabled: true,
           x: r.x, y: r.y, width: r.width, height: r.height,
-          pointerOver: target.matches(':hover') }]
+          pointerOver }]
       };
     };
     publish(); setInterval(publish, 40);
