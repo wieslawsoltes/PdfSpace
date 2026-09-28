@@ -1,0 +1,77 @@
+name: Retain pinned renderer source
+on:
+  push:
+    branches: [build/renderer-source-0.5.1]
+    paths: [.github/workflows/retain-renderer-source.yml]
+permissions:
+  contents: write
+jobs:
+  source:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/object-paint-0.5.1
+          path: target
+          fetch-depth: 0
+      - uses: actions/checkout@v4
+        with:
+          repository: BobLd/PdfPig.Rendering.Skia
+          ref: e4476d80f98bf1a5a7cd6f7d45fb7c2afe10ec11
+          path: upstream
+          persist-credentials: false
+      - name: Retain source and license without binaries
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C target rev-parse HEAD)" = '29ccf80fb6033a00df89e41d8f0a0b8d267d0c95'
+          python3 - <<'PY'
+          import pathlib,hashlib,json
+          root=pathlib.Path('upstream/UglyToad.PdfPig.Rendering.Skia')
+          output=pathlib.Path('target/src/PdfSpace.Rendering.Skia');output.mkdir(parents=True)
+          entries=[]
+          files=sorted(root.rglob('*.cs'));assert 10<len(files)<100
+          for f in files:
+              assert not {'obj','bin'}.intersection(f.parts)
+              raw=f.read_bytes(); content=raw.decode('utf-8-sig').replace('UglyToad.PdfPig.Rendering.Skia','PdfSpace.Rendering.Skia')
+              content='// PdfSpace adaptation: isolated namespace. Original copyright and license retained.\n'+content
+              relative=f.relative_to(root); dest=output/'Upstream'/relative;dest.parent.mkdir(parents=True,exist_ok=True);dest.write_text(content)
+              entries.append({'path':relative.as_posix(),'upstream_sha256':hashlib.sha256(raw).hexdigest()})
+          licenses=[p for p in pathlib.Path('upstream').iterdir() if p.is_file() and (p.name.upper().startswith('LICENSE') or p.name.upper().startswith('NOTICE'))]
+          assert licenses
+          for f in licenses:(output/f.name).write_bytes(f.read_bytes())
+          (output/'UPSTREAM.json').write_text(json.dumps({'repository':'https://github.com/BobLd/PdfPig.Rendering.Skia','commit':'e4476d80f98bf1a5a7cd6f7d45fb7c2afe10ec11','package_version':'0.1.16.4','adaptation':'Namespace isolation. Renderer fixes are reviewed separately.','sources':entries},indent=2)+'\n')
+          (output/'PdfSpace.Rendering.Skia.csproj').write_text('''<Project Sdk="Microsoft.NET.Sdk">
+            <PropertyGroup>
+              <TargetFramework>net10.0</TargetFramework>
+              <ImplicitUsings>disable</ImplicitUsings>
+              <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
+              <Authors>BobLd;PdfSpace contributors</Authors>
+              <Description>Source-pinned PdfPig Skia renderer with PdfSpace interoperability fixes. Apache-2.0 derivative; see UPSTREAM.json.</Description>
+            </PropertyGroup>
+            <ItemGroup>
+              <PackageReference Include="PdfPig" Version="0.1.16" />
+              <PackageReference Include="PdfPig.Filters.Dct.JpegLibrary" Version="0.1.16.1" />
+              <PackageReference Include="PdfPig.Filters.Jbig2.PdfboxJbig2" Version="0.1.16.1" />
+              <PackageReference Include="PdfPig.Filters.Jpx.OpenJpeg" Version="0.1.16" />
+              <PackageReference Include="SkiaSharp" Version="3.119.4" />
+              <PackageReference Include="SkiaSharp.HarfBuzz" Version="3.119.4" />
+              <None Update="LICENSE*;NOTICE*;UPSTREAM.json" Pack="true" PackagePath="/" />
+            </ItemGroup>
+          </Project>
+          ''')
+          print('Retained',len(files),'source files at the exact NuGet source commit')
+          PY
+          cd target
+          git diff --check
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/PdfSpace.Rendering.Skia
+          git commit -m 'build: retain namespaced Apache-2.0 renderer source at the pinned package commit'
+          git push origin HEAD:feat/object-paint-0.5.1
+          git archive --format=zip --output=/tmp/PdfSpace-renderer-source.zip HEAD src/PdfSpace.Rendering.Skia
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PdfSpace-renderer-source
+          path: /tmp/PdfSpace-renderer-source.zip
