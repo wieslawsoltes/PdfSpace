@@ -100,10 +100,13 @@ public sealed partial class PdfWorkbench
         }
         await _storage.SaveAsync(BaseName(Session.Document.Title) + "-pages.zip", stream.ToArray(), "application/zip"); ShowStatus("Split PDF archive download started.");
     }
+    private long _searchGeneration;
     private async Task SearchAsync(string query)
     {
+        var context = _active; var snapshot = Session.Document; var generation = ++_searchGeneration;
         _searchQuery = query; _right = "Find"; ShowStatus("Searching document…"); await Task.Delay(25);
-        _searchResults = PdfReader.Find(Session.Document, query, _matchCase).Take(500).ToArray(); RefreshRight(); AdaptLayout();
+        if (_active != context || !ReferenceEquals(snapshot, Session.Document) || generation != _searchGeneration) return;
+        _searchResults = context.Search.Find(snapshot, query, _matchCase, _wholeWord).Take(500).ToArray(); RefreshRight(); AdaptLayout();
         if (_searchResults.Length > 0) Viewport.HighlightSearch(_searchResults[0]); ShowStatus($"{_searchResults.Length} results for “{query}”.");
     }
     private async Task DeletePageAsync()

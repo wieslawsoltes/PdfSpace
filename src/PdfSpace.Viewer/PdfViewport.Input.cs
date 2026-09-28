@@ -3,7 +3,7 @@ namespace PdfSpace.Viewer;
 
 public sealed partial class PdfViewport
 {
-    private enum Gesture { None, Pan, Create, Move, Resize, SelectText, Crop, Pinch }
+    private enum Gesture { None, Pan, Create, Move, Resize, SelectText, Crop, Pinch, ImageMove, ImageResize, ImageInsert }
     private Gesture _gesture;
     private PointD _start, _screenStart, _startPan;
     private double _startScroll;
@@ -30,9 +30,10 @@ public sealed partial class PdfViewport
         if (!point.Properties.IsLeftButtonPressed && !point.Properties.IsMiddleButtonPressed) return;
         FinishText(true); Focus(FocusState.Pointer); _screenStart = screen; _startPan = new(_pan, 0); _startScroll = _scroll; _canvas.CapturePointer(e.Pointer);
         if (Session.Tool == PdfTool.Hand || point.Properties.IsMiddleButtonPressed) { _gesture = Gesture.Pan; e.Handled = true; return; }
-        var hit = Arrange().Where(p => p.Bounds.Contains(screen)).ToArray(); if (hit.Length == 0) { CancelGesture(); return; }
-        var placement = hit[0]; _dragPage = placement.Index; if (Session.CurrentPage != _dragPage) Session.Navigate(_dragPage);
+        var hit = HitPage(screen); if (hit < 0) { CancelGesture(); return; }
+        var placement = Placement(hit); _dragPage = placement.Index; if (Session.CurrentPage != _dragPage) Session.Navigate(_dragPage);
         var page = Session.Page; _start = placement.ToPage(page, screen, Zoom); _points.Clear(); _points.Add(_start); SelectedText = ""; _searchHighlight = null;
+        if (PressNativeImage()) { e.Handled = true; return; }
         if (Session.Tool == PdfTool.FillForm)
         {
             var field = page.Fields.Reverse().FirstOrDefault(item => item.Bounds.Contains(_start));
@@ -82,8 +83,9 @@ public sealed partial class PdfViewport
         }
         if (_gesture == Gesture.None) return;
         if (_gesture == Gesture.Pan) { _pan = _startPan.X + screen.X - _screenStart.X; _scroll = _startScroll - (screen.Y - _screenStart.Y); ClampScroll(); UpdateVisiblePage(); Invalidate(); e.Handled = true; return; }
-        var page = Session.Document.Pages[_dragPage]; var placement = Arrange().First(p => p.Index == _dragPage); var world = placement.ToPage(page, screen, Zoom);
+        var page = Session.Document.Pages[_dragPage]; var placement = Placement(_dragPage); var world = placement.ToPage(page, screen, Zoom);
         world = new(Math.Clamp(world.X, 0, page.Width), Math.Clamp(world.Y, 0, page.Height));
+        if (MoveNativeImage(world)) { e.Handled = true; Invalidate(); return; }
         if (_gesture == Gesture.Move && _original is not null) _preview = _original.Move(world - _start);
         else if (_gesture == Gesture.Resize && _original is not null)
         {
@@ -107,11 +109,15 @@ public sealed partial class PdfViewport
     {
         _touches.Remove(e.Pointer.PointerId);
         if (_gesture == Gesture.Pinch) { if (_touches.Count == 0) CancelGesture(); e.Handled = true; return; }
+        var imagePreview = _imagePreview; var imageIndex = _selectedImage;
         var gesture = _gesture; var preview = _preview; var marquee = _marquee; var index = _dragPage; var original = _original;
         CancelGesture();
         try
         {
-            if (gesture == Gesture.Create && preview is not null && (preview.Bounds.Width > .5 || preview.Bounds.Height > .5))
+            if (gesture is Gesture.ImageMove or Gesture.ImageResize && imagePreview is { Width: > .01, Height: > .01 } imageBounds && imageBounds != _imageInitial)
+                NativeImageChanged?.Invoke(imageIndex, imageBounds);
+            else if (gesture == Gesture.ImageInsert && marquee is { Width: > 1, Height: > 1 } insertion) NativeImageInsertRequested?.Invoke(insertion);
+            else if (gesture == Gesture.Create && preview is not null && (preview.Bounds.Width > .5 || preview.Bounds.Height > .5))
             {
                 if (Session.Tool is PdfTool.FormText or PdfTool.FormCheckBox or PdfTool.FormChoice)
                 {
@@ -146,7 +152,7 @@ public sealed partial class PdfViewport
     }
     public void CancelGesture()
     {
-        _gesture = Gesture.None; _preview = null; _original = null; _marquee = null; _points.Clear();
+        _gesture = Gesture.None; _imagePreview = null; _preview = null; _original = null; _marquee = null; _points.Clear();
         if (!_releasing) { _releasing = true; _canvas.ReleasePointerCaptures(); _releasing = false; }
     }
     private void Wheel(object sender, PointerRoutedEventArgs e)
@@ -159,14 +165,16 @@ public sealed partial class PdfViewport
     }
     private new void DoubleTapped(object sender, DoubleTappedRoutedEventArgs e)
     {
-        var position = e.GetPosition(_canvas); var screen = new PointD(position.X, position.Y); var hit = Arrange().Where(p => p.Bounds.Contains(screen)).ToArray(); if (hit.Length == 0) return;
-        var page = Session.Document.Pages[hit[0].Index]; var point = hit[0].ToPage(page, screen, Zoom);
+        var position = e.GetPosition(_canvas); var screen = new PointD(position.X, position.Y); var hit = HitPage(screen); if (hit < 0) return;
+        var page = Session.Document.Pages[hit]; var point = Placement(hit).ToPage(page, screen, Zoom);
         var text = page.Annotations.Reverse().FirstOrDefault(a => a.Kind == AnnotationKind.Text && a.Bounds.Contains(point));
-        if (text is not null) { if (Session.CurrentPage != hit[0].Index) Session.Navigate(hit[0].Index); BeginText(text); e.Handled = true; }
+        if (text is not null) { if (Session.CurrentPage != hit) Session.Navigate(hit); BeginText(text); e.Handled = true; }
     }
     private void Keyboard(object sender, KeyRoutedEventArgs e)
     {
         if (IsEditingText) return;
+        if (Session.Tool == PdfTool.EditImage && _selectedImage >= 0 && e.Key is VirtualKey.Delete or VirtualKey.Back)
+        { NativeImageDeleteRequested?.Invoke(_selectedImage); e.Handled = true; return; }
         if (HandleFormKey(e)) { e.Handled = true; return; }
         if (e.Key == VirtualKey.Escape) { CancelGesture(); Session.Select(null); Invalidate(); e.Handled = true; }
         else if (e.Key is VirtualKey.Delete or VirtualKey.Back) { if (Session.SelectedFieldId is not null) { try { Session.DeleteField(); } catch (InvalidOperationException ex) { StatusChanged?.Invoke(ex.Message); } } else Session.DeleteSelection(); e.Handled = true; }

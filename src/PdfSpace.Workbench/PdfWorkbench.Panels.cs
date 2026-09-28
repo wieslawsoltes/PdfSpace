@@ -5,7 +5,7 @@ public sealed partial class PdfWorkbench
 {
     private SearchResult[] _searchResults = [];
     private string _searchQuery = "";
-    private bool _matchCase, _hideResolved;
+    private bool _matchCase, _wholeWord, _hideResolved;
     private void BuildLeft()
     {
         if (_active is null) return;
@@ -40,6 +40,8 @@ public sealed partial class PdfWorkbench
             case "Edit":
                 _leftPanel.Description("Edit supported original text operands or add text, shapes and annotations. Changes remain undoable in the workspace.");
                 _leftPanel.Add("Edit original text", PdfIconKind.Edit, () => Run(ShowOriginalTextAsync));
+                _leftPanel.Add("Edit original images", PdfIconKind.Image, () => Safe(ShowNativeImages));
+                _leftPanel.Add("Add image", PdfIconKind.Image, () => Run(ChooseInsertImageAsync));
                 Tool("Add link", PdfIconKind.Share, PdfTool.Link);
                 Tool("Select annotation", PdfIconKind.Select, PdfTool.Select); Tool("Add text", PdfIconKind.Text, PdfTool.Text);
                 _leftPanel.Heading("MARK UP TEXT"); Tool("Highlight text", PdfIconKind.Highlight, PdfTool.Highlight); Tool("Underline text", PdfIconKind.Underline, PdfTool.Underline); Tool("Strikethrough text", PdfIconKind.Strikeout, PdfTool.Strikeout);
@@ -131,6 +133,7 @@ public sealed partial class PdfWorkbench
                 case "Form fields": BuildFormFields(content); break;
                 case "Field properties": BuildFieldProperties(content); break;
                 case "Original text": BuildOriginalText(content); break;
+                case "Original images": BuildNativeImages(content); break;
             }
             PdfTheme.Place(root, new ScrollViewer { Content = content, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled }, row: 1);
         }
@@ -200,6 +203,7 @@ public sealed partial class PdfWorkbench
         search.KeyDown += (_, e) => { if (e.Key == VirtualKey.Enter) { Run(() => SearchAsync(search.Text)); e.Handled = true; } }; content.Children.Add(search);
         var actions = PdfTheme.Row(4); actions.Children.Add(new PdfCommandButton("Search", PdfIconKind.Search, () => Run(() => SearchAsync(search.Text))));
         var match = new PdfCommandButton("Match case", action: () => { _matchCase = !_matchCase; Run(() => SearchAsync(search.Text)); }); match.Select(_matchCase); actions.Children.Add(match); content.Children.Add(actions);
+        var whole = new PdfCommandButton("Whole words", action: () => { _wholeWord = !_wholeWord; Run(() => SearchAsync(search.Text)); }); whole.Select(_wholeWord); content.Children.Add(whole);
         content.Children.Add(Paragraph(_searchQuery.Length == 0 ? "Search selectable PDF text and annotation text." : $"{_searchResults.Length} results", 11));
         foreach (var result in _searchResults.Take(500))
         {

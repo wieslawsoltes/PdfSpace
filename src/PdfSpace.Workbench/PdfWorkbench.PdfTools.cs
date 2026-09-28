@@ -6,6 +6,7 @@ namespace PdfSpace.Workbench;
 public sealed partial class PdfWorkbench
 {
     private PdfTextRun[] _originalRuns = [];
+    private bool _replaceSourceFont;
     private bool _permitPrint = true, _permitCopy = true, _permitEdit = true;
     private void BuildFormTools()
     {
@@ -180,26 +181,36 @@ public sealed partial class PdfWorkbench
         var runs = PdfTextEditor.Read(document, page);
         if (_active != context || !ReferenceEquals(document, context.Session.Document) || page != context.Session.CurrentPage) return;
         _originalRuns = runs; _right = "Original text"; RefreshRight(); AdaptLayout();
-        ShowStatus($"{runs.Count(run => run.Editable)} editable text runs. Replacement uses existing font glyphs; automatic reflow is not supported.");
+        ShowStatus($"{runs.Count(run => run.Editable)} editable text runs. Use existing glyphs or explicitly embed the replacement font for independent runs; no paragraph reflow.");
     }
     private void BuildOriginalText(StackPanel content)
     {
         content.Children.Add(Paragraph("Edits change real text-showing operands in the source PDF. Existing font subsets and positioned glyphs limit replacements; no white-cover simulation is used."));
+        var fontMode = new PdfCommandButton("Use replacement font", PdfIconKind.Text, () => { _replaceSourceFont = !_replaceSourceFont; RefreshRight(); });
+        fontMode.Select(_replaceSourceFont); content.Children.Add(fontMode);
+        content.Children.Add(Paragraph(_replaceSourceFont ? "Independent runs use the bundled Unicode font. Original baseline, color and rendering mode are retained; no paragraph reflow." : "Original font mode retains existing font subsets and positioned glyphs.", 11));
         content.Children.Add(new PdfCommandButton("Refresh text on current page", PdfIconKind.Rotate, () => Run(ShowOriginalTextAsync)));
         foreach (var run in _originalRuns.Take(200))
         {
-            var button = new PdfCommandButton("Edit source text: " + run.Text, PdfIconKind.Text, () => Run(() => ReplaceOriginalTextAsync(run))) { IsEnabled = run.Editable, Height = double.NaN, MinHeight = 44, HorizontalAlignment = HorizontalAlignment.Stretch, HorizontalContentAlignment = HorizontalAlignment.Left };
+            var button = new PdfCommandButton("Edit source text: " + run.Text, PdfIconKind.Text, () => Run(() => ReplaceOriginalTextAsync(run))) { IsEnabled = run.Editable && (!_replaceSourceFont || run.CanReplaceFont), Height = double.NaN, MinHeight = 44, HorizontalAlignment = HorizontalAlignment.Stretch, HorizontalContentAlignment = HorizontalAlignment.Left };
             button.Content = Paragraph(run.Text.Length > 200 ? run.Text[..200] + "…" : run.Text, 12, run.Editable ? "#333333" : "#999999");
             ToolTipService.SetToolTip(button, run.Limitation); content.Children.Add(button);
         }
-        if (_originalRuns.Length == 0) content.Children.Add(Paragraph("No supported top-level text runs. Scanned pages, paths and text inside nested Form XObjects are not edited by this tool."));
+        if (_originalRuns.Length == 0) content.Children.Add(Paragraph("No supported text runs. Scanned text uses Scan & OCR. Outlined glyphs and unknown encodings are not replaced."));
     }
     private async Task ReplaceOriginalTextAsync(PdfTextRun run)
     {
         var context = _active;
         var replacement = await _dialogs.PromptAsync("Edit original PDF text", run.Limitation, run.Text, multiline: true, acceptLabel: "Replace source text");
         if (replacement is null || replacement == run.Text) return;
-        context.Session.Execute("Edit original PDF text", document => PdfTextEditor.Replace(document, run, replacement));
+        if (_replaceSourceFont)
+        {
+            var sizeText = await _dialogs.PromptAsync("Replacement font size", "The bundled font is embedded into this PDF. Existing colors and text position remain; no paragraph reflow is performed.", run.FontSize.ToString("0.###", CultureInfo.InvariantCulture));
+            if (sizeText is null) return;
+            if (!double.TryParse(sizeText, NumberStyles.Float, CultureInfo.InvariantCulture, out var size)) throw new ArgumentException("Enter a valid font size.");
+            context.Session.Execute("Replace native text font", document => PdfTextEditor.ReplaceWithFont(document, run, replacement, _typeface, size));
+        }
+        else context.Session.Execute("Edit original PDF text", document => PdfTextEditor.Replace(document, run, replacement));
         await ShowOriginalTextAsync(); ShowStatus("Original PDF text changed. Undo restores the prior source bytes.");
     }
     private async Task CreateLinkAsync(DocumentContext context, RectD bounds)

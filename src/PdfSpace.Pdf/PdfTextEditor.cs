@@ -1,18 +1,24 @@
-using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
 using PdfSharp.Pdf;
 using PdfSharp.Pdf.Content;
 using PdfSharp.Pdf.Content.Objects;
 using PdfSpace.Core;
+using SkiaSharp;
 namespace PdfSpace.Pdf;
 
-public sealed record PdfTextRun(Guid SourceId, int SourcePage, int Index, string SourceHash, string Text, string FontResource, bool Editable, string Limitation);
+public sealed record PdfTextRun(Guid SourceId, int SourcePage, int Index, string SourceHash, string Text, string FontResource, bool Editable, string Limitation)
+{
+    public Guid PageId { get; init; }
+    public string ScopePath { get; init; } = "";
+    public double FontSize { get; init; }
+    public bool CanReplaceFont { get; init; }
+}
 
-/// <summary>Edits actual text-showing operands, not white overlays. Reuses the embedded font and rejects unavailable glyphs.</summary>
+/// <summary>Edits native text operands, with occurrence isolation for nested/shared forms.</summary>
 public static class PdfTextEditor
 {
-    private sealed record Run(CString[] Operands, FontCodec? Codec, string Font, string Limitation)
+    private sealed record Run(CString[] Operands, FontCodec? Codec, string Font, double Size, int[] Operations, bool ReplaceFont)
     {
         public string? Decode()
         {
@@ -24,93 +30,113 @@ public static class PdfTextEditor
     public static PdfTextRun[] Read(PdfWorkspace workspace, int pageIndex)
     {
         var page = workspace.Pages[pageIndex]; if (page.SourceId is not { } id) return [];
-        var source = workspace.Sources.First(source => source.Id == id);
+        var source = workspace.Sources.First(item => item.Id == id);
         using var native = PdfDocumentEngine.OpenNative(source.Bytes);
-        var inspection = PdfDocumentEngine.Inspect(source.Bytes);
-        var locked = inspection.SignatureFields > 0 || inspection.HasXfa;
-        var content = ContentReader.ReadContent(native.Pages[page.SourcePage - 1]);
-        var hash = Convert.ToHexString(SHA256.HashData(source.Bytes));
-        return Enumerate(native.Pages[page.SourcePage - 1], content).Select((run, i) =>
-        {
-            var decoded = run.Decode();
-            return new PdfTextRun(id, page.SourcePage, i, hash, decoded ?? "[Unsupported font encoding]", run.Font, decoded is not null && !locked,
-                locked ? "Signed/certified or XFA source; editing is blocked." : decoded is null ? run.Limitation : "Uses the original font subset; no paragraph reflow. Only glyphs already encoded by the source font can be inserted.");
-        }).ToArray();
+        var inspection = PdfDocumentEngine.Inspect(source.Bytes); var locked = inspection.SignatureFields > 0 || inspection.HasXfa;
+        var hash = PdfContentGraph.Hash(source.Bytes); var result = new List<PdfTextRun>();
+        foreach (var scope in PdfContentGraph.Read(native.Pages[page.SourcePage - 1]))
+            foreach (var (run, index) in Enumerate(scope.Resources, scope.Content).Select((run, index) => (run, index)))
+            {
+                var decoded = run.Decode();
+                result.Add(new(id, page.SourcePage, index, hash, decoded ?? "[Unsupported font encoding]", run.Font, decoded is not null && !locked,
+                    locked ? "Signed/certified or XFA source; editing is blocked." : decoded is null ? "Unsupported source font encoding; no safe text replacement is available." :
+                    "Edits only this text occurrence. Original-font mode requires encoded glyphs; replacement-font mode supports independent horizontal text-showing runs. No paragraph reflow.")
+                { PageId = page.Id, ScopePath = scope.Path, FontSize = run.Size, CanReplaceFont = !locked && decoded is not null && run.ReplaceFont });
+            }
+        return result.ToArray();
     }
-    public static PdfWorkspace Replace(PdfWorkspace workspace, PdfTextRun target, string replacement)
+    public static PdfWorkspace Replace(PdfWorkspace workspace, PdfTextRun target, string replacement) =>
+        ReplaceCore(workspace, target, replacement, null, null);
+    public static PdfWorkspace ReplaceWithFont(PdfWorkspace workspace, PdfTextRun target, string replacement, SKTypeface typeface, double? fontSize = null)
     {
-        if (replacement.Length > 100000) throw new ArgumentException("Replacement text exceeds the length limit.");
-        var source = workspace.Sources.FirstOrDefault(source => source.Id == target.SourceId) ?? throw new InvalidOperationException("The text selection belongs to a different document revision.");
-        if (Convert.ToHexString(SHA256.HashData(source.Bytes)) != target.SourceHash) throw new InvalidOperationException("The source has changed. Select the text again.");
-        var inspection = PdfDocumentEngine.Inspect(source.Bytes);
-        if (inspection.SignatureFields > 0 || inspection.HasXfa) throw new NotSupportedException("Signed/certified and XFA sources cannot be edited.");
+        ArgumentNullException.ThrowIfNull(typeface);
+        if (fontSize is { } size && (!double.IsFinite(size) || size is < 1 or > 1000)) throw new ArgumentOutOfRangeException(nameof(fontSize));
+        return ReplaceCore(workspace, target, replacement, typeface, fontSize);
+    }
+    private static PdfWorkspace ReplaceCore(PdfWorkspace workspace, PdfTextRun target, string replacement, SKTypeface? typeface, double? fontSize)
+    {
+        ArgumentNullException.ThrowIfNull(replacement);
+        if (replacement.Length > 100000 || replacement.Any(char.IsControl)) throw new ArgumentException("Use a single line of at most 100,000 characters. Paragraph reflow is not implemented.");
+        var source = PdfContentGraph.ValidateTarget(workspace, target.SourceId, target.SourcePage, target.PageId, target.SourceHash);
         using var native = PdfDocumentEngine.OpenNative(source.Bytes);
         if (target.SourcePage < 1 || target.SourcePage > native.PageCount) throw new InvalidDataException("Invalid source page.");
-        var page = native.Pages[target.SourcePage - 1]; var content = ContentReader.ReadContent(page);
-        var runs = Enumerate(page, content);
-        if (target.Index < 0 || target.Index >= runs.Length) throw new InvalidDataException("The text run no longer exists.");
-        var run = runs[target.Index];
-        if (run.Codec is null || run.Decode() != target.Text) throw new NotSupportedException("This text run has an unsupported or changed font encoding.");
-        var replacementRunes = replacement.EnumerateRunes().Select(rune => rune.ToString()).ToArray();
-        var capacities = run.Operands.Select(operand => run.Codec.Decode(operand.Value)!.EnumerateRunes().Count()).ToArray();
-        if (run.Operands.Length > 1 && replacementRunes.Length > capacities.Sum())
-            throw new NotSupportedException("This text is positioned glyph-by-glyph. Use no more characters than the original; automatic paragraph reflow is not implemented.");
-        var offset = 0;
-        // Encode every replacement before mutating the parsed stream; a missing glyph fails atomically.
-        var encoded = new List<string>();
-        for (var i = 0; i < run.Operands.Length; i++)
+        var page = native.Pages[target.SourcePage - 1];
+        PdfContentGraph.Edit(native, page, target.ScopePath, (content, resources) =>
         {
-            var take = run.Operands.Length == 1 ? replacementRunes.Length : Math.Min(capacities[i], replacementRunes.Length - offset);
-            encoded.Add(run.Codec.Encode(string.Concat(replacementRunes.Skip(offset).Take(take)))); offset += take;
-        }
-        for (var i = 0; i < run.Operands.Length; i++) { run.Operands[i].Value = encoded[i]; run.Operands[i].CStringType = CStringType.HexString; }
-        NormalizeStrings(content);
-        page.Contents.ReplaceContent(content);
-        var next = source with { Id = Guid.NewGuid(), Bytes = PdfDocumentEngine.Bytes(native), PreviewBytes = null };
-        var result = workspace with { Sources = workspace.Sources.Select(item => item.Id == source.Id ? next : item).ToArray(), Pages = workspace.Pages.Select(item => item.SourceId == source.Id ? item with { SourceId = next.Id } : item).ToArray() };
-        return PdfDocumentEngine.PrepareWorkspace(result);
-    }
-    // PDFsharp 6.2 parses hexadecimal operands but its CString writer cannot serialize them.
-    // A byte-exact hex wrapper handles all strings without changing text encodings or literal escapes.
-    private sealed class HexOperand : CString
-    {
-        public override string ToString() => "<" + Convert.ToHexString(Encoding.Latin1.GetBytes(Value)) + ">";
-    }
-    private static void NormalizeStrings(CSequence sequence)
-    {
-        for (var i = 0; i < sequence.Count; i++)
-        {
-            if (sequence[i] is CString text && text.CStringType != CStringType.Dictionary)
+            var runs = Enumerate(resources, content);
+            if (target.Index < 0 || target.Index >= runs.Length) throw new InvalidDataException("The text run no longer exists.");
+            var run = runs[target.Index];
+            if (run.Codec is null || run.Decode() != target.Text || run.Font != target.FontResource) throw new NotSupportedException("This text run has an unsupported or changed font encoding.");
+            if (typeface is not null)
             {
-                if (text.Value.Any(c => c > 255)) throw new NotSupportedException("A content string has non-byte values; the stream cannot safely be rewritten.");
-                sequence[i] = new HexOperand { Value = text.Value, CStringType = CStringType.HexString };
+                if (!run.ReplaceFont) throw new NotSupportedException("This run uses dependent positioning or clipping text. Replacement-font editing requires an independent horizontal text run.");
+                var font = new OcrPdfFont(native, typeface, [replacement]);
+                var name = PdfContentGraph.AddResource(native, resources, "/Font", font.Font);
+                var index = run.Operations[0]; var original = (COperator)content[index];
+                var prefix = original.Name == "TJ" && original.Operands.FirstOrDefault() is CArray array ?
+                    string.Join(" ", array.TakeWhile(item => item is not CString).Select(item => item.ToString())) : "";
+                var show = prefix.Length > 0 ? $"[{prefix} <{font.Encode(replacement)}>] TJ\n" : $"<{font.Encode(replacement)}> Tj\n";
+                content.RemoveAt(index);
+                PdfContentGraph.Insert(content, index, $"{name} {PdfObjects.F(fontSize ?? run.Size)} Tf\n" + show + $"{run.Font} {PdfObjects.F(run.Size)} Tf\n");
             }
-            else if (sequence[i] is COperator operation) NormalizeStrings(operation.Operands);
-            else if (sequence[i] is CSequence nested) NormalizeStrings(nested);
-        }
+            else
+            {
+                var runes = replacement.EnumerateRunes().Select(rune => rune.ToString()).ToArray();
+                var capacities = run.Operands.Select(operand => run.Codec.Decode(operand.Value)!.EnumerateRunes().Count()).ToArray();
+                if (run.Operands.Length > 1 && runes.Length > capacities.Sum()) throw new NotSupportedException("This text is positioned glyph-by-glyph. Use at most the original character count or choose replacement-font mode for an independent run.");
+                var offset = 0; var encoded = new List<string>();
+                for (var i = 0; i < run.Operands.Length; i++)
+                {
+                    var take = run.Operands.Length == 1 ? runes.Length : Math.Min(capacities[i], runes.Length - offset);
+                    encoded.Add(run.Codec.Encode(string.Concat(runes.Skip(offset).Take(take)))); offset += take;
+                }
+                for (var i = 0; i < run.Operands.Length; i++) { run.Operands[i].Value = encoded[i]; run.Operands[i].CStringType = CStringType.HexString; }
+            }
+        });
+        return PdfContentGraph.Commit(workspace, source, target.PageId, target.SourcePage, native);
     }
-    private static Run[] Enumerate(PdfPage page, CSequence content)
+    private static Run[] Enumerate(PdfDictionary resources, CSequence content)
     {
-        var fontResources = PdfObjects.Dictionary(PdfObjects.Dictionary(page.Elements["/Resources"])?.Elements["/Font"]);
-        var font = ""; var stack = new Stack<string>(); var codecs = new Dictionary<string, FontCodec?>(); var result = new List<Run>();
-        var operands = new List<CString>();
+        var fonts = PdfObjects.Dictionary(resources.Elements["/Font"]);
+        var font = ""; double size = 0; var renderMode = 0;
+        var stack = new Stack<(string Font, double Size, int RenderMode)>();
+        var codecs = new Dictionary<string, FontCodec?>(); var result = new List<Run>();
+        var operands = new List<CString>(); var operations = new List<int>();
+        bool Independent(int index)
+        {
+            if (((COperator)content[index]).Name is not ("Tj" or "TJ")) return false;
+            for (var i = index + 1; i < content.Count; i++)
+                if (content[i] is COperator op)
+                {
+                    if (op.Name is "ET" or "BT" or "Tm" or "Td" or "TD" or "T*" or "'" or "\"") return true;
+                    if (op.Name is "Tj" or "TJ" or "Do") return false;
+                }
+            return true;
+        }
         void Flush()
         {
             if (operands.Count == 0) return;
-            if (!codecs.TryGetValue(font, out var codec)) { codec = FontCodec.Create(PdfObjects.Dictionary(fontResources?.Elements[font])); codecs[font] = codec; }
-            result.Add(new(operands.ToArray(), codec, font, "This font requires an unsupported encoding or lacks a usable ToUnicode map.")); operands.Clear();
-            if (result.Count > 10000) throw new InvalidDataException("Too many text runs in a page.");
+            if (!codecs.TryGetValue(font, out var codec)) { codec = FontCodec.Create(PdfObjects.Dictionary(fonts?.Elements[font])); codecs[font] = codec; }
+            var fontObject = PdfObjects.Dictionary(fonts?.Elements[font]);
+            var encoding = PdfObjects.Text(fontObject?.Elements["/Encoding"]);
+            var horizontal = !encoding.EndsWith("-V", StringComparison.Ordinal);
+            result.Add(new(operands.ToArray(), codec, font, size, operations.ToArray(), horizontal && renderMode < 4 && size > 0 && operations.Count == 1 && Independent(operations[0])));
+            operands.Clear(); operations.Clear();
+            if (result.Count > 10000) throw new InvalidDataException("Too many text runs in a page scope.");
         }
-        foreach (var operation in content.OfType<COperator>())
+        for (var index = 0; index < content.Count; index++)
         {
-            if (operation.Name is "BT" or "ET" or "Tm" or "T*") Flush();
-            else if (operation.Name is "Td" or "TD" && operation.Operands.Count > 1 && operation.Operands[1] is CNumber vertical && (vertical is CReal real ? real.Value : ((CInteger)vertical).Value) != 0) Flush();
-            else if (operation.Name == "q") { Flush(); stack.Push(font); }
-            else if (operation.Name == "Q" && stack.Count > 0) { Flush(); font = stack.Pop(); }
-            else if (operation.Name == "Tf" && operation.Operands.FirstOrDefault() is CName name) { Flush(); font = name.Name; }
+            if (content[index] is not COperator operation) continue;
+            if (operation.Name is "BT" or "ET" or "Tm" or "T*" or "Do") Flush();
+            else if (operation.Name is "Td" or "TD" && operation.Operands.Count > 1 && Number(operation.Operands[1]) != 0) Flush();
+            else if (operation.Name == "q") { Flush(); stack.Push((font, size, renderMode)); }
+            else if (operation.Name == "Q" && stack.Count > 0) { Flush(); (font, size, renderMode) = stack.Pop(); }
+            else if (operation.Name == "Tr") { Flush(); renderMode = operation.Operands.Count > 0 ? (int)Number(operation.Operands[0]) : 0; }
+            else if (operation.Name == "Tf" && operation.Operands.FirstOrDefault() is CName name) { Flush(); font = name.Name; size = operation.Operands.Count > 1 ? Number(operation.Operands[1]) : 0; }
             else if (operation.Name is "Tj" or "TJ" or "'" or "\"")
             {
                 if (operation.Name is "'" or "\"") Flush();
+                operations.Add(index);
                 foreach (var operand in operation.Operands)
                 {
                     if (operand is CString text) operands.Add(text);
@@ -120,6 +146,7 @@ public static class PdfTextEditor
         }
         Flush(); return result.ToArray();
     }
+    private static double Number(CObject operand) => operand switch { CInteger value => value.Value, CReal value => value.Value, _ => 0 };
     private sealed class FontCodec(Dictionary<string, string> map)
     {
         private readonly Dictionary<string, string> _map = map;

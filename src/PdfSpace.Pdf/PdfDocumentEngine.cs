@@ -39,12 +39,14 @@ public static class PdfDocumentEngine
         return Enrich(workspace, importObjects: true, sensitive);
     }
     public static PdfWorkspace PrepareWorkspace(PdfWorkspace workspace) => Enrich(workspace, importObjects: false);
-    private static PdfWorkspace Enrich(PdfWorkspace workspace, bool importObjects, bool sensitive = false)
+    internal static PdfWorkspace PrepareEditedSource(PdfWorkspace workspace, Guid id) => Enrich(workspace, importObjects: false, onlySource: id);
+    private static PdfWorkspace Enrich(PdfWorkspace workspace, bool importObjects, bool sensitive = false, Guid? onlySource = null)
     {
         WorkspaceJson.Validate(workspace);
         var sources = new List<PdfSource>(); var pages = workspace.Pages.ToArray();
         foreach (var source in workspace.Sources)
         {
+            if (onlySource is not null && source.Id != onlySource) { sources.Add(source); continue; }
             using var native = OpenNative(source.Bytes);
             var inspection = Inspect(native);
             var resolver = new PdfDestinationResolver(native);
@@ -139,6 +141,7 @@ public static class PdfDocumentEngine
         if (workspace.Pages.Any(page => page.Annotations.Any(annotation => annotation.Kind == AnnotationKind.RedactionMark)))
             throw new InvalidOperationException("Apply pending redactions through Redact a PDF before saving a normal PDF. A workspace retains unredacted source data.");
         var nativeSources = new Dictionary<Guid, PdfDocument>();
+        var importSources = new Dictionary<Guid, PdfDocument>();
         PdfDocument? output = null;
         try
         {
@@ -178,7 +181,11 @@ public static class PdfDocumentEngine
                     if (page.SourceId is { } id)
                     {
                         // Page import requires a separate import-mode document; never use this path to bypass passwords.
-                        using var import = OpenNative(workspace.Sources.First(source => source.Id == id).Bytes, mode: PdfDocumentOpenMode.Import);
+                        if (!importSources.TryGetValue(id, out var import))
+                        {
+                            import = OpenNative(workspace.Sources.First(source => source.Id == id).Bytes, mode: PdfDocumentOpenMode.Import);
+                            importSources.Add(id, import);
+                        }
                         output.AddPage(import.Pages[page.SourcePage - 1]);
                     }
                     else { var blank = output.AddPage(); blank.Width = PdfSharp.Drawing.XUnit.FromPoint(page.Width); blank.Height = PdfSharp.Drawing.XUnit.FromPoint(page.Height); }
@@ -241,12 +248,13 @@ public static class PdfDocumentEngine
                 output.SecuritySettings.PermitAnnotations = protection.AllowEdit; output.SecuritySettings.PermitFormsFill = protection.AllowEdit; output.SecuritySettings.PermitAssembleDocument = protection.AllowEdit;
             }
             var bytes = Bytes(output);
-            return new(bytes, preserve, preserve ? ["PDF objects are rewritten, not incrementally appended. Digital signatures and XFA changes are blocked."] : ["Pages and their content are imported into a new PDF catalog. Original document-level metadata, outlines, named destinations, tags and attachments are not guaranteed to survive page assembly."]);
+            return new(bytes, preserve, preserve ? ["PDF objects are rewritten, not incrementally appended. Digital signatures and XFA changes are blocked."] : ["Pages and their content are imported into a new PDF catalog. Original document-level metadata, outlines, named destinations, tags and attachments are not guaranteed to survive page assembly."]) { ImportSourceCount = importSources.Count };
         }
         finally
         {
             if (output is not null && !nativeSources.Values.Contains(output)) output.Dispose();
             foreach (var native in nativeSources.Values) native.Dispose();
+            foreach (var import in importSources.Values) import.Dispose();
         }
     }
     public static PdfWorkspace CreateFormSample(SKTypeface typeface)
