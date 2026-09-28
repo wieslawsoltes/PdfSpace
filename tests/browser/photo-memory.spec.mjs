@@ -52,14 +52,18 @@ test('photo import retains JPEG bytes and EXIF replacement remains a native imag
 test('native duplication, proportions and explicit history release keep current edits', async ({ page }) => {
   await start(page); await click(page, 'Edit'); await click(page, 'Edit original images');
   await click(page, 'Open native object example'); await click(page, 'Select image 1');
+  const original = await state(page);
+  const expectedHeight = original.imageBounds.width * original.imageSamples[0].height / original.imageSamples[0].width;
+  expect(original.imageSamples[0]).toEqual({ width: 40, height: 24 });
+  expect(expectedHeight).toBe(96);
   await click(page, 'Duplicate image');
   await expect.poll(async () => (await state(page)).nativeImages).toBe(3);
   await click(page, 'Restore image proportions');
-  await expect.poll(async () => (await state(page)).imageBounds.height).toBeCloseTo(80, 2);
+  await expect.poll(async () => (await state(page)).imageBounds.height).toBeCloseTo(expectedHeight, 2);
   await click(page, 'Undo'); await click(page, 'Select image 1');
-  await expect.poll(async () => (await state(page)).imageBounds.height).toBeCloseTo(70, 2);
+  await expect.poll(async () => (await state(page)).imageBounds.height).toBeCloseTo(original.imageBounds.height, 2);
   await click(page, 'Redo'); await click(page, 'Select image 1');
-  await expect.poll(async () => (await state(page)).imageBounds.height).toBeCloseTo(80, 2);
+  await expect.poll(async () => (await state(page)).imageBounds.height).toBeCloseTo(expectedHeight, 2);
   const before = await state(page); expect(before.undoCount).toBe(2); expect(before.dirty).toBe(true);
   await save(page, 'photo-browser-duplicated.pdf');
   await click(page, 'Properties'); await click(page, 'Clear undo history'); await click(page, 'Clear history');
@@ -67,6 +71,7 @@ test('native duplication, proportions and explicit history release keep current 
   const after = await state(page); expect(after.redoCount).toBe(0); expect(after.dirty).toBe(true);
   expect(after.retainedSourceBytes).toBeLessThan(before.retainedSourceBytes);
   await click(page, 'Edit original images'); expect((await state(page)).nativeImages).toBe(3);
+  await page.screenshot({ path: 'artifacts/screenshots/pdfspace-image-duplication.png' });
 });
 
 test('closing a document from Home removes its card instead of retaining a stale session', async ({ page }) => {

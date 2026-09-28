@@ -27,7 +27,9 @@ internal static class BrowserPhotoVerification
         }
         var duplicated = PdfDocumentEngine.Open(Bytes("photo-browser-duplicated.pdf"), "duplicated.pdf");
         var images = PdfImageEditor.Read(duplicated, 0);
-        Check(images.Length == 3 && Math.Abs(images[0].Bounds.Height - 80) < .01, "native reader verifies browser duplication and proportion correction");
+        var expectedHeight = 160d * 24 / 40; // NativeObjectSample has 40 x 24 raster samples.
+        Check(images.Length == 3 && Math.Abs(images[0].Bounds.Height - expectedHeight) < .01 &&
+            images[0].PixelWidth == 40 && images[0].PixelHeight == 24, "native reader verifies browser duplication and proportion correction");
         Check(PdfImageEditor.Read(duplicated, 1).Single().Bounds.Width == 160, "browser duplication leaves the other shared-resource page unchanged");
         Console.WriteLine("5 browser photo verification checks passed.");
     }
