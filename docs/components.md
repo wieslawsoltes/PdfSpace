@@ -106,3 +106,16 @@ Pass an `IOcrEngine` as the optional fifth `PdfWorkbench` constructor argument. 
 ## Photographs and history
 
 `PdfImageEditor.OpenImage`, `Duplicate` and `RestoreAspectRatio` support native photo workflows. `EditorHistoryOptions` configures count/source-byte retention; `EditorSession.ClearHistory` releases undo/redo while retaining current edits and saved-state identity. See [the photograph embedding example](photo-import.md) and [memory accounting](performance.md).
+
+## Unified object editing
+
+`PdfObjectEditor` discovers snapshot-specific `PdfPageObject` descriptors and applies native operations without depending on Uno. `Transform`, `SetBounds`, `Align`, `Distribute`, `Crop`, `Arrange`, `Duplicate`, `Group`, `Ungroup`, `Copy` and `Paste` support the guarded mixed-object workflows documented in [object editing](object-editing.md). `SetPath`/`SetAppearance` edit vector commands/painting; `ReplaceTextBlock` and `InsertText` explicitly lay out independent left-to-right glyphs with overflow validation.
+
+```csharp
+var objects = PdfObjectEditor.Read(session.Document, session.CurrentPage);
+var selected = objects.Where(item => item.Kind == PdfPageObjectKind.Path && item.Editable).ToArray();
+session.Execute("Move native paths", snapshot =>
+    PdfObjectEditor.Transform(snapshot, selected, PdfAffineMatrix.Translate(12, 6)));
+```
+
+Refresh descriptors after any document mutation or undo. Never reuse a descriptor from a different page or snapshot. A clipboard payload owns serialized source/resource data until the host releases it; propagate its sensitivity flag. The viewer's object-target records contain detached geometry and no parsed PDF handles. Selection membership and union bounds are cached independently from PDF object discovery.

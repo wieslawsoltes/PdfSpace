@@ -113,3 +113,26 @@ test('private mixed-object clipboard pastes into a new PDF and native Unicode te
   await save(page,'mixed-browser-text.pdf');
   await shot(page,'pdfspace-native-unicode-block');
 });
+
+
+test('marquee selection, native rectangle insertion and resize commit one transaction per gesture', async ({ page }) => {
+  await start(page);
+  await drag(page, [35,350], [280,460]);
+  await expect.poll(async () => (await state(page)).selectedObjects).toEqual([6,7]);
+  expect((await state(page)).undoCount).toBe(0);
+  await drag(page, [270,452], [292,461]);
+  await expect.poll(async () => (await state(page)).undoCount).toBe(1);
+  await expect.poll(async () => (await state(page)).objects.find(o=>o.index===6)?.width).toBeCloseTo(130*244/222,0);
+  await click(page, 'Undo');
+  await point(page, 290,580);
+  await expect.poll(async () => (await state(page)).selectedObjects).toEqual([]);
+  await click(page, 'Draw native rectangle');
+  await drag(page, [330,560], [460,610]);
+  await expect.poll(async () => (await state(page)).nativeObjects).toBe(13);
+  await expect.poll(async () => (await state(page)).objects.filter(o=>o.kind==='Path').length).toBe(5);
+  const inserted=(await state(page)).objects.at(-1);
+  expect(inserted.x).toBeCloseTo(330,0); expect(inserted.y).toBeCloseTo(560,0);
+  expect(inserted.width).toBeCloseTo(130,0); expect(inserted.height).toBeCloseTo(50,0);
+  await click(page, 'Undo');
+  await expect.poll(async () => (await state(page)).nativeObjects).toBe(12);
+});

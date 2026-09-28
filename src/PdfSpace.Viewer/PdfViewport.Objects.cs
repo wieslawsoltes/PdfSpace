@@ -7,6 +7,9 @@ public sealed partial class PdfViewport
 {
     private NativeObjectTarget[] _objectTargets = [];
     private int[] _objectSelection = [];
+    private Dictionary<int, NativeObjectTarget> _objectLookup = [];
+    private HashSet<int> _objectSelectionSet = [];
+    private RectD _objectSelectionBounds;
     private RectD _objectInitial;
     private RectD? _objectPreview;
     private int[] _marqueeBase = [];
@@ -23,21 +26,35 @@ public sealed partial class PdfViewport
     public event Action<string>? NativeObjectCommand;
     public void SetNativeObjects(NativeObjectTarget[] targets)
     {
+        ArgumentNullException.ThrowIfNull(targets);
         _objectTargets = targets;
+        _objectLookup = targets.ToDictionary(target => target.Index);
         _objectSelection = [];
+        _objectSelectionSet.Clear();
+        _objectSelectionBounds = default;
         _objectPreview = null;
         Invalidate();
     }
 
     public void SelectNativeObjects(IEnumerable<int> indices, bool notify = true)
     {
-        _objectSelection = indices.Distinct().Where(i => _objectTargets.Any(t => t.Index == i)).Order().ToArray();
+        ArgumentNullException.ThrowIfNull(indices);
+        _objectSelection = indices.Distinct().Where(_objectLookup.ContainsKey).Order().ToArray();
+        _objectSelectionSet = new(_objectSelection);
+        _objectSelectionBounds = default;
+        for (var index = 0; index < _objectSelection.Length; index++)
+        {
+            var bounds = _objectLookup[_objectSelection[index]].Bounds;
+            _objectSelectionBounds = index == 0 ? bounds : RectD.Union(_objectSelectionBounds, bounds);
+        }
         if (notify)
             NativeObjectsSelectionChanged?.Invoke(_objectSelection.ToArray());
         Invalidate();
     }
 
-    private RectD ObjectBounds() => _objectTargets.Where(t => _objectSelection.Contains(t.Index)).Select(t => t.Bounds).Aggregate(RectD.Union);
+    // Selection membership and union bounds are computed only when it changes,
+    // not N objects × M selected objects on every pointer/render update.
+    private RectD ObjectBounds() => _objectSelectionBounds;
     private bool PressObjects(PointerRoutedEventArgs args)
     {
         if (Session.Tool is PdfTool.ObjectRectangle or PdfTool.ObjectEllipse)
@@ -57,7 +74,7 @@ public sealed partial class PdfViewport
         var additive = args.KeyModifiers.HasFlag(VirtualKeyModifiers.Shift) || args.KeyModifiers.HasFlag(VirtualKeyModifiers.Control);
         if (EditObjectPoints && _objectSelection.Length == 1)
         {
-            var selected = _objectTargets.FirstOrDefault(t => t.Index == _objectSelection[0]);
+            var selected = _objectLookup.GetValueOrDefault(_objectSelection[0]);
             _objectNode = selected?.Points.FirstOrDefault(p => p.Position.Distance(_start) <= 7 / Zoom);
             if (_objectNode is not null)
             {
@@ -93,10 +110,10 @@ public sealed partial class PdfViewport
         }
 
         if (additive)
-            SelectNativeObjects(_objectSelection.Contains(hit.Index) ? _objectSelection.Where(i => i != hit.Index) : _objectSelection.Append(hit.Index));
-        else if (!_objectSelection.Contains(hit.Index))
+            SelectNativeObjects(_objectSelectionSet.Contains(hit.Index) ? _objectSelection.Where(i => i != hit.Index) : _objectSelection.Append(hit.Index));
+        else if (!_objectSelectionSet.Contains(hit.Index))
             SelectNativeObjects([hit.Index]);
-        if (_objectSelection.Length > 0 && _objectTargets.Where(t => _objectSelection.Contains(t.Index)).All(t => t.Editable))
+        if (_objectSelection.Length > 0 && _objectSelection.All(index => _objectLookup[index].Editable))
         {
             _objectInitial = ObjectBounds();
             _objectPreview = _objectInitial;
@@ -252,7 +269,7 @@ public sealed partial class PdfViewport
         };
         foreach (var item in _objectTargets)
         {
-            var selected = _objectSelection.Contains(item.Index);
+            var selected = _objectSelectionSet.Contains(item.Index);
             line.Color = selected ? new SKColor(20, 115, 230) : new SKColor(20, 115, 230, 65);
             var bounds = item.Bounds;
             if (selected && _objectPreview is { } preview)
