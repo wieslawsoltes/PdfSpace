@@ -1,0 +1,40 @@
+name: Apply verified interaction source
+on:
+  push:
+    branches: [build/interaction-transfer-0.5.2]
+    paths: [.github/workflows/materialize-interaction052.yml]
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/constrained-editing-0.5.2
+          fetch-depth: 0
+      - name: Verify and apply exact source delta
+        env:
+          TRANSFER_COMMIT: ${{ github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = 'b47c3dc4cd285e0c948334a232bb0469513625dd'
+          git fetch origin "$TRANSFER_COMMIT"
+          python3 - <<'PY'
+          import os,subprocess,base64,lzma,hashlib,pathlib
+          encoded=subprocess.check_output(['git','show',f'{os.environ["TRANSFER_COMMIT"]}:tools/interaction052.b64'])
+          patch=lzma.decompress(base64.b64decode(encoded,validate=True))
+          assert hashlib.sha256(patch).hexdigest()=='271f7a05b28b3d7e304a5c3eaadfd5ecb573fe7d5a3968807dd21e2b3620c1e7'
+          pathlib.Path('/tmp/interaction052.patch').write_bytes(patch)
+          print('Verified',len(patch),'bytes of source changes')
+          PY
+          git apply --unidiff-zero --check /tmp/interaction052.patch
+          git apply --unidiff-zero /tmp/interaction052.patch
+          git diff --check
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'feat: constrained native PDF gestures and persistent inline input focus'
+          git push origin HEAD:feat/constrained-editing-0.5.2
