@@ -69,6 +69,7 @@ public sealed partial class PdfViewport
         StatusChanged?.Invoke($"Field {next + 1} of {fields.Length}: {target.Field.Name}. Tab moves; Space selects buttons; arrows change choices.");
         Invalidate();
     }
+    private static bool AltPressed() => (InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Menu) & Windows.UI.Core.CoreVirtualKeyStates.Down) != 0;
     private static bool ShiftPressed() => (InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Shift) & Windows.UI.Core.CoreVirtualKeyStates.Down) != 0;
     private bool HandleFormKey(KeyRoutedEventArgs args)
     {
@@ -95,7 +96,7 @@ public sealed partial class PdfViewport
     private void FinishField(bool commit)
     {
         if (_fieldEditor is not { } input) return;
-        var field = _editingField; _fieldEditor = null; _editingField = null; _overlay.Children.Remove(input);
+        var field = _editingField; _fieldEditor = null; _editingField = null; ReturnFocusBeforeRemoving(input); _overlay.Children.Remove(input);
         if (commit && field is not null)
         {
             try { Session.SetFieldValue(field.Id, input.Text); }

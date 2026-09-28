@@ -17,11 +17,28 @@ public sealed partial class PdfViewport
         Canvas.SetLeft(field, top.X); Canvas.SetTop(field, top.Y); _overlay.Children.Add(field);
         StatusChanged?.Invoke("Type your text. Click outside to apply; Escape cancels."); Invalidate();
     }
+    private void ReturnFocusBeforeRemoving(Control editor)
+    {
+        if (_disposed || XamlRoot is null) return;
+        var focused = FocusManager.GetFocusedElement(XamlRoot) as DependencyObject;
+        while (focused is not null)
+        {
+            if (ReferenceEquals(focused, editor))
+            {
+                // Do this before detaching the focused visual. LostFocus has already cleared
+                // the editor identity, so re-entry is harmless. Never steal focus from a toolbar.
+                Focus(FocusState.Programmatic);
+                return;
+            }
+            focused = Microsoft.UI.Xaml.Media.VisualTreeHelper.GetParent(focused);
+        }
+    }
+
     public void FinishText(bool commit)
     {
         FinishField(commit);
         if (_textEditor is null || _finishing) return; _finishing = true;
-        var field = _textEditor; var annotation = _editingAnnotation; _textEditor = null; _editingAnnotation = null; _overlay.Children.Clear();
+        var field = _textEditor; var annotation = _editingAnnotation; _textEditor = null; _editingAnnotation = null; ReturnFocusBeforeRemoving(field); _overlay.Children.Clear();
         try
         {
             if (commit && annotation is not null && !string.IsNullOrWhiteSpace(field.Text))

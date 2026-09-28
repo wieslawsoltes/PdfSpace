@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.5.2-alpha.1
+
+- Added reusable constrained-move/resize/creation geometry: Shift axis/aspect lock, Alt center origin and preserved handle grab offsets; pointer release stays one native transaction.
+- Preserved Shift-click selection while allowing Shift-drag of an already-selected object. Escape cancels without rewriting the source.
+- Avoided selection-set and inspector rebuilding for an unchanged native selection.
+- Retained a persistent focus target between inline form editors and when closing added-text editors, without stealing external input focus.
+- Replaced stale scroll-geometry assumptions in acceptance tests with fresh revisioned, read-only compositor observations.
+- Added native/browser gesture and focus regressions, plus independent reopening of actual browser gesture exports.
+
 ## 0.5.1-alpha.1
 
 - Added native per-paint opacity and sixteen PDF blend names, including text objects whose internal graphics state changes between showing operations. Preserve masks and following text-state side effects.

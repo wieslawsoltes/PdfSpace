@@ -15,6 +15,9 @@ public sealed partial class App : Application
     private Window? _window;
     private SKTypeface? _font;
     private PdfWorkbench? _workbench;
+#if __WASM__
+    private DispatcherTimer? _diagnosticTimer;
+#endif
     public App() { InitializeComponent(); RequestedTheme = ApplicationTheme.Light; }
     protected override async void OnLaunched(LaunchActivatedEventArgs args)
     {
@@ -44,9 +47,10 @@ public sealed partial class App : Application
                 BrowserFiles.SetDirty(_workbench.HasUnsavedChanges);
                 // Uno's browser bridge deliberately leaves Tab to the DOM while
                 // document.body is focused. Keep the native canvas focused when
-                // managed focus belongs to a non-text document control.
+                // managed focus belongs to the document, including the brief editor-attachment gap.
+                // The JS bridge itself never takes focus from an active native text input.
                 var canvasFocused = false;
-                if (!_workbench.Viewport.IsEditingText && _workbench.XamlRoot is { } root)
+                if (_workbench.XamlRoot is { } root)
                 {
                     var focused = Microsoft.UI.Xaml.Input.FocusManager.GetFocusedElement(root) as DependencyObject;
                     while (focused is not null)
@@ -71,9 +75,21 @@ public sealed partial class App : Application
                 // Panel construction changes desired size before controls receive arranged bounds.
                 // Publish geometry after layout, not just when the underlying document state changes.
                 _workbench.LayoutUpdated += (_, _) => Publish();
+                // Scroll animation changes render transforms without a layout pass. A stale
+                // geometry snapshot can appear stable to acceptance tooling while the panel moves.
+                // This read-only sampler exists only for ?test=1; it never invalidates the UI.
+                _diagnosticTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(80) };
+                _diagnosticTimer.Tick += (_, _) => Publish();
+                _diagnosticTimer.Start();
             }
 #endif
-            _window.Closed += (_, _) => { _workbench.Dispose(); _font?.Dispose(); };
+            _window.Closed += (_, _) =>
+            {
+#if __WASM__
+                _diagnosticTimer?.Stop(); _diagnosticTimer = null;
+#endif
+                _workbench.Dispose(); _font?.Dispose();
+            };
             await _workbench.OfferRecoveryAsync();
         }
         catch (Exception ex)

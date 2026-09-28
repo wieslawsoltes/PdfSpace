@@ -1,6 +1,7 @@
 (() => {
   'use strict';
   let dirty = false;
+  let diagnosticRevision = 0;
   let canvasOwnsManagedFocus = false;
   let canvasFocusScheduled = false;
   function focusDocumentCanvas() {
@@ -78,7 +79,7 @@
       setTimeout(() => URL.revokeObjectURL(url), 300000); return 'opened';
     },
     isTestMode: () => new URLSearchParams(location.search).has('test'),
-    publishDiagnostics: json => { if (!new URLSearchParams(location.search).has('test')) return; globalThis.pdfSpaceDiagnostics = Object.freeze(JSON.parse(json)); document.documentElement.dataset.pdfspaceReady = 'true'; },
+    publishDiagnostics: json => { if (!new URLSearchParams(location.search).has('test')) return; globalThis.pdfSpaceDiagnostics = Object.freeze({ ...JSON.parse(json), diagnosticRevision: ++diagnosticRevision }); document.documentElement.dataset.pdfspaceReady = 'true'; },
     setCanvasFocus: value => {
       canvasOwnsManagedFocus = value;
       if (!value || canvasFocusScheduled) return;

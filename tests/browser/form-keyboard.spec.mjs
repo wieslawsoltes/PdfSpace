@@ -41,3 +41,24 @@ test('keyboard traversal across non-text widgets preserves field values and nati
   fs.mkdirSync('artifacts/screenshots', { recursive: true });
   await page.screenshot({ path: 'artifacts/screenshots/pdfspace-keyboard-forms.png' });
 });
+
+
+test('consecutive Tab transitions retain a focus recipient while native inputs attach', async ({ page }) => {
+  page.on('dialog', dialog => dialog.accept());
+  await page.goto(url + (url.includes('?') ? '&' : '?') + 'test=1');
+  await page.waitForFunction(() => globalThis.pdfSpaceDiagnostics?.ready, null, { timeout: 150000 });
+  await click(page, 'Prepare a form'); await click(page, 'Open form example'); await click(page, 'Fit page');
+  const s = await state(page);
+  await page.mouse.click(s.pageBounds.x + 250 * s.zoom, s.pageBounds.y + 370 * s.zoom);
+  await page.waitForFunction(() => document.activeElement instanceof HTMLInputElement);
+  await page.keyboard.type('Focus handoff', { delay: 8 });
+  // Deliberately wait only for selection, not native input attachment: this
+  // reproduces the inter-editor window from the failed public build trace.
+  for (let cycle = 0; cycle < 3; cycle++) {
+    for (const name of ['Organization', 'Approved', 'Role', 'FullName']) {
+      await page.keyboard.press('Tab');
+      await expect.poll(async () => (await state(page)).selectedField).toBe(name);
+    }
+  }
+  expect((await state(page)).formValues.find(f => f.name === 'FullName').value).toBe('Focus handoff');
+});
