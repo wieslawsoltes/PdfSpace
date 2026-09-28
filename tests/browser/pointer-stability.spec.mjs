@@ -48,3 +48,40 @@ test('read-only geometry must advance before a stable coordinate is accepted', a
   await clickUnoControl(page, 'Fresh command');
   await expect.poll(() => page.evaluate(() => globalThis.receivedClicks)).toBe(1);
 });
+
+
+test('ahead-of-input geometry never clicks the unrelated button beneath stale coordinates', async ({ page }) => {
+  await page.setContent(`
+    <button id="target" style="position:absolute;left:100px;top:220px;width:190px;height:34px">Verified command</button>
+    <button id="decoy" style="position:absolute;left:100px;top:500px;width:190px;height:34px">Destructive decoy</button>`);
+  await page.evaluate(() => {
+    const target = document.getElementById('target');
+    const decoy = document.getElementById('decoy');
+    globalThis.receivedClicks = 0;
+    globalThis.decoyClicks = 0;
+    let useRealBounds = false;
+    let correctionStarted = false;
+    let revision = 0;
+    target.addEventListener('click', () => globalThis.receivedClicks++);
+    decoy.addEventListener('click', () => globalThis.decoyClicks++);
+    decoy.addEventListener('pointerenter', () => {
+      if (correctionStarted) return;
+      correctionStarted = true;
+      // Even advancing observations can report a target layout while the input surface lags.
+      setTimeout(() => { useRealBounds = true; }, 350);
+    });
+    const publish = () => {
+      const r = (useRealBounds ? target : decoy).getBoundingClientRect();
+      globalThis.pdfSpaceDiagnostics = {
+        diagnosticRevision: ++revision,
+        controls: [{ name: 'Verified command', enabled: true,
+          x: r.x, y: r.y, width: r.width, height: r.height,
+          pointerOver: target.matches(':hover') }]
+      };
+    };
+    publish(); setInterval(publish, 40);
+  });
+  await clickUnoControl(page, 'Verified command');
+  expect(await page.evaluate(() => globalThis.decoyClicks)).toBe(0);
+  expect(await page.evaluate(() => globalThis.receivedClicks)).toBe(1);
+});

@@ -45,6 +45,36 @@ export async function settledUnoControl(page, name, timeout = 10000) {
   }, { name, timeout });
 }
 
+async function pointerTargetsButton(page, name, expected, timeout = 800) {
+  return page.evaluate(async ({ name, expected, timeout }) => {
+    const deadline = performance.now() + timeout;
+    let matchingSince = null;
+    let revision = -1;
+    let freshSamples = 0;
+    while (performance.now() < deadline) {
+      const snapshot = globalThis.pdfSpaceDiagnostics;
+      const target = snapshot?.controls.find(control => control.name === name && control.enabled);
+      const same = target && ['x', 'y', 'width', 'height'].every(key =>
+        Number.isFinite(target[key]) && Math.abs(target[key] - expected[key]) < 0.05);
+      if (!same) return false; // Re-locate; never click the old coordinate.
+      if (target.pointerOver === undefined) return true; // Non-button control or older observation source.
+      const now = performance.now();
+      if (!target.pointerOver) { matchingSince = null; freshSamples = 0; }
+      else {
+        matchingSince ??= now;
+        if (snapshot.diagnosticRevision !== revision) {
+          revision = snapshot.diagnosticRevision;
+          freshSamples++;
+        }
+        if (now - matchingSince >= 120 &&
+            (snapshot.diagnosticRevision === undefined || freshSamples >= 2)) return true;
+      }
+      await new Promise(resolve => setTimeout(resolve, 40));
+    }
+    return false;
+  }, { name, expected, timeout });
+}
+
 export async function clickUnoControl(page, name) {
   const deadline = Date.now() + 30000;
   for (let attempt = 0; attempt < 30 && Date.now() < deadline; attempt++) {
@@ -68,6 +98,11 @@ export async function clickUnoControl(page, name) {
     target = await settledUnoControl(page, name);
     if (!valid(target)) continue;
     if (rightPanel && (target.y < 112 || target.y + target.height > bottom)) continue;
+    // A fresh TransformToVisual rectangle can still precede compositor/input scrolling.
+    // Probe with a real pointer move and observe ButtonBase.IsPointerOver before any press.
+    // Failed probes may move/re-locate the pointer, but never retry a command invocation.
+    await page.mouse.move(target.x + target.width / 2, target.y + target.height / 2);
+    if (!await pointerTargetsButton(page, name, target)) continue;
     await page.mouse.click(target.x + target.width / 2, target.y + target.height / 2);
     await page.waitForTimeout(180);
     return;

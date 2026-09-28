@@ -97,7 +97,12 @@ public sealed partial class PdfWorkbench
                     if (visible && !string.IsNullOrEmpty(name) && element.ActualWidth > 0 && element.ActualHeight > 0 && element is Control control && element.XamlRoot == XamlRoot)
                     {
                         var position = element.TransformToVisual(this).TransformPoint(new Point(0, 0));
-                        json.WriteStartObject(); json.WriteString("name", name); json.WriteNumber("x", position.X); json.WriteNumber("y", position.Y); json.WriteNumber("width", element.ActualWidth); json.WriteNumber("height", element.ActualHeight); json.WriteBoolean("enabled", control.IsEnabled); json.WriteEndObject();
+                        json.WriteStartObject(); json.WriteString("name", name); json.WriteNumber("x", position.X); json.WriteNumber("y", position.Y); json.WriteNumber("width", element.ActualWidth); json.WriteNumber("height", element.ActualHeight); json.WriteBoolean("enabled", control.IsEnabled);
+                        // Observe the actual routed pointer target, not just possibly-ahead scroll geometry.
+                        // This getter is read only and only runs in opt-in diagnostic sessions.
+                        if (control is Microsoft.UI.Xaml.Controls.Primitives.ButtonBase button)
+                            json.WriteBoolean("pointerOver", button.IsPointerOver);
+                        json.WriteEndObject();
                     }
                 }
                 var count = VisualTreeHelper.GetChildrenCount(node); for (var i = 0; i < count; i++) Visit(VisualTreeHelper.GetChild(node, i), visible);
