@@ -165,7 +165,7 @@ public sealed partial class PdfWorkbench
         }
         if (comments.Length > 200) content.Children.Add(Paragraph("Showing the first 200 items. Resolve or filter comments to narrow the review."));
     }
-    private PdfWorkspace? _bookmarkDocument;
+    private readonly WorkspaceSnapshotStamp _bookmarkDocument = new();
     private IReadOnlyList<PdfBookmark> _sourceBookmarks = [];
     private void BuildBookmarks(StackPanel content)
     {
@@ -178,8 +178,8 @@ public sealed partial class PdfWorkbench
         content.Children.Add(PdfTheme.Divider()); content.Children.Add(PdfTheme.Text("DOCUMENT BOOKMARKS", 10, "#777777", true));
         try
         {
-            if (!ReferenceEquals(_bookmarkDocument, Session.Document))
-            { _sourceBookmarks = PdfNavigation.ReadBookmarks(Session.Document); _bookmarkDocument = Session.Document; }
+            if (!_bookmarkDocument.Matches(Session.Document))
+            { _sourceBookmarks = PdfNavigation.ReadBookmarks(Session.Document); _bookmarkDocument.Remember(Session.Document); }
             foreach (var entry in _sourceBookmarks.Take(1000))
             {
                 var target = entry.PageIndex;

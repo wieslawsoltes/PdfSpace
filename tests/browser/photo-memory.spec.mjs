@@ -67,3 +67,17 @@ test('native duplication, proportions and explicit history release keep current 
   expect(after.retainedSourceBytes).toBeLessThan(before.retainedSourceBytes);
   await click(page, 'Edit original images'); expect((await state(page)).nativeImages).toBe(3);
 });
+
+
+test('closing a document from Home removes its card instead of retaining a stale session', async ({ page }) => {
+  const errors = []; page.on('pageerror', error => errors.push(error.message));
+  await start(page); const initial = (await state(page)).title;
+  await click(page, 'Edit'); await click(page, 'Edit original images'); await click(page, 'Open native object example');
+  const active = (await state(page)).title;
+  await click(page, 'Home'); await click(page, 'Close ' + initial);
+  await expect.poll(async () => (await state(page)).documents).toBe(1);
+  await expect.poll(async () => (await state(page)).controls.some(control => control.name === initial)).toBe(false);
+  await click(page, active); await click(page, 'Next page');
+  await expect.poll(async () => (await state(page)).page).toBe(2);
+  expect(errors).toEqual([]);
+});

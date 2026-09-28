@@ -44,6 +44,17 @@ internal static class HistoryMemoryTests
         GC.Collect(); GC.WaitForPendingFinalizers(); GC.Collect();
         check(!weak.IsAlive && collectible.IsDirty, "saved-state marker does not pin discarded source snapshots");
         GC.KeepAlive(collectible);
+        var stamp = new WorkspaceSnapshotStamp();
+        check(!stamp.Matches(current), "empty UI snapshot stamp is invalid");
+        stamp.Remember(current);
+        check(stamp.Matches(current) && !stamp.Matches(current with { }), "UI cache stamp compares exact snapshot identity");
+        stamp.Clear(); check(!stamp.Matches(current), "clearing a UI stamp invalidates its cache");
+        var expired = StampCollectible(stamp);
+        GC.Collect(); GC.WaitForPendingFinalizers(); GC.Collect();
+        check(!expired.IsAlive && !stamp.Matches(current), "UI snapshot stamps do not pin discarded PDF buffers");
+        stamp.Remember(current); check(stamp.Matches(current), "expired UI stamp can be reused for the active document");
+        reject(() => stamp.Remember(null!), "UI stamp rejects a null snapshot");
+        GC.KeepAlive(current); GC.KeepAlive(stamp);
     }
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static (EditorSession Session, WeakReference Previous) CollectibleSaved()
@@ -52,6 +63,11 @@ internal static class HistoryMemoryTests
         var session = new EditorSession(initial, new EditorHistoryOptions { MaximumEntries = 0 });
         session.Execute("Replace", _ => Source(512));
         return (session, previous);
+    }
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static WeakReference StampCollectible(WorkspaceSnapshotStamp stamp)
+    {
+        var previous = Source(512); stamp.Remember(previous); return new WeakReference(previous);
     }
     private static PdfWorkspace Source(int count)
     {

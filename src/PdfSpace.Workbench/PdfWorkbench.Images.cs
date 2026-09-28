@@ -4,7 +4,7 @@ namespace PdfSpace.Workbench;
 public sealed partial class PdfWorkbench
 {
     private PdfImageOccurrence[] _nativeImages = [];
-    private PdfWorkspace? _imageSnapshot;
+    private readonly WorkspaceSnapshotStamp _imageSnapshot = new();
     private Guid _imagePageId;
     private int _imageSelection = -1;
     private bool _refreshingImages;
@@ -18,11 +18,11 @@ public sealed partial class PdfWorkbench
     private void RefreshNativeImages()
     {
         if (_refreshingImages || _active is null || Session.Tool != PdfTool.EditImage ||
-            (ReferenceEquals(_imageSnapshot, Session.Document) && _imagePageId == Session.Page.Id)) return;
+            (_imageSnapshot.Matches(Session.Document) && _imagePageId == Session.Page.Id)) return;
         _refreshingImages = true;
         try
         {
-            _imageSnapshot = Session.Document; _imagePageId = Session.Page.Id; _imageSelection = -1;
+            _imageSnapshot.Remember(Session.Document); _imagePageId = Session.Page.Id; _imageSelection = -1;
             _nativeImages = PdfImageEditor.Read(Session.Document, Session.CurrentPage);
             Viewport.SetNativeImages(_nativeImages.Select((image, index) => new NativeImageTarget(index, image.Bounds,
                 [image.UnitToPage.Transform(new(0, 0)), image.UnitToPage.Transform(new(1, 0)), image.UnitToPage.Transform(new(1, 1)), image.UnitToPage.Transform(new(0, 1))], image.Editable)).ToArray());
@@ -36,7 +36,7 @@ public sealed partial class PdfWorkbench
     }
     private void EditSourceImage(DocumentContext context, int index, Func<PdfWorkspace, PdfImageOccurrence, PdfWorkspace> edit, string label)
     {
-        if (_active != context || !ReferenceEquals(_imageSnapshot, context.Session.Document) || (uint)index >= _nativeImages.Length)
+        if (_active != context || !_imageSnapshot.Matches(context.Session.Document) || (uint)index >= _nativeImages.Length)
             throw new InvalidOperationException("The selected image changed. Select it again.");
         var target = _nativeImages[index]; context.Viewport.FinishText(true);
         context.Session.Execute(label, document => edit(document, target));
