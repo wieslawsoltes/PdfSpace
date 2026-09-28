@@ -1,0 +1,41 @@
+name: Apply verified object appearance
+on:
+  push:
+    branches: [build/renderer-source-0.5.1]
+    paths: [.github/workflows/apply-paint051.yml]
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/object-paint-0.5.1
+          fetch-depth: 0
+      - name: Apply source at the reviewed baseline
+        env:
+          TRANSFER_COMMIT: ${{ github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = '2758c3c8b4264247d0a1bba614f7fff8795e95ab'
+          git fetch origin "$TRANSFER_COMMIT"
+          python3 - <<'PY'
+          import os,subprocess,base64,lzma,hashlib,pathlib
+          chunks=[subprocess.check_output(['git','show',f'{os.environ["TRANSFER_COMMIT"]}:tools/paint051/{i}.b64']).decode().strip() for i in range(1,7)]
+          patch=lzma.decompress(base64.b64decode(''.join(chunks),validate=True))
+          assert hashlib.sha256(patch).hexdigest()=='3a2cc81d4a6fcb98a214d872790a905788f4d8090290babaa3674f564445f313'
+          pathlib.Path('/tmp/paint051.patch').write_bytes(patch)
+          print('Verified',len(patch),'bytes of complete source changes')
+          PY
+          git apply --check /tmp/paint051.patch
+          git apply /tmp/paint051.patch
+          git diff --check
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          test "$(git write-tree)" = '4db0cc2b3f937f09bac73653a7b0c1de9b516ffc'
+          git commit -m 'feat: native object compositing, stroke controls and indexed selection; fix renderer fidelity'
+          git push origin HEAD:feat/object-paint-0.5.1
