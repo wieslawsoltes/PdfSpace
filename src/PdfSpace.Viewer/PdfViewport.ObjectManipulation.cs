@@ -38,9 +38,11 @@ public sealed partial class PdfViewport
     private PointD RotationHandle(RectD bounds) => RotationStem(bounds).Handle;
 
     // Check before page hit testing: the handle can lie in the pasteboard above a page.
-    private bool TryBeginObjectRotation(PointD screen)
+    private bool TryBeginObjectRotation(PointD screen, bool bypassHandles)
     {
-        if (NativeObjectRotationHandle is not { } handle) return false;
+        // Match resize-handle routing: Ctrl-click selects underlying content.
+        // Shift remains available for constrained rotation from pointer-down.
+        if (bypassHandles || NativeObjectRotationHandle is not { } handle) return false;
         var page = Session.Page;
         var placement = Placement(Session.CurrentPage);
         if (placement.ToScreen(page, handle, Zoom).Distance(screen) > 8) return false;

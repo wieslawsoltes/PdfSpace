@@ -30,7 +30,7 @@ public sealed partial class PdfViewport
         if (!point.Properties.IsLeftButtonPressed && !point.Properties.IsMiddleButtonPressed) return;
         FinishText(true); Focus(FocusState.Pointer); _screenStart = screen; _startPan = new(_pan, 0); _startScroll = _scroll; _canvas.CapturePointer(e.Pointer);
         if (Session.Tool == PdfTool.Hand || point.Properties.IsMiddleButtonPressed) { _gesture = Gesture.Pan; e.Handled = true; return; }
-        if (TryBeginObjectRotation(screen)) { e.Handled = true; Invalidate(); return; }
+        if (TryBeginObjectRotation(screen, e.KeyModifiers.HasFlag(VirtualKeyModifiers.Control))) { e.Handled = true; Invalidate(); return; }
         var hit = HitPage(screen); if (hit < 0) { CancelGesture(); return; }
         var placement = Placement(hit); _dragPage = placement.Index; if (Session.CurrentPage != _dragPage) Session.Navigate(_dragPage);
         var page = Session.Page; _start = placement.ToPage(page, screen, Zoom); _points.Clear(); _points.Add(_start); SelectedText = ""; _searchHighlight = null;
