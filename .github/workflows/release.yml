@@ -5,7 +5,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: Package version, for example 0.3.0-alpha.1
+        description: Package version, for example 0.4.0-alpha.1
         required: true
         type: string
       publish_nuget:
@@ -45,7 +45,7 @@ jobs:
           python3 scripts/fetch-assets.py
           dotnet run --project tests/PdfSpace.Tests -c Release
           mkdir -p artifacts/fixtures
-          cp artifacts/engine/*.pdf artifacts/engine/scanned.png artifacts/fixtures/
+          cp artifacts/engine/*.pdf artifacts/engine/*.png artifacts/fixtures/
           dotnet publish src/PdfSpace.App -f net10.0-browserwasm -c Release -o artifacts/publish -p:Version="$VERSION" -p:WasmShellWebAppBasePath=/PdfSpace/
           python3 scripts/collect-site.py artifacts/publish artifacts/site
           npm ci --ignore-scripts
@@ -54,6 +54,7 @@ jobs:
           npm run test:browser
           dotnet run --project tests/PdfSpace.Tests -c Release -- --verify-browser-security artifacts/browser-exports
           dotnet run --project tests/PdfSpace.Tests -c Release -- --verify-browser-ocr artifacts/browser-exports
+          dotnet run --project tests/PdfSpace.Tests -c Release -- --verify-browser-objects artifacts/browser-exports
           for project in src/*/*.csproj; do
             case "$project" in */PdfSpace.App/*) continue;; esac
             dotnet pack "$project" -c Release -p:Version="$VERSION" -o artifacts/packages

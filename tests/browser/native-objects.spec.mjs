@@ -15,7 +15,8 @@ async function click(page, name) {
   for (let attempt = 0; attempt < 12; attempt++) {
     const c = (await state(page)).controls.find(c => c.name === name && c.enabled && c.width > 1);
     const bottom = page.viewportSize().height - 28;
-    if (c.y < 98 || c.y + c.height > bottom) {
+    const chrome = ['Edit', 'Export PDF', 'Open PDF', 'Find in document', 'Undo', 'Redo', 'Fit page', 'Next page'].includes(name);
+    if (!chrome && (c.y < 98 || c.y + c.height > bottom)) {
       // Only panel contents scroll; global chrome remains fixed.
       if (c.x > 900 || (c.x < 255 && c.y > 90)) {
         await page.mouse.move(c.x + c.width / 2, c.y < 98 ? 250 : bottom - 110);
