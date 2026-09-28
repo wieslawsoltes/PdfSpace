@@ -39,7 +39,9 @@ public sealed class PdfRenderer : IDisposable
     }
     public static SKRect Rect(RectD r) => new((float)r.X, (float)r.Y, (float)r.Right, (float)r.Bottom);
     public static SKColor Color(uint argb) => new((byte)(argb >> 16), (byte)(argb >> 8), (byte)argb, (byte)(argb >> 24));
-    public static void TransformPage(SKCanvas canvas, PdfPageState page)
+    public static void TransformPage(SKCanvas canvas, PdfPageState page) => TransformPage(canvas, page, true);
+    /// <summary>Applies the page transform; disable clipping only for editor overlays, not PDF content.</summary>
+    public static void TransformPage(SKCanvas canvas, PdfPageState page, bool clip)
     {
         var b = page.VisibleBox;
         switch (page.Rotation)
@@ -49,7 +51,7 @@ public sealed class PdfRenderer : IDisposable
             case 270: canvas.Translate(0, (float)b.Width); canvas.RotateDegrees(270); break;
         }
         canvas.Translate((float)-b.X, (float)-b.Y);
-        canvas.ClipRect(Rect(b));
+        if (clip) canvas.ClipRect(Rect(b));
     }
     public void DrawPage(SKCanvas canvas, PdfWorkspace document, PdfPageState page, bool annotations = true)
     {

@@ -88,7 +88,7 @@ test('native grouping round trips and arrangement does not retarget stale select
 });
 
 test('private mixed-object clipboard pastes into a new PDF and native Unicode text stays searchable',async({page})=>{
-  await start(page);await point(page,113,397);await point(page,140,275,true);await point(page,130,210,true);
+  await start(page);await point(page,113,397);await point(page,140,275,true);await point(page,90,210,true); // Use unobstructed text, not the rotation handle above the current selection.
   await expect.poll(async ()=>(await state(page)).selectedObjects).toEqual([2,3,6]);
   await click(page,'Copy objects');await click(page,'Home');await click(page,'Create a PDF');
   await click(page,'Edit objects');await click(page,'Paste objects');
