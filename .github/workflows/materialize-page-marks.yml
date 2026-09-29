@@ -1,0 +1,48 @@
+name: Materialize native page marks
+on:
+  push:
+    branches: [build/native-page-marks-0.6]
+    paths: [.github/workflows/materialize-page-marks.yml]
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/native-page-marks-0.6
+          fetch-depth: 0
+      - name: Apply exact recovered implementation and preserve newer main changes
+        env:
+          TRANSFER_COMMIT: ${{ github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = 'e95a7b5f647e327e22906e33b8f0bd2a2c5e1d07'
+          git fetch origin "$TRANSFER_COMMIT"
+          python3 - <<'PY'
+          import os,subprocess,base64,lzma,hashlib,pathlib
+          chunks=[subprocess.check_output(['git','show',f'{os.environ["TRANSFER_COMMIT"]}:tools/page-marks/{i}.b64']).decode().strip() for i in range(1,6)]
+          patch=lzma.decompress(base64.b64decode(''.join(chunks),validate=True))
+          assert hashlib.sha256(patch).hexdigest()=='0f112b0da4ff59d33f05a0f4d716d0ded40de32dc91255ee334cb07f14cde40c'
+          pathlib.Path('/tmp/page-marks.patch').write_bytes(patch)
+          print('Verified complete source patch:',len(patch),'bytes')
+          PY
+          git apply --check --unidiff-zero /tmp/page-marks.patch
+          git apply --unidiff-zero /tmp/page-marks.patch
+          git diff --check
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'feat: native headers, footers, Bates numbering and managed text watermarks'
+          git merge --no-edit f995f3b14f2728d0c6de850f9ab2da5aebde1f18
+          git diff --check
+          git push origin HEAD:feat/native-page-marks-0.6
+          git archive --format=zip --output=/tmp/PdfSpace-page-marks-source.zip HEAD
+      - uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: PdfSpace-page-marks-integrated-source
+          path: /tmp/PdfSpace-page-marks-source.zip
