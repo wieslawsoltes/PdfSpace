@@ -5,7 +5,7 @@ namespace PdfSpace.Layout;
 /// <summary>A page-space alignment line spanning the moving bounds and its target.</summary>
 public readonly record struct ObjectSnapGuide(double Coordinate, double Start, double End);
 
-/// <summary>The translation correction and optional vertical/horizontal alignment guides.</summary>
+/// <summary>Snapped bounds and guides. Correction is translation for Snap, or grabbed-edge displacement for SnapResize.</summary>
 public readonly record struct ObjectSnapResult(RectD Bounds, PointD Correction,
     ObjectSnapGuide? VerticalGuide, ObjectSnapGuide? HorizontalGuide);
 
@@ -109,8 +109,7 @@ public sealed partial class ObjectSnapIndex
     {
         Match? best = null;
         for (var anchor = 0; anchor < 3; anchor++)
-            if (NearestAt(entries, start + length * (anchor / 2d), tolerance, anchor) is { } candidate && Better(candidate, best))
-                best = candidate;
+            if (NearestAt(entries, start + length * (anchor / 2d), tolerance, anchor) is { } candidate && Better(candidate, best)) best = candidate;
         return best;
     }
 

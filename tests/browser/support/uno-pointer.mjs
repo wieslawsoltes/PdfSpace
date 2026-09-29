@@ -5,7 +5,7 @@
  */
 const fixedChrome = new Set([
   'Edit', 'Home', 'Undo', 'Redo', 'Export PDF', 'Next page',
-  'Fit page', 'Zoom in', 'Open PDF'
+  'Fit page', 'Zoom in', 'Open PDF', 'Close Objects'
 ]);
 
 function valid(control) {
