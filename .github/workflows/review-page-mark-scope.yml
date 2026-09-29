@@ -1,0 +1,30 @@
+name: Review page mark inspection scope
+on:
+  push:
+    branches: [build/native-page-marks-0.6]
+    paths: [.github/workflows/review-page-mark-scope.yml]
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/native-page-marks-0.6
+          fetch-depth: 0
+      - name: Apply reviewed scope changes
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = '599ef54a9fc5d24c0adb126c88de173c40ec5bfa'
+          git show 1444d1f265cd06f7ae28f9f5d535b6dc0eaea6b0:tools/page-marks/review-scope.py > /tmp/review-scope.py
+          echo 'cc1998e1b59b8c21f6bc181bbd643565d7d444f2c2440ace406cdf78f1d3d8fc  /tmp/review-scope.py' | sha256sum -c -
+          python3 /tmp/review-scope.py
+          git diff --check
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src tests docs
+          git commit -m 'perf: scope native page mark inspection to requested pages and referenced sources'
+          git push origin HEAD:feat/native-page-marks-0.6
