@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.5.5-alpha.1
+
+- Add native alignment to a selected reference or visible page crop, matching width/height/both around individual centers, and nonnegative equal-gap distribution with fixed outer objects.
+- Validate exact identity transformations but skip source cloning/serialization and history churn; omit unchanged occurrences from mixed edit batches.
+- Replace quadratic pairwise native-selection preflight with sorted per-scope ranges and ancestor lookup. Copy operator ranges by index rather than repeated prefix enumeration.
+- Add native layout, stale/forged no-op, crop/rotation, randomized preflight and real Uno browser/download regressions. Keep existing release and Trusted Publishing workflows unchanged.
+
+
 ## 0.5.4-alpha.1
 
 - Bounded 64-row object inspector with full-range navigation, exact object-number selection and slot/generation-safe rebinding.

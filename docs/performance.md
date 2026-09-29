@@ -78,3 +78,9 @@ Opt-in browser diagnostics no longer serialize synchronously for every state, fo
 The accepted-file picker transitions to a reading phase synchronously and detaches its event handlers before asynchronous I/O. Late cancel or duplicate change events cannot discard the accepted file or start another read; size and read failures still reject. A deterministic Node test fails on the previous implementation and passes with the phase guard. The original intermittent dense-file test passed both isolated reproductions, so that result alone is not proof of a unique root cause.
 
 CI defaults to two isolated Playwright workers, with no retries or omitted cases. Set `PDFSPACE_TEST_WORKERS=1` for single-worker reproduction; values outside 1–4 fail explicitly. This changes test scheduling, not application threading.
+
+## Native batch preflight and identity transforms (0.5.5)
+
+Structural occurrence validation now sorts source ranges and checks complete ancestor scopes rather than testing every selected pair. This removes quadratic temporary string construction for large selections. `ObjectLayoutTests` compares behavior against exhaustive legacy preflight and records one warmed 1,000-object validation in `object-selection-preflight-performance.json`. The measurement excludes native source validation, parsing/writing, UI, rendering and GPU allocations; it is not an overall application speedup.
+
+Exact identity transforms still revalidate native content but skip cloning/serialization and return the original workspace. Mixed batches omit unchanged occurrences after all descriptors have been validated. Consequently repeated exact align/spacing commands preserve history, preview/source buffers and descriptor cache identity. Operator copying accesses the selected range directly rather than enumerating preceding content. See [native object layout](object-layout.md).

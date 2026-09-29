@@ -337,6 +337,7 @@ public sealed partial class PdfWorkbench
         var selected = _selectedObjects.Where(i => (uint)i < _pageObjects.Length).Select(i => _pageObjects[i]).ToArray();
         if (selected.Length == 0)
             return;
+        BuildObjectLayoutControls(content, selected);
         var enabled = selected.All(o => o.Editable);
         var bounds = PdfObjectEditor.SelectionBounds(selected);
         content.Children.Add(PdfTheme.Divider());
