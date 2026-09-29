@@ -18,7 +18,7 @@ public sealed record PdfPageMarkText(string Text, double X, double Baseline, dou
 
 /// <summary>Batch native headers/footers and text watermarks. Managed updates replace only verified,
 /// application-owned streams. Structured-save restrictions apply; source deletion is not sanitization.</summary>
-public static class PdfPageMarks
+public static partial class PdfPageMarks
 {
     private const string Key = "/PdfSpacePageMarks";
     private const string IsolationKey = "/PdfSpaceMarkIsolation";
@@ -267,9 +267,10 @@ public static class PdfPageMarks
         if (list is null)
         {
             if (page.Elements.ContainsKey(Key)) throw new InvalidDataException("Invalid page-mark ownership container.");
+            if (page.Elements.ContainsKey(IsolationKey)) throw ModifiedMark();
             return result;
         }
-        if (list.Elements.Count > 2) throw new InvalidDataException("Too many page-mark ownership records.");
+        if (list.Elements.Count is < 1 or > 2) throw new InvalidDataException("Invalid number of page-mark ownership records.");
         _ = page.Contents; // Resolve wrappers only on pages that actually have ownership metadata.
         var kinds = new HashSet<PdfPageMarkKind>();
         foreach (var entry in list.Elements)
@@ -292,6 +293,12 @@ public static class PdfPageMarks
                 string.Equals(meta.Elements.GetString("/Fingerprint"), RecordHash(fingerprint, form, settings, ordinal, pages, fontIdentity), StringComparison.Ordinal);
             result.Add(new(meta, stream, form, resource, new PdfPageMarkInfo(pageIndex, settings, ordinal, pages, intact) { TypefaceFingerprint = fontIdentity }));
         }
+        // The invocation checksum alone cannot establish front/behind placement or
+        // a valid source-state boundary. Validate the whole envelope before even
+        // the identity-preserving Apply path can report the marks unchanged.
+        if (!HasIntactEnvelope(page, result))
+            for (var i = 0; i < result.Count; i++)
+                result[i] = result[i] with { Info = result[i].Info with { Intact = false } };
         return result;
     }
     private static bool Exact(PdfDictionary stream, string expected) => stream.Stream is { Length: <= 1024 } content && content.UnfilteredValue.AsSpan().SequenceEqual(Encoding.ASCII.GetBytes(expected));

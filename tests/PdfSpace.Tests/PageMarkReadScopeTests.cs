@@ -8,6 +8,7 @@ internal static class PageMarkReadScopeTests
     public static void Run(PdfWorkspace marked, PdfPageMarkSettings settings, SKTypeface font,
         Action<bool, string> check, Action<Action, string> reject)
     {
+        PageMarkEnvelopeTests.Run(marked, settings, font, check);
         var selected = PdfPageMarks.Read(marked, [1]);
         check(selected.Count == 1 && selected[0].PageIndex == 1 && selected[0].Intact,
             "page-mark inspection reads only its selected page");
