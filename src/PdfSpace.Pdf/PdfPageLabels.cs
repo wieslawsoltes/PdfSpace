@@ -87,6 +87,7 @@ public static class PdfPageLabels
     internal static PdfPageLabel?[] Read(PdfDocument document, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        if (document.PageCount is < 1 or > 4096) throw new InvalidDataException("Page labels support 1 to 4096 source pages.");
         var result = new PdfPageLabel?[document.PageCount];
         var item = document.Internals.Catalog.Elements["/PageLabels"];
         if (item is null) return result;
@@ -173,6 +174,7 @@ public static class PdfPageLabels
     internal static void Write(PdfDocument document, PdfWorkspace workspace, IReadOnlyDictionary<Guid, PdfDocument> sources)
     {
         var sourceLabels = new Dictionary<Guid, PdfPageLabel?[]>();
+        var hasExplicitLabels = false;
         PdfPageLabel Effective(int i)
         {
             var page = workspace.Pages[i]; var label = page.Label;
@@ -181,19 +183,20 @@ public static class PdfPageLabels
                 if (!sourceLabels.TryGetValue(id, out var labels)) { labels = Read(sources[id]); sourceLabels.Add(id, labels); }
                 label = SourceLabel(labels, page.SourcePage);
             }
+            hasExplicitLabels |= label is not null;
             return label ?? new PdfPageLabel { Number = i + 1 };
         }
         var runs = new List<(int Index, PdfPageLabel Label)>(); PdfPageLabel? previous = null;
-        var allDefault = true;
         for (var i = 0; i < workspace.Pages.Length; i++)
         {
             var current = Effective(i); current.Validate();
-            allDefault &= current.Style == PdfPageLabelStyle.Decimal && current.Prefix.Length == 0 && current.Number == i + 1;
             if (previous is null || previous.Style != current.Style || previous.Prefix != current.Prefix ||
                 (current.Style != PdfPageLabelStyle.PrefixOnly && (long)previous.Number + 1 != current.Number)) runs.Add((i, current));
             previous = current;
         }
-        if (allDefault) { document.Internals.Catalog.Elements.Remove("/PageLabels"); return; }
+        // Explicit physical-looking labels still belong to their page identity after
+        // reopening/reordering. Only an entirely implicit/reset sequence drops the tree.
+        if (!hasExplicitLabels) { document.Internals.Catalog.Elements.Remove("/PageLabels"); return; }
         var nums = new PdfArray(document);
         foreach (var (index, label) in runs)
         {
@@ -203,7 +206,8 @@ public static class PdfPageLabels
                 PdfPageLabelStyle.Decimal => "/D", PdfPageLabelStyle.RomanLower => "/r", PdfPageLabelStyle.RomanUpper => "/R",
                 PdfPageLabelStyle.LettersLower => "/a", PdfPageLabelStyle.LettersUpper => "/A", _ => null
             };
-            if (style is not null) { rule.Elements.SetName("/S", style); if (label.Number != 1) rule.Elements.SetInteger("/St", label.Number); }
+            if (style is not null) rule.Elements.SetName("/S", style);
+            if (label.Number != 1) rule.Elements.SetInteger("/St", label.Number);
             if (label.Prefix.Length > 0) rule.Elements["/P"] = new PdfString(label.Prefix, PdfStringEncoding.Unicode);
             nums.Elements.Add(new PdfInteger(index)); nums.Elements.Add(rule);
         }

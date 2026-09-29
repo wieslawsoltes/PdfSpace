@@ -7,6 +7,7 @@ public enum PageLabelMatch { Found, NotFound, Ambiguous }
 public sealed class PageLabelIndex
 {
     private readonly string[] _labels;
+    private readonly PdfPageLabel?[] _definitions;
     private readonly Dictionary<string, int> _lookup = new(StringComparer.Ordinal);
     public int Count => _labels.Length;
     public string this[int pageIndex] => _labels[pageIndex];
@@ -16,13 +17,25 @@ public sealed class PageLabelIndex
         ArgumentNullException.ThrowIfNull(pages);
         if (pages.Count > 4096) throw new ArgumentException("Page-label index is limited to 4096 pages.", nameof(pages));
         _labels = new string[pages.Count];
+        _definitions = new PdfPageLabel?[pages.Count];
         for (var i = 0; i < pages.Count; i++)
         {
             var page = pages[i] ?? throw new ArgumentException("Null page.", nameof(pages));
+            _definitions[i] = page.Label;
             var label = page.Label?.Format() ?? (i + 1).ToString(CultureInfo.InvariantCulture);
             _labels[i] = label;
             if (!_lookup.TryAdd(label, i)) _lookup[label] = -1;
         }
+    }
+
+    /// <summary>Reuse the index across annotation/geometry-only snapshots. Does not retain page state or source buffers.</summary>
+    public bool Matches(IReadOnlyList<PdfPageState> pages)
+    {
+        ArgumentNullException.ThrowIfNull(pages);
+        if (pages.Count != Count) return false;
+        for (var i = 0; i < pages.Count; i++)
+            if (pages[i] is not { } page || page.Label != _definitions[i]) return false;
+        return true;
     }
 
     /// <summary>Exact case-sensitive labels win; duplicate labels are ambiguous. #N always means physical page N.</summary>

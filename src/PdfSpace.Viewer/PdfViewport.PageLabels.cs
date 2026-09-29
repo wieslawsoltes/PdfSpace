@@ -13,8 +13,11 @@ public sealed partial class PdfViewport
         {
             if (_pageLabelIndex is null || !_pageLabelStamp.Matches(Session.Document))
             {
-                _pageLabelIndex = new PageLabelIndex(Session.Document.Pages);
-                _pageLabelStamp.Remember(Session.Document); PageLabelIndexBuilds++;
+                if (_pageLabelIndex is null || !_pageLabelIndex.Matches(Session.Document.Pages))
+                {
+                    _pageLabelIndex = new PageLabelIndex(Session.Document.Pages); PageLabelIndexBuilds++;
+                }
+                _pageLabelStamp.Remember(Session.Document);
             }
             return _pageLabelIndex;
         }

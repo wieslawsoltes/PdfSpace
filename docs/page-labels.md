@@ -34,7 +34,7 @@ var output = PdfDocumentEngine.Save(labels, typeface);
 
 The reader validates a bounded number tree, including nested Kids/Nums, global ascending keys, a page-zero start, positive integer start values, optional Limits, cycles/reused nodes, depth and expansion limits. Unsupported or malformed native labels fail explicitly rather than being guessed. This means some malformed PDFs previously readable without interpreting labels will now be rejected by the structured engine.
 
-Export coalesces consecutive compatible labels into maximal runs and replaces the catalog tree. All-physical numbering removes the redundant tree. It does not claim byte-for-byte preservation of private label dictionary keys or the original tree topology. Page streams are not rewritten by the label operation. Structured export still runs its existing annotation/form/OCR and source-safety logic; it is not a signature-preserving incremental writer. Signed/XFA and unsafe form-reassembly restrictions remain in effect.
+Export coalesces consecutive compatible labels into maximal runs and replaces the catalog tree. A fully reset, implicit physical sequence removes the tree; explicitly assigned numeric labels remain explicit. It does not claim byte-for-byte preservation of private label dictionary keys or the original tree topology. Page streams are not rewritten by the label operation. Structured export still runs its existing annotation/form/OCR and source-safety logic; it is not a signature-preserving incremental writer. Signed/XFA and unsafe form-reassembly restrictions remain in effect.
 
 Older PdfSpace binaries do not understand these new workspace fields; use current versions for label-preserving round trips. General flattened visual exports intentionally discard document structure and are not label-preserving.
 
@@ -43,3 +43,9 @@ Older PdfSpace binaries do not understand these new workspace fields; use curren
 Label assignment changes metadata snapshots and shares original/preview buffers; it does not embed a font, rerender source content or write a PDF until export. `PageLabelIndex` stores bounded strings and a dictionary, not sources or workspace objects. The viewport shares one weak-snapshot-keyed index with visible thumbnails. Pan/zoom and navigation do not rebuild it. Lookup is expected constant time and avoids query-time allocations for unchanged input strings.
 
 The native suite emits `artifacts/structured/labels-performance.json`: 100,000 warm exact-label queries across 4,096 pages. It records elapsed time and current-thread allocations; fixture/index construction, PDF parsing/writing, UI and GPU work are excluded. No universal speedup or timing pass threshold is claimed. Native number-tree, Unicode, invalid-input, identity/history, reassembly, exact content/pixel and browser download checks accompany the feature.
+
+## Identity and cache details
+
+Explicitly assigned decimal labels that happen to equal physical numbers remain in `/PageLabels`, so reopening and then reordering does not silently change them into implicit numbering. Resetting every page to implicit numbering removes the tree. Within a PDF that contains a label tree, every page necessarily belongs to a native range; importing resolves those ranges into per-page definitions.
+
+The navigation/thumbnail index retains strings and immutable label definitions, not page states or PDF sources. A new snapshot with unchanged label definitions reuses the index after a bounded sequence comparison; pan/zoom/navigation on the same snapshot skips even that comparison. Only changed label definitions rebuild the lookup.

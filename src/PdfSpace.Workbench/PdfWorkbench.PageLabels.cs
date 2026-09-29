@@ -9,7 +9,7 @@ public sealed partial class PdfWorkbench
     private void ShowPageLabels()
     {
         Viewport.FinishText(true); Viewport.CancelGesture();
-        UseTool(PdfTool.Hand);
+        Session.SetTool(PdfTool.Hand); // Metadata editing stays in the thumbnail organization view.
         _labelRange = "all"; _labelDraft = Session.Page.Label ?? new PdfPageLabel();
         _right = "Page labels"; RefreshRight(); AdaptLayout();
     }

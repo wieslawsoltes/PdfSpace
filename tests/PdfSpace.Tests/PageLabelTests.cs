@@ -60,12 +60,35 @@ internal static class PageLabelTests
         var combined = WorkspaceComposition.Append(body, body);
         check(combined.Pages[6].Label == body.Pages[0].Label, "combining preserves incoming resolved labels");
         using var font = SKTypeface.FromFamilyName("DejaVu Sans") ?? SKTypeface.Default;
+        Directory.CreateDirectory("artifacts/structured");
+        var unicode = PdfPageLabels.Apply(blank, 0, 6, new PdfPageLabel { Prefix = "章-Żółć-📄-" });
+        var unicodeBytes = PdfDocumentEngine.Save(unicode, font).Bytes;
+        check(PdfDocumentEngine.Open(unicodeBytes, "unicode-labels.pdf").Pages[5].Label!.Format() == "章-Żółć-📄-6",
+            "Unicode BMP and supplementary page-label prefixes survive native export");
+        File.WriteAllBytes("artifacts/structured/labels-unicode.pdf", unicodeBytes);
+        var literal = PdfPageLabels.Apply(blank, 0, 2, new PdfPageLabel { Style = PdfPageLabelStyle.PrefixOnly, Prefix = "Cover", Number = 12 });
+        check(PdfDocumentEngine.Open(PdfDocumentEngine.Save(literal, font).Bytes, "literal-labels.pdf").Pages[0].Label == literal.Pages[0].Label,
+            "prefix-only numbering metadata roundtrips without changing settings");
         var bytes = PdfDocumentEngine.Save(body, font).Bytes;
         var reopened = PdfDocumentEngine.Open(bytes, "labels.pdf");
         check(new PageLabelIndex(reopened.Pages)[5] == "A-4", "native PageLabels survives save and reopen");
         using (var native = PdfDocumentEngine.OpenNative(bytes))
             check(PdfObjects.Array(PdfObjects.Dictionary(native.Internals.Catalog.Elements["/PageLabels"])!.Elements["/Nums"])!.Elements.Count == 4,
                 "six page labels serialize as two maximal number-tree runs");
+        var physical = PdfPageLabels.Apply(blank, 0, 6, new PdfPageLabel());
+        var physicalReload = PdfDocumentEngine.Open(PdfDocumentEngine.Save(physical, font).Bytes, "explicit-physical-labels.pdf");
+        check(physicalReload.Pages.All(p => p.Label is not null), "explicit physical-looking labels survive native roundtrip");
+        check(new PageLabelIndex(WorkspacePages.Select(physicalReload, [5, 0]).Pages)[0] == "6",
+            "explicit numeric labels retain page identity after reopen and reordering");
+        var alteredPages = body.Pages.Select(p => p with { Bookmark = "changed" }).ToArray();
+        check(index.Matches(alteredPages), "annotation and bookmark changes can reuse the label index");
+        alteredPages[2] = alteredPages[2] with { Label = new PdfPageLabel { Prefix = "Other-" } };
+        check(!index.Matches(alteredPages), "changed label definitions invalidate the navigation index");
+        check(index[2] == "A-1", "index owns its definition sequence independently of mutable input arrays");
+        check(!index.Matches(WorkspacePages.Select(body, [5, 0, 2]).Pages), "changed page order and count invalidate label index");
+        var lastInteger = PdfPageLabels.Apply(blank, 5, 1, new PdfPageLabel { Number = int.MaxValue });
+        check(PdfDocumentEngine.Open(PdfDocumentEngine.Save(lastInteger, font).Bytes, "last-integer.pdf").Pages[5].Label!.Number == int.MaxValue,
+            "last-page maximum starting integer avoids intermediate overflow");
         var reset = PdfPageLabels.Reset(reopened, 0, 6);
         using (var native = PdfDocumentEngine.OpenNative(PdfDocumentEngine.Save(reset, font).Bytes))
             check(!native.Internals.Catalog.Elements.ContainsKey("/PageLabels"), "physical numbering reset removes redundant native tree");
@@ -100,7 +123,6 @@ internal static class PageLabelTests
             var rule = new PdfDictionary(doc); rule.Elements.SetName("/S", style); rule.Elements.SetString("/P", prefix); rule.Elements.SetInteger("/St", number);
             var nums = new PdfArray(doc); nums.Elements.Add(new PdfInteger(key)); nums.Elements.Add(rule);
             var leaf = new PdfDictionary(doc); leaf.Elements["/Nums"] = nums;
-            leaf.Elements["/Limits"] = PdfObjects.Numbers(doc, key, key);
             // Number-tree limits, unlike geometric arrays, require integers.
             var limits = new PdfArray(doc); limits.Elements.Add(new PdfInteger(key)); limits.Elements.Add(new PdfInteger(key)); leaf.Elements["/Limits"] = limits;
             return leaf;
@@ -110,6 +132,7 @@ internal static class PageLabelTests
         kids.Elements.Add(left); kids.Elements.Add(right); root.Elements["/Kids"] = kids;
         doc.Internals.Catalog.Elements["/PageLabels"] = root;
         check(PdfPageLabels.Read(doc)[3]!.Format() == "章-BB", "nested native number trees resolve repeated alphabetic labels");
+        File.WriteAllBytes("artifacts/structured/labels-nested.pdf", PdfDocumentEngine.Bytes(doc));
         var limits = right.Elements["/Limits"]!;
         right.Elements["/Limits"] = PdfObjects.Numbers(doc, 2, 2);
         reject(() => PdfPageLabels.Read(doc), "real-valued number-tree limits rejected"); right.Elements["/Limits"] = limits;

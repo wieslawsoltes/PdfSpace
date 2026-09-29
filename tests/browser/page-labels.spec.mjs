@@ -26,6 +26,8 @@ test('native page labels preserve mixed sections, support navigation, undo and s
   await set(page, 'Label page range', '3-6'); await set(page, 'Label prefix', 'Chapter-');
   await click(page, 'Decimal labels'); await click(page, 'Apply page labels');
   await expect.poll(async () => (await state(page)).undoCount).toBe(2);
+  fs.mkdirSync('artifacts/screenshots', { recursive: true });
+  await page.screenshot({ path: 'artifacts/screenshots/pdfspace-page-labels-sections.png' });
   const bytes = await save(page, 'labels-browser-sections.pdf');
   await set(page, 'Page number', 'Chapter-3'); await page.keyboard.press('Enter');
   await expect.poll(async () => (await state(page)).page).toBe(5);
