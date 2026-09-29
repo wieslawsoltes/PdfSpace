@@ -1,0 +1,43 @@
+name: Recover page mark source
+on:
+  push:
+    branches: [build/native-page-marks-0.6]
+    paths: [.github/workflows/recover-page-marks.yml]
+permissions:
+  contents: read
+jobs:
+  recover:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Decode and validate complete source records
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/page-mark-recovery
+          python3 - <<'PY'
+          import pathlib,base64,lzma,hashlib,json,subprocess
+          out=pathlib.Path('/tmp/page-mark-recovery')
+          chunks=[pathlib.Path(f'tools/page-marks/{i}.b64').read_text().strip() for i in range(1,6)]
+          decoder=lzma.LZMADecompressor()
+          patch=decoder.decompress(base64.b64decode(''.join(chunks),validate=True))
+          assert decoder.eof and not decoder.unused_data,'Incomplete source transfer'
+          (out/'page-marks.patch').write_bytes(patch)
+          report={'baseline':'e95a7b5f647e327e22906e33b8f0bd2a2c5e1d07','main':'f995f3b14f2728d0c6de850f9ab2da5aebde1f18','sha256':hashlib.sha256(patch).hexdigest(),'bytes':len(patch),'files':[s.decode() for s in patch.splitlines() if s.startswith(b'diff --git ')]}
+          subprocess.run(['git','worktree','add','--detach','/tmp/page-mark-source',report['baseline']],check=True)
+          subprocess.run(['git','apply','--check',str(out/'page-marks.patch')],cwd='/tmp/page-mark-source',check=True)
+          subprocess.run(['git','apply',str(out/'page-marks.patch')],cwd='/tmp/page-mark-source',check=True)
+          subprocess.run(['git','diff','--check'],cwd='/tmp/page-mark-source',check=True)
+          subprocess.run(['git','archive','--format=zip','--output='+str(out/'current-main.zip'),report['main']],check=True)
+          (out/'report.json').write_text(json.dumps(report,indent=2)+'\n');print(json.dumps(report,indent=2))
+          PY
+          cd /tmp/page-mark-source
+          zip -qr /tmp/page-mark-recovery/recovered-source.zip . -x .git
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: PdfSpace-page-mark-recovery
+          path: /tmp/page-mark-recovery
