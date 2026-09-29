@@ -13,7 +13,13 @@
 
 PdfSpace is an independent, local-first PDF application built in **C# with Uno Platform and SkiaSharp**. The browser runs a real Uno WebAssembly application with the same document, editing and rendering libraries as the desktop host. An Acrobat-inspired shell brings together document tabs, floating quick tools, comments, form preparation, original-text editing, protection, redaction and page organization.
 
-> **0.5.5-alpha.1:** functional PDF workflows, not complete or pixel-identical Adobe Acrobat compatibility. PdfSpace has original branding and icons and is not affiliated with Adobe. Review the [save and security boundaries](docs/compatibility.md) before processing important documents.
+> **0.6.0-alpha.1:** functional PDF workflows, not complete or pixel-identical Adobe Acrobat compatibility. PdfSpace has original branding and icons and is not affiliated with Adobe. Review the [save and security boundaries](docs/compatibility.md) before processing important documents.
+
+## Native page marks in 0.6
+
+**Edit → Header and footer / Bates numbering / Add watermark** now creates native searchable marks, with six header/footer slots, ranges, explicit date/page/Bates templates, Roman numbering, margins, opacity, rotation and front/behind placement. A placement-only preview does not rewrite the PDF. Apply/update/remove work on verified PdfSpace-owned content, share one font across the batch and commit one undo entry. Duplicate pages, crop/rotation, supported forms and sensitive-source rules are respected. [Page-mark guide](docs/page-marks.md).
+
+Search now combines reviewed OCR with later visible native additions and groups oblique text along its baseline. [Acrobat workflow coverage and remaining gaps](docs/acrobat-coverage.md) distinguishes implemented bounded workflows from absent features; no full/pixel-parity claim is made.
 
 ## Native layout and batch efficiency in 0.5.5
 

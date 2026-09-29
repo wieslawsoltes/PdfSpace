@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.6.0-alpha.1
+
+- Native header/footer, page/Bates numbering and text watermark batches with pure placement preview and shared searchable TrueType resources.
+- Versioned settings persist in PDF page manifests; verified invocation/resource/settings identity guards update/removal. Repeated identical settings/font preserve workspace identity.
+- Display-space crop/rotation layout, alias-safe content/resource detachment, one-transaction undo, supported form/OCR preservation and sensitivity propagation.
+- Reviewed OCR search includes later visible native text while excluding its stale invisible layer; oblique text uses baseline-aware word grouping.
+- New native/browser/export checks and observational batch/font reuse benchmarks; documented Acrobat workflow gap inventory.
+- Limits remain explicit: no image watermarks, cross-file Bates automation, arbitrary third-party mark recognition, general paragraph shaping or signature-preserving incremental updates.
+
 ## 0.5.5-alpha.1
 
 - Add native alignment to a selected reference or visible page crop, matching width/height/both around individual centers, and nonnegative equal-gap distribution with fixed outer objects.
