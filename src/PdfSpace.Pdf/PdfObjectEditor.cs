@@ -36,15 +36,19 @@ public static partial class PdfObjectEditor
             ValidateBounds(Bounds(Corners(change.Target.Bounds, change.Transform)));
         }
 
-        return Edit(workspace, changes.Select(c => c.Target).ToArray(), (native, items) =>
+        var changed = false;
+        return Edit(workspace, changes.Select(c => c.Target).ToArray(), (native, items, _) =>
         {
             var matrices = changes.ToDictionary(c => Key(c.Target), c => c.Transform);
-            ChangeScopes(native, items, (content, resources, item) =>
+            var effective = items.Where(i => matrices[Key(i.Object)] != PdfAffineMatrix.Identity).ToArray();
+            if (effective.Length == 0) return; // Native descriptors were still revalidated by Edit.
+            changed = true;
+            ChangeScopes(native, effective, (content, resources, item) =>
             {
                 var delta = item.Object.LocalToPage.Inverse() * matrices[Key(item.Object)] * item.Object.LocalToPage;
                 Replace(content, item, "q\n" + Matrix(delta), null, "Q\n", preserveState: true);
             });
-        });
+        }, hasChanges: () => changed);
     }
 
     public static PdfWorkspace Transform(PdfWorkspace workspace, IReadOnlyList<PdfPageObject> objects, PdfAffineMatrix transform) => Transform(workspace, objects.Select(o => new PdfObjectChange(o, transform)).ToArray());
@@ -245,18 +249,8 @@ public static partial class PdfObjectEditor
     private static PdfWorkspace Edit(PdfWorkspace workspace, IReadOnlyList<PdfPageObject> objects, Action<PdfDocument, Item[]> action) => Edit(workspace, objects, (native, items, _) => action(native, items));
     private static PdfWorkspace Edit(PdfWorkspace workspace, IReadOnlyList<PdfPageObject> objects, Action<PdfDocument, Item[], PdfObjectScanner> action, bool commit = true, Func<bool>? hasChanges = null)
     {
-        ArgumentNullException.ThrowIfNull(objects);
-        if (objects.Count is < 1 or > 1000)
-            throw new ArgumentException("Select between 1 and 1,000 objects.");
+        PdfObjectSelectionValidator.Validate(objects);
         var first = objects[0];
-        if (objects.Any(o => o.PageId != first.PageId || o.SourceId != first.SourceId || o.SourceHash != first.SourceHash || o.SourcePage != first.SourcePage))
-            throw new ArgumentException("One edit batch belongs to one source page and snapshot.");
-        if (objects.Select(Key).Distinct().Count() != objects.Count)
-            throw new ArgumentException("Duplicate object selection.");
-        foreach (var outer in objects)
-            foreach (var inner in objects)
-                if (!ReferenceEquals(outer, inner) && ((outer.ScopePath == inner.ScopePath && outer.Start <= inner.End && inner.Start <= outer.End) || inner.ScopePath == ChildKey(outer) || inner.ScopePath.StartsWith(ChildKey(outer) + "/", StringComparison.Ordinal)))
-                    throw new ArgumentException("Select either a Form group or its contents, not overlapping parent and child occurrences.");
         var source = PdfContentGraph.ValidateTarget(workspace, first.SourceId, first.SourcePage, first.PageId, first.SourceHash);
         using var native = PdfDocumentEngine.OpenNative(source.Bytes);
         var pageIndex = Array.FindIndex(workspace.Pages, p => p.Id == first.PageId);
@@ -289,8 +283,8 @@ public static partial class PdfObjectEditor
     private static void Replace(CSequence content, Item item, string before, string? body, string after, bool preserveState)
     {
         var original = new CSequence();
-        foreach (var op in content.Skip(item.Object.Start).Take(item.Object.End - item.Object.Start + 1))
-            original.Add(op);
+        for (var index = item.Object.Start; index <= item.Object.End; index++)
+            original.Add(content[index]);
         var result = new CSequence();
         Append(result, before);
         if (body is null)

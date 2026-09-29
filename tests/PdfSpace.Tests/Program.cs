@@ -23,9 +23,15 @@ if (args is ["--verify-browser-manipulation", var manipulationDirectory]) { Brow
 
 if (args is ["--verify-browser-snap-editing", var snapDirectory]) { BrowserSnapEditingVerification.Run(snapDirectory); return; }
 
+if (args is ["--verify-browser-layout", var layoutDirectory]) { BrowserObjectLayoutVerification.Run(layoutDirectory); return; }
+
 var passed = 0;
 void Check(bool condition, string name) { if (!condition) throw new Exception("FAILED: " + name); Console.WriteLine("PASS " + name); passed++; }
 void Reject(Action action, string name) { try { action(); } catch { Check(true, name); return; } throw new Exception("FAILED: " + name); }
+if (args is ["--test-object-layout"])
+{
+    ObjectLayoutTests.Run(Check, Reject); Console.WriteLine($"{passed} object layout checks passed."); return;
+}
 if (args is ["--test-snap-editing"])
 {
     ObjectSnapEditingTests.Run(Check, Reject);
@@ -137,4 +143,5 @@ ObjectManipulationTests.Run(Check, Reject);
 ObjectSnapEditingTests.Run(Check, Reject);
 IndexWindowTests.Run(Check, Reject);
 ObjectDiagnosticsTests.Run(Check);
+ObjectLayoutTests.Run(Check, Reject);
 Console.WriteLine($"\n{passed} engine checks passed.");
