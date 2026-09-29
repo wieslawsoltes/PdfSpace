@@ -1,0 +1,85 @@
+name: Reproduce dense document open
+on:
+  push:
+    branches: [test/dense-open-054]
+    paths: [.github/workflows/reproduce-dense-open.yml]
+permissions:
+  contents: read
+  actions: read
+jobs:
+  reproduce:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+      - uses: actions/download-artifact@v4
+        with:
+          name: PdfSpace-browser
+          run-id: 36532693304
+          github-token: ${{ github.token }}
+          path: artifacts/site
+      - uses: actions/download-artifact@v4
+        with:
+          name: PdfSpace-engine-validation
+          run-id: 36532693304
+          github-token: ${{ github.token }}
+          path: artifacts/fixtures
+      - name: Add observational event trace to fixture scenario
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path=Path('tests/browser/snap-editing.spec.mjs')
+          path.write_text(path.read_text()+'''
+          test.beforeEach(async ({ page }) => {
+            page.on('console', message => { if (message.text().startsWith('PICKER')) console.log(message.text()); });
+            page.on('pageerror', error => console.log('PICKER PAGEERROR', error.message));
+            await page.addInitScript(() => {
+              const log = (...args) => console.log('PICKER', performance.now().toFixed(1), ...args);
+              let bridge;
+              Object.defineProperty(globalThis, 'pdfSpaceFiles', {
+                configurable: true, get() { return bridge; }, set(value) {
+                  const original = value.open;
+                  value.open = function(...args) {
+                    log('open invoked');
+                    return original.apply(this, args).then(result => {
+                      log('open completed', result.length, result ? JSON.parse(result).name : '(cancelled)');
+                      return result;
+                    }, error => { log('open rejected', String(error)); throw error; });
+                  };
+                  bridge = value;
+                }
+              });
+              for (const name of ['cancel', 'input', 'change']) {
+                document.addEventListener(name, event => {
+                  if (event.target instanceof HTMLInputElement && event.target.type === 'file')
+                    log(name, event.target.files?.length, event.target.files?.[0]?.name || '', event.target.isConnected);
+                }, true);
+              }
+              const read = File.prototype.arrayBuffer;
+              File.prototype.arrayBuffer = function(...args) {
+                log('read started', this.name, this.size);
+                return read.apply(this, args).then(bytes => { log('read completed', this.name, bytes.byteLength); return bytes; },
+                  error => { log('read failed', String(error)); throw error; });
+              };
+            });
+          });
+          ''')
+          PY
+      - name: Reproduce using real pointer and file chooser
+        run: |
+          npm ci --ignore-scripts
+          npx playwright install --with-deps chromium
+          python3 scripts/serve-site.py --directory artifacts/site --port 4173 > artifacts/server.log 2>&1 &
+          npx playwright test tests/browser/snap-editing.spec.mjs --grep 'dense object inspector' --repeat-each=2
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: PdfSpace-dense-open-reproducer
+          path: |
+            artifacts/playwright-report
+            artifacts/test-results
+            artifacts/browser-results.xml
+            artifacts/server.log
