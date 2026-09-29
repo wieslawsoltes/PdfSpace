@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import fs from 'node:fs';
+import { clickUnoControl as click } from './support/uno-pointer.mjs';
 const url = process.env.PDFSPACE_URL || 'http://127.0.0.1:4173/PdfSpace/';
 const state = page => page.evaluate(() => globalThis.pdfSpaceDiagnostics);
 async function start(page) {
@@ -7,17 +8,6 @@ async function start(page) {
   await page.goto(url + (url.includes('?') ? '&' : '?') + 'test=1');
   await page.waitForFunction(() => globalThis.pdfSpaceDiagnostics?.ready, null, { timeout: 150000 });
   await page.waitForTimeout(300);
-}
-async function click(page, name) {
-  await expect.poll(async () => (await state(page)).controls.some(c => c.name === name && c.enabled && c.width > 1)).toBe(true);
-  for (let i = 0; i < 8; i++) {
-    const c = (await state(page)).controls.find(c => c.name === name && c.enabled && c.width > 1);
-    if (c.y > 95 && c.y + c.height > page.viewportSize().height - 30) {
-      await page.mouse.move(c.x + c.width / 2, page.viewportSize().height - 140); await page.mouse.wheel(0, 330); await page.waitForTimeout(300); continue;
-    }
-    await page.mouse.click(c.x + c.width / 2, c.y + c.height / 2); await page.waitForTimeout(200); return;
-  }
-  throw new Error('Could not reveal control: ' + name);
 }
 async function type(page, text) {
   await page.waitForFunction(() => document.activeElement instanceof HTMLInputElement || document.activeElement instanceof HTMLTextAreaElement);
