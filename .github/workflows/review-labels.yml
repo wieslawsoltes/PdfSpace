@@ -1,0 +1,35 @@
+name: Review native page labels
+on:
+  push:
+    branches: [build/page-labels-0.6.1]
+    paths: [.github/workflows/review-labels.yml]
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/page-labels-0.6.1
+          fetch-depth: 0
+      - name: Apply reviewed exact-tree delta
+        env:
+          TRANSFER_COMMIT: ${{ github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = 'e3f61ad1d88f1eda29f6ef47eb87d84316e9c683'
+          git fetch origin "$TRANSFER_COMMIT"
+          git show "$TRANSFER_COMMIT:tools/labels/review.patch" > /tmp/labels-review.patch
+          echo '08d448c1aa203a858149eb553afe3f6b59baa53ee2c680c6a934c6a26c5f51d4  /tmp/labels-review.patch' | sha256sum -c -
+          git apply --check /tmp/labels-review.patch
+          git apply /tmp/labels-review.patch
+          git diff --check
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          test "$(git write-tree)" = '488317d4882b7e01604d027a4ac6b169752b7808'
+          git commit -m 'fix: preserve explicit label identities and reuse unchanged label indexes'
+          git push origin HEAD:feat/page-labels-0.6.1
