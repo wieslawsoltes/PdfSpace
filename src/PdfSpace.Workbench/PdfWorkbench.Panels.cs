@@ -114,6 +114,7 @@ public sealed partial class PdfWorkbench
     { _right = _right == name ? "" : name; RefreshRight(); AdaptLayout(); }
     private void RefreshRight()
     {
+        DetachObjectList();
         _rightHost.Content = null; if (_right.Length == 0 || _active is null) return;
         var root = new Grid { Background = PdfTheme.Brush("#FFFFFF"), BorderBrush = PdfTheme.Brush("#D8D8D8"), BorderThickness = new Thickness(1, 0, 0, 0), RowDefinitions = { new() { Height = new GridLength(55) }, new() { Height = new GridLength(1, GridUnitType.Star) } } };
         var header = new Grid { Margin = new Thickness(18, 0, 10, 0), ColumnDefinitions = { new() { Width = new GridLength(1, GridUnitType.Star) }, new() { Width = GridLength.Auto } } };

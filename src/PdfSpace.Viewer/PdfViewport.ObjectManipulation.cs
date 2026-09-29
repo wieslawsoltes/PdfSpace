@@ -6,7 +6,7 @@ public sealed partial class PdfViewport
     private RectD _objectSnapPage;
     private ObjectSnapGuide? _objectSnapVertical, _objectSnapHorizontal;
     private double _objectRotation;
-    private bool _snapNativeObjectMovement;
+    private bool _snapNativeObjectMovement, _snapNativeObjectResize, _snapNativeObjectPoints;
 
     /// <summary>Optional edge/center snapping while moving a native selection. Alt temporarily bypasses it.</summary>
     public bool SnapNativeObjectMovement
@@ -14,6 +14,19 @@ public sealed partial class PdfViewport
         get => _snapNativeObjectMovement;
         set { _snapNativeObjectMovement = value; _objectSnapVertical = null; _objectSnapHorizontal = null; Invalidate(); }
     }
+    /// <summary>Snap grabbed resize edges. Shift retains aspect; Alt centers and bypasses snapping.</summary>
+    public bool SnapNativeObjectResize
+    {
+        get => _snapNativeObjectResize;
+        set { _snapNativeObjectResize = value; _objectSnapVertical = null; _objectSnapHorizontal = null; Invalidate(); }
+    }
+    /// <summary>Snap dragged vector points to page/other-object edges and centers. Alt bypasses it.</summary>
+    public bool SnapNativeObjectPoints
+    {
+        get => _snapNativeObjectPoints;
+        set { _snapNativeObjectPoints = value; _objectSnapVertical = null; _objectSnapHorizontal = null; Invalidate(); }
+    }
+    public PointD? NativeObjectPointPreview => _objectNodePreview;
     public int ObjectSnapIndexBuilds { get; private set; }
     public double ObjectRotationPreview => _objectRotation;
     public RectD? NativeObjectPreviewBounds => _objectPreview;
@@ -68,6 +81,15 @@ public sealed partial class PdfViewport
         var proposed = _objectInitial.Translate(delta);
         _objectSnapVertical = null; _objectSnapHorizontal = null;
         if (!SnapNativeObjectMovement || AltPressed()) return proposed;
+        var horizontal = !locked || Math.Abs(raw.X) >= Math.Abs(raw.Y);
+        var vertical = !locked || !horizontal;
+        var result = ObjectSnappingIndex().Snap(proposed, 6 / Zoom, horizontal, vertical);
+        _objectSnapVertical = result.VerticalGuide; _objectSnapHorizontal = result.HorizontalGuide;
+        return result.Bounds;
+    }
+
+    private ObjectSnapIndex ObjectSnappingIndex()
+    {
         if (_objectSnapIndex is null || _objectSnapPage != Session.Page.VisibleBox)
         {
             // Cache only value geometry, never a document or source buffer. Selection/index changes invalidate it.
@@ -76,11 +98,35 @@ public sealed partial class PdfViewport
                 .Prepend(_objectSnapPage).ToArray();
             _objectSnapIndex = new(targets); ObjectSnapIndexBuilds++;
         }
-        var horizontal = !locked || Math.Abs(raw.X) >= Math.Abs(raw.Y);
-        var vertical = !locked || !horizontal;
-        var result = _objectSnapIndex.Snap(proposed, 6 / Zoom, horizontal, vertical);
+        return _objectSnapIndex;
+    }
+
+    private RectD SnapObjectResize(PointD world)
+    {
+        _objectSnapVertical = null; _objectSnapHorizontal = null;
+        var delta = world - _start;
+        if (world.Distance(_start) * Zoom < 3) return _objectInitial;
+        if (!SnapNativeObjectResize || AltPressed())
+            return SelectionTransform.Resize(_objectInitial, _handle, delta, ShiftPressed(), AltPressed());
+        var result = ObjectSnappingIndex().SnapResize(_objectInitial, _handle, delta, 6 / Zoom, ShiftPressed());
         _objectSnapVertical = result.VerticalGuide; _objectSnapHorizontal = result.HorizontalGuide;
         return result.Bounds;
+    }
+
+    private PointD SnapObjectPoint(PointD world)
+    {
+        _objectSnapVertical = null; _objectSnapHorizontal = null;
+        var origin = _objectNode!.Position;
+        // Retain where the pointer grabbed the handle; a near miss must not jump the node.
+        if (world.Distance(_start) * Zoom < 3) return origin;
+        var raw = world - _start;
+        var locked = ShiftPressed();
+        var proposed = origin + SelectionTransform.ConstrainMove(raw, locked);
+        if (!SnapNativeObjectPoints || AltPressed()) return proposed;
+        var horizontal = !locked || Math.Abs(raw.X) >= Math.Abs(raw.Y);
+        var result = ObjectSnappingIndex().SnapPoint(proposed, 6 / Zoom, horizontal, !locked || !horizontal);
+        _objectSnapVertical = result.VerticalGuide; _objectSnapHorizontal = result.HorizontalGuide;
+        return result.Position;
     }
 
     private void ApplyRotationPreview(SKCanvas canvas)

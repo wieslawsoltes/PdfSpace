@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.5.4-alpha.1
+
+- Add independently enabled resize and Bézier-point alignment guides, constrained corner/side snapping, axis-locked point movement and one native transaction per committed gesture.
+- Retain point-handle grab offsets; stationary, returned and cancelled gestures do not rewrite source content.
+- Compact duplicate snap anchors without changing priority and remove redundant binary searches; reuse inspector object rows and avoid the intermediate rebuild during native edit commands.
+- Add deterministic/randomized native tests, source PDF roundtrips, real Uno browser gesture/cache regressions and native verification of browser exports.
+
+
 ## 0.5.3-alpha.1 — 2026-09-28
 
 - Direct native-object rotation handle with free angles, Shift 15-degree snapping, exact numeric rotation, one-transaction commit, and Escape cancellation.

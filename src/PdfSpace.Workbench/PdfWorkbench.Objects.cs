@@ -7,7 +7,7 @@ public sealed partial class PdfWorkbench
     private Guid _objectPage;
     private PdfPageObject[] _pageObjects = [];
     private int[] _selectedObjects = [];
-    private bool _refreshingObjects, _objectGroups;
+    private bool _refreshingObjects, _objectGroups, _applyingObjects;
     private long _objectIndexBuilds;
     private PdfObjectClipboard? _objectClipboard;
     private void ShowObjects()
@@ -24,6 +24,7 @@ public sealed partial class PdfWorkbench
     {
         if (_refreshingObjects || _active is null || Session.Tool is not (PdfTool.EditObject or PdfTool.ObjectCrop) || _objectStamp.Matches(Session.Document) && _objectPage == Session.Page.Id)
             return;
+        ClearObjectList();
         _refreshingObjects = true;
         try
         {
@@ -157,7 +158,15 @@ public sealed partial class PdfWorkbench
         var count = _pageObjects.Length;
         if (selected.Length == 0)
             throw new InvalidOperationException("Select one or more native objects first.");
-        context.Session.Execute(label, d => action(d, selected));
+        var before = context.Session.Document;
+        _applyingObjects = true;
+        try { context.Session.Execute(label, d => action(d, selected)); }
+        finally { _applyingObjects = false; }
+        if (ReferenceEquals(before, context.Session.Document))
+        {
+            ShowStatus(label + ": no document change.");
+            return;
+        }
         RefreshObjects();
         if (_pageObjects.Length == count && label != "Arrange objects")
         {
@@ -294,20 +303,7 @@ public sealed partial class PdfWorkbench
             ShowObjects();
         });
         content.Children.Add(Paragraph($"{_pageObjects.Length} native objects · {_selectedObjects.Length} selected", 11));
-        var list = PdfTheme.Column(2);
-        foreach (var(o, i)in _pageObjects.Select((o, i) => (o, i)).Take(200))
-        {
-            var button = new PdfCommandButton($"Select object {i + 1}", action: () => Viewport.SelectNativeObjects([i]))
-            {
-                Height = 29,
-                HorizontalContentAlignment = HorizontalAlignment.Left
-            };
-            button.Label = $"{i + 1} · {o.Kind}" + (o.Text.Length > 0 ? " · " + o.Text[..Math.Min(24, o.Text.Length)] : "");
-            button.Select(_selectedObjects.Contains(i));
-            list.Children.Add(button);
-        }
-
-        content.Children.Add(new ScrollViewer { Content = list, MaxHeight = 170, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled });
+        AttachObjectList(content);
         if (_pageObjects.Length > 200)
             content.Children.Add(Paragraph("The list shows 200 objects. All indexed objects remain selectable on the canvas.", 10));
         var snap = new PdfCommandButton("Snap moving objects", action: () =>
@@ -319,12 +315,26 @@ public sealed partial class PdfWorkbench
                 : "Object snapping disabled.");
         });
         snap.Select(Viewport.SnapNativeObjectMovement); content.Children.Add(snap);
+        var resizeSnap = new PdfCommandButton("Snap resizing objects", action: () =>
+        {
+            Viewport.SnapNativeObjectResize = !Viewport.SnapNativeObjectResize;
+            RefreshRight();
+            ShowStatus("Resize snapping " + (Viewport.SnapNativeObjectResize ? "enabled. Shift retains proportions; Alt centers and bypasses snapping." : "disabled."));
+        });
+        resizeSnap.Select(Viewport.SnapNativeObjectResize); content.Children.Add(resizeSnap);
+        var pointSnap = new PdfCommandButton("Snap vector points", action: () =>
+        {
+            Viewport.SnapNativeObjectPoints = !Viewport.SnapNativeObjectPoints;
+            RefreshRight();
+            ShowStatus("Vector-point snapping " + (Viewport.SnapNativeObjectPoints ? "enabled. Shift locks an axis; Alt bypasses snapping." : "disabled."));
+        });
+        pointSnap.Select(Viewport.SnapNativeObjectPoints); content.Children.Add(pointSnap);
         Command("Select all objects");
         Command("Paste objects", _objectClipboard is not null);
         Button("Draw native rectangle", () => UseTool(PdfTool.ObjectRectangle), PdfIconKind.Rectangle);
         Button("Draw native ellipse", () => UseTool(PdfTool.ObjectEllipse), PdfIconKind.Ellipse);
         Command("Add native text");
-        content.Children.Add(Paragraph("Drag the round handle to rotate; Shift snaps to 15°. Snap moving objects aligns edges/centers; Alt bypasses it. Shift constrains movement/proportions; Alt resizes/draws from center. Escape cancels.", 10));
+        content.Children.Add(Paragraph("Drag the round handle to rotate; Shift snaps to 15°. Enable move, resize or point snapping separately; Alt bypasses it. Shift constrains movement/proportions; Alt resizes/draws from center. Escape cancels.", 10));
         var selected = _selectedObjects.Where(i => (uint)i < _pageObjects.Length).Select(i => _pageObjects[i]).ToArray();
         if (selected.Length == 0)
             return;

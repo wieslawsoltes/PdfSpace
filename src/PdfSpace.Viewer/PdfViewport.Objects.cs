@@ -176,7 +176,7 @@ public sealed partial class PdfViewport
 
         if (_gesture == Gesture.ObjectNode)
         {
-            _objectNodePreview = world;
+            _objectNodePreview = SnapObjectPoint(world);
             return true;
         }
 
@@ -197,7 +197,7 @@ public sealed partial class PdfViewport
 
         if (_gesture != Gesture.ObjectResize)
             return false;
-        _objectPreview = SelectionTransform.Resize(_objectInitial, _handle, world - _start, ShiftPressed(), AltPressed());
+        _objectPreview = SnapObjectResize(world);
         return true;
     }
 

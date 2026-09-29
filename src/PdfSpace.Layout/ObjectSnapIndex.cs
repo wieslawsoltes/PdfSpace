@@ -14,13 +14,17 @@ public readonly record struct ObjectSnapResult(RectD Bounds, PointD Correction,
 /// query examines at most twelve candidates using binary search. Entries must exclude
 /// the moving selection. Put the visible page box first to give it deterministic tie priority.
 /// </summary>
-public sealed class ObjectSnapIndex
+public sealed partial class ObjectSnapIndex
 {
     private readonly record struct Anchor(double Coordinate, int Target);
     private readonly record struct Match(double Correction, int Target, int MovingAnchor);
     private readonly RectD[] _targets;
     private readonly Anchor[] _x, _y;
     public int Count => _targets.Length;
+    /// <summary>Unique retained horizontal coordinates after deterministic duplicate compaction.</summary>
+    public int HorizontalAnchorCount => _x.Length;
+    /// <summary>Unique retained vertical coordinates after deterministic duplicate compaction.</summary>
+    public int VerticalAnchorCount => _y.Length;
 
     public ObjectSnapIndex(IReadOnlyList<RectD> targets)
     {
@@ -41,6 +45,7 @@ public sealed class ObjectSnapIndex
             return order == 0 ? a.Target.CompareTo(b.Target) : order;
         }
         Array.Sort(_x, Compare); Array.Sort(_y, Compare);
+        _x = Compact(_x); _y = Compact(_y);
     }
 
     /// <summary>
@@ -64,28 +69,48 @@ public sealed class ObjectSnapIndex
         return new(bounds, delta, vx, hy);
     }
 
+    // Sorting places the highest-priority target first at each coordinate. Other
+    // duplicates can never win a query, so discard them without changing tie semantics.
+    private static Anchor[] Compact(Anchor[] entries)
+    {
+        if (entries.Length < 2) return entries;
+        var count = 1;
+        for (var i = 1; i < entries.Length; i++)
+            if (entries[i].Coordinate != entries[count - 1].Coordinate) entries[count++] = entries[i];
+        if (count == entries.Length) return entries;
+        Array.Resize(ref entries, count);
+        return entries;
+    }
+
+    private static bool Better(Match candidate, Match? best) => best is not { } current ||
+        Math.Abs(candidate.Correction) < Math.Abs(current.Correction) ||
+        Math.Abs(candidate.Correction) == Math.Abs(current.Correction) &&
+        (candidate.Target < current.Target || candidate.Target == current.Target &&
+        (candidate.MovingAnchor < current.MovingAnchor || candidate.MovingAnchor == current.MovingAnchor &&
+        candidate.Correction < current.Correction));
+
+    private static Match? NearestAt(Anchor[] entries, double coordinate, double tolerance, int movingAnchor = 0)
+    {
+        Match? best = null;
+        var next = LowerBound(entries, coordinate);
+        // Compacted tables need only one binary search: previous is already the
+        // highest-priority representative, not the last member of a duplicate run.
+        for (var side = 0; side < 2; side++)
+        {
+            var i = next - side;
+            if ((uint)i >= entries.Length) continue;
+            var candidate = new Match(entries[i].Coordinate - coordinate, entries[i].Target, movingAnchor);
+            if (Math.Abs(candidate.Correction) <= tolerance && Better(candidate, best)) best = candidate;
+        }
+        return best;
+    }
+
     private static Match? Nearest(Anchor[] entries, double start, double length, double tolerance)
     {
         Match? best = null;
         for (var anchor = 0; anchor < 3; anchor++)
-        {
-            var coordinate = start + length * (anchor / 2d);
-            var next = LowerBound(entries, coordinate);
-            // Choose the FIRST duplicate coordinate, not an arbitrary sort result.
-            var previous = next > 0 ? LowerBound(entries, entries[next - 1].Coordinate) : -1;
-            for (var side = 0; side < 2; side++)
-            {
-                var index = side == 0 ? next : previous;
-                if ((uint)index >= entries.Length) continue;
-                var candidate = new Match(entries[index].Coordinate - coordinate, entries[index].Target, anchor);
-                var distance = Math.Abs(candidate.Correction);
-                if (distance > tolerance) continue;
-                if (best is not { } current || distance < Math.Abs(current.Correction) ||
-                    distance == Math.Abs(current.Correction) && (candidate.Target < current.Target ||
-                    (candidate.Target == current.Target && (candidate.MovingAnchor < current.MovingAnchor ||
-                    candidate.MovingAnchor == current.MovingAnchor && candidate.Correction < current.Correction)))) best = candidate;
-            }
-        }
+            if (NearestAt(entries, start + length * (anchor / 2d), tolerance, anchor) is { } candidate && Better(candidate, best))
+                best = candidate;
         return best;
     }
 

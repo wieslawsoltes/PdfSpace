@@ -91,6 +91,7 @@ public sealed partial class PdfWorkbench : UserControl, IDisposable
     {
         if (_active is not null) _active.Viewport.FinishText(true);
         _homeHost.Content = null; // Hidden recent-document cards must not retain closed sessions.
+        ClearObjectList();
         _active = context; _objectStamp.Clear(); _pageObjects = []; _selectedObjects = []; _imageSnapshot.Clear(); _nativeImages = []; _imageSelection = -1; _home = false; _documentHost.Children.Clear(); _documentHost.Children.Add(context.Viewport);
         _organizerHost.Content = new PdfThumbnailView(context.Viewport) { OrganizeMode = true };
         BuildLeft(); RefreshData(); UpdateModeVisibility(); ShowStatus(Session.Document.IsSensitive ? "Unlocked protected PDF: automatic recovery disabled. Workspace copies would be unencrypted." : "All files stay on your device.");
@@ -111,7 +112,7 @@ public sealed partial class PdfWorkbench : UserControl, IDisposable
     { _statusText = text; _status.Text = text; _status.Foreground = PdfTheme.Brush(error ? "#B12620" : "#686868"); StateChanged?.Invoke(); }
     private void RefreshData()
     {
-        UpdateTabs(); RefreshObjects(); RefreshNativeImages(); UpdateChrome(); RefreshRight(); (_organizerHost.Content as PdfThumbnailView)?.Invalidate();
+        UpdateTabs(); RefreshObjects(); RefreshNativeImages(); UpdateChrome(); if (!_applyingObjects) RefreshRight(); (_organizerHost.Content as PdfThumbnailView)?.Invalidate();
     }
     private readonly WorkspaceSnapshotStamp _chromeDocument = new();
     private void UpdateChrome()
@@ -179,5 +180,5 @@ public sealed partial class PdfWorkbench : UserControl, IDisposable
         }
         catch (Exception ex) { ShowStatus("Recovery is unavailable: " + ex.Message, true); }
     }
-    public void Dispose() { if (_disposed) return; _disposed = true; _objectClipboard = null; _pageObjects = []; _selectedObjects = []; _objectStamp.Clear(); _ocrCancellation?.Cancel(); _autosave.Stop(); foreach (var d in _documents) { d.Search.Clear(); d.Viewport.Dispose(); } _documents.Clear(); }
+    public void Dispose() { if (_disposed) return; _disposed = true; ClearObjectList(); _objectClipboard = null; _pageObjects = []; _selectedObjects = []; _objectStamp.Clear(); _ocrCancellation?.Cancel(); _autosave.Stop(); foreach (var d in _documents) { d.Search.Clear(); d.Viewport.Dispose(); } _documents.Clear(); }
 }

@@ -44,6 +44,12 @@ public sealed partial class PdfWorkbench
             json.WriteEndArray();
             json.WriteNumber("nativeObjects", _pageObjects.Length);
             json.WriteNumber("objectIndexBuilds", _objectIndexBuilds);
+            json.WriteNumber("objectListBuilds", _objectListBuilds);
+            json.WriteNumber("objectListRowsCreated", _objectListRowsCreated);
+            json.WriteBoolean("objectResizeSnapping", Viewport.SnapNativeObjectResize);
+            json.WriteBoolean("objectPointSnapping", Viewport.SnapNativeObjectPoints);
+            if (Viewport.NativeObjectPointPreview is { } np)
+            { json.WriteStartObject("objectPointPreview"); json.WriteNumber("x", np.X); json.WriteNumber("y", np.Y); json.WriteEndObject(); }
             json.WriteBoolean("objectSnapping", Viewport.SnapNativeObjectMovement);
             json.WriteNumber("snapIndexBuilds", Viewport.ObjectSnapIndexBuilds);
             json.WriteNumber("rotationPreview", Viewport.ObjectRotationPreview);
