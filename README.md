@@ -6,6 +6,8 @@
 [![Build](https://github.com/wieslawsoltes/PdfSpace/actions/workflows/build.yml/badge.svg)](https://github.com/wieslawsoltes/PdfSpace/actions/workflows/build.yml)
 [![Desktop](https://github.com/wieslawsoltes/PdfSpace/actions/workflows/desktop.yml/badge.svg)](https://github.com/wieslawsoltes/PdfSpace/actions/workflows/desktop.yml)
 [![Pages](https://github.com/wieslawsoltes/PdfSpace/actions/workflows/pages.yml/badge.svg)](https://github.com/wieslawsoltes/PdfSpace/actions/workflows/pages.yml)
+[![NuGet](https://img.shields.io/nuget/vpre/PdfSpace.Core.svg?label=NuGet)](https://www.nuget.org/packages/PdfSpace.Core)
+[![Downloads](https://img.shields.io/nuget/dt/PdfSpace.Core.svg)](https://www.nuget.org/packages/PdfSpace.Core)
 
 **[Open the browser app](https://wieslawsoltes.github.io/PdfSpace/)** · **[Components](docs/components.md)** · **[Architecture](docs/architecture.md)** · **[Compatibility](docs/compatibility.md)**
 
@@ -101,24 +103,465 @@ Extract and run `PdfSpace` (`PdfSpace.exe` on Windows). Builds are not code-sign
 
 The libraries below are published to [NuGet.org](https://www.nuget.org/packages?q=PdfSpace), e.g. `dotnet add package PdfSpace.Core --prerelease`.
 
-## Twelve reusable libraries
+## NuGet packages
 
-| Package | Responsibility |
-|---|---|
-| `PdfSpace.Core` | Workspace, page, annotation, field and geometry models; validated JSON |
-| `PdfSpace.Layout` | Crop/rotation transforms and viewport/page layouts |
-| `PdfSpace.Editing` | Transactional editing, shared field state and bounded undo/redo |
-| `PdfSpace.Documents` | PdfPig import, search, page ranges and XFDF/JSON form data |
-| `PdfSpace.Rendering.Skia` | Source-pinned Apache-2.0 PDF renderer adaptation with image-alpha, dash and miter fixes. |
-| `PdfSpace.Skia` | Cached rendering, overlays, visual export and raster redaction |
-| `PdfSpace.Pdf` | PDFsharp native annotation/form writer, source-text editing, inspection and security-provider contract |
-| `PdfSpace.Ocr` | Local recognition contracts, raster preparation, bounded TSV decoding, snapshot batches and native process adapter |
-| `PdfSpace.Controls` | Custom Uno icons, command buttons, tabs, panels, palettes and dialogs |
-| `PdfSpace.Viewer` | Embeddable document viewport, form input and thumbnails |
-| `PdfSpace.Storage` | File, recovery, clipboard and print contracts |
-| `PdfSpace.Workbench` | Complete multi-document shell and PDF workflows |
+PdfSpace ships as twelve packages, all versioned together. Eleven are MIT-licensed; **`PdfSpace.Rendering.Skia` is Apache-2.0**, a derivative of an upstream renderer (see its subsection). Nine target plain `net10.0` and have no UI dependency: `PdfSpace.Core`, `Layout`, `Editing` and `Storage` are pure .NET, `Documents` adds PdfPig, `Rendering.Skia`, `Skia` and `Ocr` add SkiaSharp, and `Pdf` adds PDFsharp. The three Uno Platform packages (`Controls`, `Viewer`, `Workbench`) target `net10.0-desktop` and `net10.0-browserwasm`. Symbols are published to nuget.org as `.snupkg` with SourceLink. The application itself is a thin browser/desktop host and is not packaged; see also the [embedding guide](docs/components.md).
 
-The application is a thin browser/desktop host. All twelve libraries are packed with symbols and published to NuGet.org for version tags. See [embedding examples](docs/components.md).
+```sh
+dotnet add package PdfSpace.Core --prerelease
+```
+
+| Package | Version | Downloads | Description |
+| :--- | :--- | :--- | :--- |
+| [PdfSpace.Core](https://www.nuget.org/packages/PdfSpace.Core) | [![NuGet](https://img.shields.io/nuget/vpre/PdfSpace.Core.svg)](https://www.nuget.org/packages/PdfSpace.Core) | [![Downloads](https://img.shields.io/nuget/dt/PdfSpace.Core.svg)](https://www.nuget.org/packages/PdfSpace.Core) | Immutable workspace, page, annotation, form-field, OCR-layer and geometry models; validated JSON |
+| [PdfSpace.Layout](https://www.nuget.org/packages/PdfSpace.Layout) | [![NuGet](https://img.shields.io/nuget/vpre/PdfSpace.Layout.svg)](https://www.nuget.org/packages/PdfSpace.Layout) | [![Downloads](https://img.shields.io/nuget/dt/PdfSpace.Layout.svg)](https://www.nuget.org/packages/PdfSpace.Layout) | Crop/rotation transforms, indexed page layouts, hit testing, snapping and spatial indexes |
+| [PdfSpace.Editing](https://www.nuget.org/packages/PdfSpace.Editing) | [![NuGet](https://img.shields.io/nuget/vpre/PdfSpace.Editing.svg)](https://www.nuget.org/packages/PdfSpace.Editing) | [![Downloads](https://img.shields.io/nuget/dt/PdfSpace.Editing.svg)](https://www.nuget.org/packages/PdfSpace.Editing) | Transactional annotation, page and form editing with bounded immutable undo/redo |
+| [PdfSpace.Storage](https://www.nuget.org/packages/PdfSpace.Storage) | [![NuGet](https://img.shields.io/nuget/vpre/PdfSpace.Storage.svg)](https://www.nuget.org/packages/PdfSpace.Storage) | [![Downloads](https://img.shields.io/nuget/dt/PdfSpace.Storage.svg)](https://www.nuget.org/packages/PdfSpace.Storage) | Platform-neutral file, recovery, clipboard and print contracts |
+| [PdfSpace.Documents](https://www.nuget.org/packages/PdfSpace.Documents) | [![NuGet](https://img.shields.io/nuget/vpre/PdfSpace.Documents.svg)](https://www.nuget.org/packages/PdfSpace.Documents) | [![Downloads](https://img.shields.io/nuget/dt/PdfSpace.Documents.svg)](https://www.nuget.org/packages/PdfSpace.Documents) | PdfPig import, text extraction, bounded search, page ranges and XFDF/JSON form data |
+| [PdfSpace.Rendering.Skia](https://www.nuget.org/packages/PdfSpace.Rendering.Skia) | [![NuGet](https://img.shields.io/nuget/vpre/PdfSpace.Rendering.Skia.svg)](https://www.nuget.org/packages/PdfSpace.Rendering.Skia) | [![Downloads](https://img.shields.io/nuget/dt/PdfSpace.Rendering.Skia.svg)](https://www.nuget.org/packages/PdfSpace.Rendering.Skia) | Apache-2.0: source-pinned PdfPig Skia renderer with image-alpha, dash and miter fixes |
+| [PdfSpace.Skia](https://www.nuget.org/packages/PdfSpace.Skia) | [![NuGet](https://img.shields.io/nuget/vpre/PdfSpace.Skia.svg)](https://www.nuget.org/packages/PdfSpace.Skia) | [![Downloads](https://img.shields.io/nuget/dt/PdfSpace.Skia.svg)](https://www.nuget.org/packages/PdfSpace.Skia) | Cached page rendering, annotation/form overlays, PNG and flattened PDF export, raster redaction |
+| [PdfSpace.Pdf](https://www.nuget.org/packages/PdfSpace.Pdf) | [![NuGet](https://img.shields.io/nuget/vpre/PdfSpace.Pdf.svg)](https://www.nuget.org/packages/PdfSpace.Pdf) | [![Downloads](https://img.shields.io/nuget/dt/PdfSpace.Pdf.svg)](https://www.nuget.org/packages/PdfSpace.Pdf) | PDFsharp native annotations/AcroForms, source-text and native object editing, inspection and password protection |
+| [PdfSpace.Ocr](https://www.nuget.org/packages/PdfSpace.Ocr) | [![NuGet](https://img.shields.io/nuget/vpre/PdfSpace.Ocr.svg)](https://www.nuget.org/packages/PdfSpace.Ocr) | [![Downloads](https://img.shields.io/nuget/dt/PdfSpace.Ocr.svg)](https://www.nuget.org/packages/PdfSpace.Ocr) | Local OCR contracts, raster preparation, bounded Tesseract TSV decoding and cancellable batches |
+| [PdfSpace.Controls](https://www.nuget.org/packages/PdfSpace.Controls) | [![NuGet](https://img.shields.io/nuget/vpre/PdfSpace.Controls.svg)](https://www.nuget.org/packages/PdfSpace.Controls) | [![Downloads](https://img.shields.io/nuget/dt/PdfSpace.Controls.svg)](https://www.nuget.org/packages/PdfSpace.Controls) | Custom Uno icons, command buttons, tabs, panels, palettes and dialogs |
+| [PdfSpace.Viewer](https://www.nuget.org/packages/PdfSpace.Viewer) | [![NuGet](https://img.shields.io/nuget/vpre/PdfSpace.Viewer.svg)](https://www.nuget.org/packages/PdfSpace.Viewer) | [![Downloads](https://img.shields.io/nuget/dt/PdfSpace.Viewer.svg)](https://www.nuget.org/packages/PdfSpace.Viewer) | Embeddable Uno/Skia viewport with direct annotation editing, form input, zoom/pan, page layouts and thumbnails |
+| [PdfSpace.Workbench](https://www.nuget.org/packages/PdfSpace.Workbench) | [![NuGet](https://img.shields.io/nuget/vpre/PdfSpace.Workbench.svg)](https://www.nuget.org/packages/PdfSpace.Workbench) | [![Downloads](https://img.shields.io/nuget/dt/PdfSpace.Workbench.svg)](https://www.nuget.org/packages/PdfSpace.Workbench) | Complete multi-document shell: tools, review, forms, organization, search, export, OCR and recovery |
+
+Dependencies (from project references): `Core ← Layout`, `Core ← Editing`, `Core ← Documents`; `Documents + Layout + Rendering.Skia ← Skia ← Pdf`, `Skia ← Ocr`; `Controls + Editing + Skia ← Viewer`; `Pdf + Viewer + Storage + Ocr ← Workbench`. `Storage`, `Controls` and `Rendering.Skia` have no PdfSpace dependencies.
+
+### PdfSpace.Core
+
+The immutable document model shared by every package: a `PdfWorkspace` holds the original source bytes plus per-page state (rotation, crop, bookmarks, annotations with replies, form fields and OCR layers), so edits stay reversible until export. Includes validated `.pdfspace` JSON and page selection/composition helpers. No dependencies and no UI.
+
+```sh
+dotnet add package PdfSpace.Core --prerelease
+```
+
+**Key types**
+
+- `PdfWorkspace` – `Sources`, `Pages`, `UpdatePage`, `IsSensitive`, `AnnotationCount`, `FieldCount`
+- `PdfPageState`, `PdfSource` – page geometry/state and original PDF bytes
+- `Annotation` / `AnnotationKind`, `PdfFormFieldState` / `PdfFieldKind` – review and form models
+- `WorkspaceJson` – `Save`, `Load` (bounded, validated), `Validate`
+- `WorkspacePages.Select`, `WorkspaceComposition.Append`, `PdfFormData.FromWorkspace`
+- `RectD`, `PointD` – page-space geometry in PDF points
+
+**Usage**
+
+```csharp
+using PdfSpace.Core;
+
+var page = new PdfPageState { Width = 612, Height = 792 };
+var note = new Annotation { Kind = AnnotationKind.Note, Bounds = new RectD(72, 72, 24, 24), Text = "Check totals" };
+var workspace = new PdfWorkspace { Title = "Review.pdf", Pages = [page with { Annotations = [note] }] };
+
+workspace = workspace.UpdatePage(page.Id, p => p with { Rotation = 90, Bookmark = "Summary" });
+var firstPageOnly = WorkspacePages.Select(workspace, [0]);
+
+string json = WorkspaceJson.Save(workspace);   // .pdfspace workspace
+var restored = WorkspaceJson.Load(json);       // bounded + validated
+Console.WriteLine($"{restored.Pages.Length} page(s), {restored.AnnotationCount} annotation(s)");
+```
+
+### PdfSpace.Layout
+
+Renderer-independent page geometry: page ↔ display transforms under crop and rotation, an indexed continuous/single/two-page layout with visible-page queries and hit testing, a spatial bounds index for picking dense pages, object snapping (move, resize, points) and selection transforms. Depends on `PdfSpace.Core`; no UI.
+
+```sh
+dotnet add package PdfSpace.Layout --prerelease
+```
+
+**Key types**
+
+- `PageLayoutIndex` – `Visible`, `Place`, `HitTest`, `NearestPage`, `TotalHeight` for `PageLayoutMode`
+- `PageGeometry` – `ToDisplay`, `ToPage`, `DisplayBounds`; `PagePlacement.ToPage`/`ToScreen`
+- `SpatialBoundsIndex` – `Query` and `HitTest` over many rectangles
+- `ObjectSnapIndex` – `Snap`, `SnapResize`, `SnapPoint` with guides
+- `SelectionTransform`, `SelectionRotation` – constrained move/resize/create and rotation deltas
+
+**Usage**
+
+```csharp
+using PdfSpace.Core;
+using PdfSpace.Layout;
+
+var pages = Enumerable.Range(0, 50).Select(_ => new PdfPageState()).ToArray();
+var index = new PageLayoutIndex(pages, PageLayoutMode.TwoPage);
+double width = 1280, zoom = 1.25, scroll = 0, pan = 0;
+
+foreach (PagePlacement placement in index.Visible(width, height: 900, zoom, scroll, pan))
+    Console.WriteLine($"page {placement.Index + 1} at {placement.Bounds}");
+
+var screen = new PointD(400, 300);
+int hit = index.HitTest(screen, width, zoom, scroll, pan);
+if (hit >= 0)
+{
+    PointD pagePoint = index.Place(hit, width, zoom, scroll, pan).ToPage(pages[hit], screen, zoom);
+    Console.WriteLine($"page {hit + 1}, PDF point {pagePoint}");
+}
+RectD rotatedBox = PageGeometry.DisplayBounds(pages[0] with { Rotation = 90 }, new RectD(72, 72, 200, 50));
+```
+
+### PdfSpace.Editing
+
+`EditorSession` applies every change as an immutable workspace transaction with bounded undo/redo (entry count and retained source bytes): annotations and replies, page rotate/crop/insert/duplicate/delete/move/combine, form-field creation, filling and validated XFDF/JSON imports, and OCR corrections. Custom commands go through `Execute`. Depends on `PdfSpace.Core`; no UI.
+
+```sh
+dotnet add package PdfSpace.Editing --prerelease
+```
+
+**Key types**
+
+- `EditorSession` – `Document`, `CurrentPage`, `Execute(label, command)`, `Undo`/`Redo`, `IsDirty`, `Changed`
+- Annotations and pages – `AddAnnotation`, `UpdateAnnotation`, `Reply`, `RotatePage`, `CropPage`, `MovePage`, `Combine`
+- Forms – `AddField`, `UpdateField`, `SetFieldValue`, `PrepareFormDataImport` / `ApplyFormDataImport`
+- `EditorHistoryOptions` – `MaximumEntries`, `MaximumSourceBytes`; `ClearHistory()`
+
+**Usage**
+
+```csharp
+using PdfSpace.Core;
+using PdfSpace.Editing;
+
+var session = new EditorSession(new PdfWorkspace(), new EditorHistoryOptions { MaximumEntries = 50 });
+session.Changed += (_, _) => Console.WriteLine($"{session.UndoLabel} (dirty: {session.IsDirty})");
+
+session.AddAnnotation(new Annotation
+{
+    Kind = AnnotationKind.Rectangle,
+    Bounds = new RectD(72, 120, 180, 64),
+    Color = 0xFF1473E6,
+    StrokeWidth = 2
+});
+session.RotatePage();
+session.DuplicatePage();
+session.Execute("Bookmark pages", doc => doc with
+{
+    Pages = doc.Pages.Select((p, i) => p with { Bookmark = $"Page {i + 1}" }).ToArray()
+});
+session.Undo();
+File.WriteAllText("review.pdfspace", WorkspaceJson.Save(session.Document));
+```
+
+### PdfSpace.Storage
+
+The host contract the workbench uses for everything platform-specific: opening documents, images and form data, saving/downloading, local recovery, clipboard text and printing. Implement it once per platform (the app ships browser and desktop implementations). No dependencies and no UI.
+
+```sh
+dotnet add package PdfSpace.Storage --prerelease
+```
+
+**Key types**
+
+- `IWorkspaceStorage` – `OpenAsync`, `SaveAsync`, `Read/Write/ClearRecoveryAsync`, `CopyTextAsync`, `PrintAsync`
+- Optional members with defaults – `OpenImageAsync`, `OpenFormDataAsync`
+- `WorkspaceFile` – name + bytes
+
+**Usage**
+
+```csharp
+using PdfSpace.Storage;
+
+public sealed class FolderStorage(string root) : IWorkspaceStorage
+{
+    private string Recovery => Path.Combine(root, "recovery.pdfspace");
+    public Task<WorkspaceFile?> OpenAsync() => Task.FromResult<WorkspaceFile?>(null); // show a file picker here
+    public Task SaveAsync(string name, byte[] bytes, string contentType) => File.WriteAllBytesAsync(Path.Combine(root, name), bytes);
+    public async Task<string?> ReadRecoveryAsync() => File.Exists(Recovery) ? await File.ReadAllTextAsync(Recovery) : null;
+    public Task WriteRecoveryAsync(string workspace) => File.WriteAllTextAsync(Recovery, workspace);
+    public Task ClearRecoveryAsync() { File.Delete(Recovery); return Task.CompletedTask; }
+    public Task CopyTextAsync(string text) => Task.CompletedTask;          // host clipboard
+    public Task PrintAsync(string name, byte[] pdf) => Task.CompletedTask; // host print dialog
+}
+```
+
+### PdfSpace.Documents
+
+Reads PDFs into a `PdfWorkspace` with PdfPig: page sizes, words with bounds, full-text extraction and search (including a byte-bounded per-document index), one-based page-range parsing, and plain-field form data as XFDF or versioned JSON. Depends on `PdfSpace.Core` and PdfPig; no UI.
+
+```sh
+dotnet add package PdfSpace.Documents --prerelease
+```
+
+**Key types**
+
+- `PdfReader` – `Open(bytes, name)`, `Words`, `Find`, `ExtractText`
+- `PdfSearchIndex` – bounded cached search with `Find(document, query, matchCase, wholeWord)`
+- `PdfTextReader` – reusable per-workspace word reader
+- `PageRange.Parse("1-3, 5", pageCount)` – zero-based indices
+- `PdfFormDataCodec` – `Read`, `WriteXfdf`, `WriteJson`
+
+**Usage**
+
+```csharp
+using PdfSpace.Core;
+using PdfSpace.Documents;
+
+var workspace = PdfReader.Open(File.ReadAllBytes("report.pdf"), "report.pdf");
+Console.WriteLine(PdfReader.ExtractText(workspace));
+
+var search = new PdfSearchIndex();
+foreach (SearchResult hit in search.Find(workspace, "revenue", wholeWord: true).Take(10))
+    Console.WriteLine($"p.{hit.PageIndex + 1}: {hit.Text} at {hit.Bounds}");
+
+int[] pages = PageRange.Parse("1-3, 5", workspace.Pages.Length); // zero-based indices
+File.WriteAllBytes("form.xfdf", PdfFormDataCodec.WriteXfdf(PdfFormData.FromWorkspace(workspace)));
+PdfFormData answers = PdfFormDataCodec.Read(File.ReadAllBytes("answers.json"), "answers.json");
+```
+
+### PdfSpace.Rendering.Skia
+
+**License: Apache-2.0 (not MIT).** This package is a derivative work: a source-pinned adaptation of [BobLd/PdfPig.Rendering.Skia](https://github.com/BobLd/PdfPig.Rendering.Skia) 0.1.16.4, moved into the isolated `PdfSpace.Rendering.Skia` namespace, with fixes for image alpha, odd-length dash patterns and miter limits. The package retains the upstream `LICENSE.txt` and `NOTICE.txt` plus `UPSTREAM.json` (original source hashes) and `ADAPTATIONS.md` (every modification); keep those notices when you redistribute it. Use it directly to rasterize PDF pages with PdfPig and SkiaSharp; `PdfSpace.Skia` references it for you. It depends on PdfPig (with its DCT, JBIG2 and JPX filter packages), SkiaSharp and SkiaSharp.HarfBuzz; no UI.
+
+```sh
+dotnet add package PdfSpace.Rendering.Skia --prerelease
+```
+
+**Key types**
+
+- `PdfPigExtensions` – `AddSkiaPageFactory`, `GetPageSize`, `GetPageAsSKPicture`, `GetPageAsSKBitmap`, `GetPageAsPng`
+- `SkiaRenderingParsingOptions.Instance` – lenient PdfPig parsing with the image filter provider
+- `PdfPageSize` – `Width`, `Height`, `PageNumber`
+- `SkiaPageFactory`, `SkiaRenderingFilterProvider` – the PdfPig factory/filter plumbing
+
+**Usage**
+
+```csharp
+using PdfSpace.Rendering.Skia;
+using SkiaSharp;
+using UglyToad.PdfPig;
+
+using var document = PdfDocument.Open(File.ReadAllBytes("input.pdf"), SkiaRenderingParsingOptions.Instance);
+document.AddSkiaPageFactory();
+
+for (var page = 1; page <= document.NumberOfPages; page++)
+{
+    PdfPageSize size = document.GetPageSize(page);
+    using var png = document.GetPageAsPng(page, scale: 2);
+    File.WriteAllBytes($"page-{page}.png", png.ToArray());
+    Console.WriteLine($"page {page}: {size.Width} x {size.Height} pt");
+}
+using SKPicture picture = document.GetPageAsSKPicture(1); // replay onto any SKCanvas
+```
+
+### PdfSpace.Skia
+
+Draws workspace pages: cached source pictures from the Apache-2.0 renderer, then crop/rotation, annotations and form widgets on top. Exports PNG pages and an explicitly *flattened* visual PDF, rebuilds image-only redacted copies, imports PNG/JPEG scans as pages, and generates the original sample documents. For native annotations and interactive forms use `PdfSpace.Pdf` instead. Depends on `PdfSpace.Documents`, `PdfSpace.Layout`, `PdfSpace.Rendering.Skia` and SkiaSharp; no UI framework.
+
+```sh
+dotnet add package PdfSpace.Skia --prerelease
+```
+
+**Key types**
+
+- `PdfRenderer` – `DrawPage`, `ExportPng`, `ExportPdf` (flattened), `Typeface`, `CacheCapacity`
+- `RasterRedactor.Export` – image-only reconstruction with burned-in redaction marks
+- `PdfImageImporter` – `Open` a PNG/JPEG as a one-page workspace
+- `AnnotationPainter`, `FormFieldPainter` – overlay drawing on any `SKCanvas`
+- `SampleDocument.Create(typeface)` – original synthetic demo workspace
+
+**Usage**
+
+```csharp
+using PdfSpace.Documents;
+using PdfSpace.Skia;
+using SkiaSharp;
+
+var workspace = PdfReader.Open(File.ReadAllBytes("input.pdf"), "input.pdf");
+using var typeface = SKTypeface.FromFile("fonts/Inter.ttf");                 // annotation fallback text
+using var renderer = new PdfRenderer { CacheCapacity = 8, Typeface = typeface }; // disposed before the typeface
+
+File.WriteAllBytes("first-page.png", renderer.ExportPng(workspace, pageIndex: 0, scale: 2));
+File.WriteAllBytes("flattened.pdf", renderer.ExportPdf(workspace));              // visual copy, not native
+File.WriteAllBytes("redacted.pdf", RasterRedactor.Export(workspace, renderer));  // image-only rebuild
+
+using var surface = SKSurface.Create(new SKImageInfo(612, 792));
+renderer.DrawPage(surface.Canvas, workspace, workspace.Pages[0]);
+```
+
+### PdfSpace.Pdf
+
+Structured PDF output and native editing with PDFsharp: save workspaces with real annotation and AcroForm objects, edit supported original text runs, read/move/replace native images, discover and transform native page objects (text, paths, images, shadings, Form groups), read outlines, inspect documents, and encrypt/unlock with AES-256 through `IPdfSecurityProvider`. Depends on `PdfSpace.Skia` and PDFsharp; no UI.
+
+```sh
+dotnet add package PdfSpace.Pdf --prerelease
+```
+
+**Key types**
+
+- `PdfDocumentEngine` – `Open` (with optional password), `Save` → `PdfWriteResult`, `Inspect`, `CanPreserveCatalog`
+- `PdfTextEditor` – `Read`, `Replace`, `ReplaceWithFont`; `PdfImageEditor` – native image occurrences
+- `PdfObjectEditor` – `Read`, `Transform`, `Align`, `Distribute`, `Group`, `Copy`/`Paste`, `SetAppearance`
+- `IPdfSecurityProvider` / `NativePdfSecurityProvider` – `EncryptAsync`, `UnlockAsync`; `PdfProtectionOptions`
+- `PdfNavigation.ReadBookmarks`, `PdfAffineMatrix`
+
+**Usage**
+
+```csharp
+using PdfSpace.Pdf;
+using SkiaSharp;
+
+using var typeface = SKTypeface.FromFile("fonts/Inter.ttf"); // font for new annotation/form text
+var workspace = PdfDocumentEngine.Open(File.ReadAllBytes("input.pdf"), "input.pdf");
+
+PdfTextRun run = PdfTextEditor.Read(workspace, pageIndex: 0).First(r => r.Editable);
+workspace = PdfTextEditor.Replace(workspace, run, "Updated heading");
+
+var paths = PdfObjectEditor.Read(workspace, 0).Where(o => o.Kind == PdfPageObjectKind.Path && o.Editable).ToArray();
+workspace = PdfObjectEditor.Transform(workspace, paths, PdfAffineMatrix.Translate(12, 6));
+
+PdfWriteResult result = PdfDocumentEngine.Save(workspace, typeface); // native annotations + AcroForms
+File.WriteAllBytes("native-copy.pdf", result.Bytes);
+foreach (var warning in result.Warnings) Console.WriteLine(warning);
+
+IPdfSecurityProvider security = new NativePdfSecurityProvider(); // desktop; not for AES on browserwasm
+byte[] encrypted = await security.EncryptAsync(result.Bytes,
+    new PdfProtectionOptions(openingPassword, ownerPassword, AllowCopy: false));
+```
+
+### PdfSpace.Ocr
+
+Local OCR orchestration: rasterize selected pages, send them to an `IOcrEngine`, decode bounded Tesseract TSV into word boxes, and apply the result as one undoable OCR layer that `PdfSpace.Pdf` exports as an invisible, searchable text layer. `TesseractProcessEngine` runs an installed Tesseract 5 executable; browser hosts inject their own engine. Nothing is sent to a service. Depends on `PdfSpace.Skia`; no UI.
+
+```sh
+dotnet add package PdfSpace.Ocr --prerelease
+```
+
+**Key types**
+
+- `OcrBatch` – `RecognizeAsync(snapshot, renderer, engine, pages, language, dpi, progress, token)`, `Apply`, `WordCount`
+- `IOcrEngine` – `RecognizeTsvAsync(image, language, token)`; `TesseractProcessEngine`, `UnavailableOcrEngine`
+- `TesseractTsv.Decode` – bounded TSV → `PdfOcrLayer`
+- `OcrImage`, `OcrProgress`
+
+**Usage**
+
+```csharp
+using PdfSpace.Ocr;
+using PdfSpace.Skia;
+
+var scan = PdfImageImporter.Open(File.ReadAllBytes("scan.png"), "scan.png"); // PNG/JPEG → one-page workspace
+using var renderer = new PdfRenderer();
+IOcrEngine engine = new TesseractProcessEngine(); // requires Tesseract 5 on PATH
+
+var progress = new Progress<OcrProgress>(p => Console.WriteLine($"{p.Completed}/{p.Total} {p.Stage}"));
+OcrBatch batch = await OcrBatch.RecognizeAsync(scan, renderer, engine, pages: [0], language: "eng", progress: progress);
+var searchable = batch.Apply(scan); // adds the recognized OCR layer
+Console.WriteLine($"{batch.WordCount} words on {batch.RecognizedPages} page(s)");
+```
+
+### PdfSpace.Controls
+
+Original, Skia-drawn Uno building blocks for PDF tools: vector icons, command buttons, document tabs, tool panels, a color palette, an in-window dialog host (prompt/secret/confirm) and styled text fields, plus `PdfTheme` helpers and `PdfResources` styles. Compose them into your own shell without the workbench. Depends only on Uno Platform (Skia renderer).
+
+```sh
+dotnet add package PdfSpace.Controls --prerelease
+```
+
+**Key types**
+
+- `PdfIcon` / `PdfIconKind`, `PdfCommandButton`, `PdfTextField`
+- `PdfToolPanel` – `Heading`, `Description`, `Add(label, icon, action)`, `Items`
+- `PdfDocumentTab`, `PdfColorPalette` (`ColorChanged`)
+- `PdfDialogHost` – `PromptAsync`, `SecretAsync`, `ConfirmAsync`
+- `PdfTheme`, `PdfResources`, `PdfInputFocus.ActivateWhenLoaded`
+
+**Usage**
+
+```csharp
+using Microsoft.UI.Xaml.Controls;
+using PdfSpace.Controls;
+
+var status = PdfTheme.Text("Ready");
+var panel = new PdfToolPanel("Review");
+panel.Heading("Annotate");
+panel.Add("Highlight", PdfIconKind.Highlight, () => status.Text = "Highlight");
+panel.Add("Add note", PdfIconKind.Comment, () => status.Text = "Note");
+var palette = new PdfColorPalette();
+palette.ColorChanged += argb => status.Text = $"#{argb:X8}";
+panel.Items.Children.Add(palette);
+panel.Items.Children.Add(status);
+
+var dialogs = new PdfDialogHost();
+var root = new Grid { Children = { panel, dialogs } };
+window.Content = root;
+string? title = await dialogs.PromptAsync("Rename", "New document title", initial: "Report.pdf");
+```
+
+### PdfSpace.Viewer
+
+The embeddable document viewport: Skia-rendered pages with continuous/single/two-page layouts, zoom/pan, text selection, direct annotation creation and editing for the session's current tool, in-place form filling, search highlighting and native object/image manipulation surfaces, plus virtualized `PdfThumbnailView`. Navigation and zoom are view operations; document changes belong to `EditorSession`. Depends on `PdfSpace.Controls`, `PdfSpace.Editing`, `PdfSpace.Skia` and Uno Platform.
+
+```sh
+dotnet add package PdfSpace.Viewer --prerelease
+```
+
+**Key types**
+
+- `PdfViewport` – `PdfViewport(session)`, `Renderer`, `Navigate`, `FitPage`, `ZoomTo`, `SetLayout`, `HighlightSearch`
+- `PdfViewport` events – `StatusChanged`, `NoteRequested`, `FieldRequested`, `LinkRequested`, `ContextRequested`
+- `PdfThumbnailView` – `PdfThumbnailView(viewport)`, `PageActivated`, `OrganizeMode`
+- `NativeObjectTarget`, `NativeImageTarget` – detached geometry the host supplies for object editing
+
+**Usage**
+
+```csharp
+using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Controls;
+using PdfSpace.Core;
+using PdfSpace.Documents;
+using PdfSpace.Editing;
+using PdfSpace.Viewer;
+
+var session = new EditorSession(PdfReader.Open(pdfBytes, "input.pdf"));
+var viewport = new PdfViewport(session);
+var thumbnails = new PdfThumbnailView(viewport) { Width = 180 };
+
+session.SetTool(PdfTool.Highlight);
+viewport.NoteRequested += (pageIndex, point) => session.AddAnnotation(
+    new Annotation { Kind = AnnotationKind.Note, Bounds = new RectD(point.X, point.Y, 24, 24), Text = "New note" }, pageIndex);
+viewport.Loaded += (_, _) => viewport.FitPage(); // needs a nonzero arranged size
+
+var root = new Grid { ColumnDefinitions = { new ColumnDefinition { Width = GridLength.Auto }, new ColumnDefinition() } };
+Grid.SetColumn(viewport, 1);
+root.Children.Add(thumbnails);
+root.Children.Add(viewport);
+window.Content = root;
+window.Closed += (_, _) => viewport.Dispose();
+```
+
+### PdfSpace.Workbench
+
+The complete Acrobat-style shell used by the app: document tabs, quick tools, comments, form preparation, original-text and native object editing, page organization, search, export, protection, redaction, OCR and recovery. Platform services come from `IWorkspaceStorage`; security and OCR providers are optional constructor arguments. The host owns the injected typeface; the workbench owns the viewports it creates. Depends on `PdfSpace.Pdf`, `PdfSpace.Viewer`, `PdfSpace.Storage`, `PdfSpace.Ocr` and Uno Platform.
+
+```sh
+dotnet add package PdfSpace.Workbench --prerelease
+```
+
+**Key types**
+
+- `PdfWorkbench` – `PdfWorkbench(initial, storage, typeface, security?, ocr?)`, `AddDocument`, `OpenFileAsync`, `OfferRecoveryAsync`
+- State – `Session`, `Viewport`, `DocumentCount`, `HasUnsavedChanges`, `StateChanged`, `ShowStatus`
+
+**Usage**
+
+```csharp
+using PdfSpace.Ocr;
+using PdfSpace.Pdf;
+using PdfSpace.Skia;
+using PdfSpace.Storage;
+using PdfSpace.Workbench;
+using SkiaSharp;
+
+using var fontData = SKData.CreateCopy(fontBytes);
+var typeface = SKTypeface.FromData(fontData);          // host-owned UI/annotation font
+IWorkspaceStorage storage = new FolderStorage(appData); // see PdfSpace.Storage above
+
+var workbench = new PdfWorkbench(SampleDocument.Create(typeface), storage, typeface,
+    security: new NativePdfSecurityProvider(), ocr: new TesseractProcessEngine()); // desktop providers
+window.Content = workbench;
+await workbench.OfferRecoveryAsync();
+window.Closed += (_, _) => { workbench.Dispose(); typeface.Dispose(); };
+```
 
 ## Toolchain
 
