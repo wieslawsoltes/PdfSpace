@@ -28,15 +28,42 @@ public static class PdfPageMarks
     public static IReadOnlyList<PdfPageMarkInfo> Read(PdfWorkspace workspace)
     {
         WorkspaceJson.Validate(workspace);
+        return ReadCore(workspace, Enumerable.Range(0, workspace.Pages.Length), CancellationToken.None);
+    }
+
+    /// <summary>Read only the requested pages, opening each referenced native source once.
+    /// Unselected pages and unreferenced source buffers are not parsed or certified.</summary>
+    public static IReadOnlyList<PdfPageMarkInfo> Read(PdfWorkspace workspace, IReadOnlyList<int> pageIndices,
+        CancellationToken cancellationToken = default)
+    {
+        var indices = ValidatePages(workspace, pageIndices);
+        return ReadCore(workspace, indices, cancellationToken);
+    }
+
+    private static IReadOnlyList<PdfPageMarkInfo> ReadCore(PdfWorkspace workspace, IEnumerable<int> indices,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
         var result = new List<PdfPageMarkInfo>();
         var fingerprint = new PdfMarkFingerprint();
-        foreach (var source in workspace.Sources)
+        var sources = workspace.Sources.ToDictionary(source => source.Id);
+        var groups = indices.Select(index => (Page: workspace.Pages[index], Index: index))
+            .Where(item => item.Page.SourceId.HasValue).GroupBy(item => item.Page.SourceId!.Value);
+        foreach (var group in groups)
         {
-            using var document = PdfDocumentEngine.OpenNative(source.Bytes);
-            var pages = workspace.Pages.Select((p, i) => (p, i)).Where(x => x.p.SourceId == source.Id);
-            foreach (var (page, index) in pages)
-                foreach (var owned in ReadOwned(document.Pages[page.SourcePage - 1], index, fingerprint)) result.Add(owned.Info);
+            cancellationToken.ThrowIfCancellationRequested();
+            using var document = PdfDocumentEngine.OpenNative(sources[group.Key].Bytes);
+            foreach (var (page, index) in group)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (page.SourcePage > document.PageCount)
+                    throw new InvalidDataException("Page-mark source page does not exist.");
+                foreach (var owned in ReadOwned(document.Pages[page.SourcePage - 1], index, fingerprint))
+                    result.Add(owned.Info);
+            }
         }
+        result.Sort((left, right) => left.PageIndex != right.PageIndex
+            ? left.PageIndex.CompareTo(right.PageIndex) : left.Settings.Kind.CompareTo(right.Settings.Kind));
         return result;
     }
 
@@ -46,8 +73,7 @@ public static class PdfPageMarks
         ArgumentNullException.ThrowIfNull(settings); settings.Validate(); ArgumentNullException.ThrowIfNull(typeface);
         var indices = ValidatePages(workspace, pageIndices); cancellationToken.ThrowIfCancellationRequested();
         var fontIdentity = FontIdentity(typeface);
-        var selected = indices.ToHashSet();
-        var existing = Read(workspace).Where(m => selected.Contains(m.PageIndex) && m.Settings.Kind == settings.Kind).ToDictionary(m => m.PageIndex);
+        var existing = ReadCore(workspace, indices, cancellationToken).Where(m => m.Settings.Kind == settings.Kind).ToDictionary(m => m.PageIndex);
         if (existing.Values.Any(m => !m.Intact)) throw ModifiedMark();
         var changed = indices.Where((index, ordinal) => !existing.TryGetValue(index, out var old) || old.Settings != settings || old.Ordinal != ordinal ||
             old.PageCount != workspace.Pages.Length || old.TypefaceFingerprint != fontIdentity || workspace.Pages[index].Crop is not null || workspace.Pages[index].Rotation != 0).ToArray();
@@ -96,8 +122,7 @@ public static class PdfPageMarks
         if (!Enum.IsDefined(kind)) throw new ArgumentOutOfRangeException(nameof(kind));
         ArgumentNullException.ThrowIfNull(typeface); var indices = ValidatePages(workspace, pageIndices);
         cancellationToken.ThrowIfCancellationRequested();
-        var selected = indices.ToHashSet();
-        var marks = Read(workspace).Where(m => selected.Contains(m.PageIndex) && m.Settings.Kind == kind).ToArray();
+        var marks = ReadCore(workspace, indices, cancellationToken).Where(m => m.Settings.Kind == kind).ToArray();
         if (marks.Any(m => !m.Intact)) throw ModifiedMark();
         if (marks.Length == 0) return Unchanged(workspace);
         var saved = PdfDocumentEngine.Save(workspace, typeface);
@@ -238,7 +263,6 @@ public static class PdfPageMarks
     private static List<Owned> ReadOwned(PdfPage page, int pageIndex, PdfMarkFingerprint fingerprint)
     {
         var result = new List<Owned>();
-        _ = page.Contents; // Normalize PDFsharp content wrappers before comparing resolved stream identities.
         var list = PdfObjects.Array(page.Elements[Key]);
         if (list is null)
         {
@@ -246,6 +270,7 @@ public static class PdfPageMarks
             return result;
         }
         if (list.Elements.Count > 2) throw new InvalidDataException("Too many page-mark ownership records.");
+        _ = page.Contents; // Resolve wrappers only on pages that actually have ownership metadata.
         var kinds = new HashSet<PdfPageMarkKind>();
         foreach (var entry in list.Elements)
         {

@@ -82,3 +82,7 @@ Reviewed OCR words replace the invisible OCR layer in search while later visible
 `dotnet run --project tests/PdfSpace.Tests -c Release -- --test-page-marks` exercises native persistence, font reuse/change, repeated updates, malformed/stale records, Unicode, aliases, crop/rotation, form values, OCR integration and atomicity. `--benchmark-page-marks` records three alternating-order samples after warmup for eight blank pages: one batch versus repeated per-page Apply calls, including actual native font counts and file sizes. Timing is observational, not a pass threshold or whole-app speed claim.
 
 `tests/browser/page-marks.spec.mjs` drives the actual Uno inspector, confirmation, history and file downloads. `--verify-browser-page-marks <directory>` independently reopens those downloads with the native backend. The full CI verifier includes this mode alongside the previous ten categories.
+
+## Range-scoped inspection
+
+`PdfPageMarks.Read(workspace, pageIndices, cancellationToken)` inspects an ascending distinct range of at most 500 pages and opens each referenced source once. The inspector uses the current page, and Apply/Remove inspect only their requested range before materialization. Unreferenced source buffers are not parsed and pages without ownership metadata do not normalize their content arrays. Full-document `Read(workspace)` still inspects every referenced page. This is not certification of unselected content; all structured-save checks remain in force when an effective edit materializes the document.

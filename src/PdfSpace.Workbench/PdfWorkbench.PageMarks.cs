@@ -10,7 +10,7 @@ public sealed partial class PdfWorkbench
     private void ShowPageMarks(PdfPageMarkKind kind, bool bates = false)
     {
         Viewport.FinishText(true); Viewport.CancelGesture();
-        var existing = PdfPageMarks.Read(Session.Document).FirstOrDefault(m => m.PageIndex == Session.CurrentPage && m.Settings.Kind == kind && m.Intact);
+        var existing = PdfPageMarks.Read(Session.Document, [Session.CurrentPage]).FirstOrDefault(m => m.PageIndex == Session.CurrentPage && m.Settings.Kind == kind && m.Intact);
         _markSettings = existing?.Settings ?? (kind == PdfPageMarkKind.HeaderFooter ? new() : new()
         { Kind = kind, WatermarkText = "DRAFT", FontSize = 48, Opacity = .2, Rotation = -35 });
         if (bates) _markSettings = _markSettings with { FooterCenter = "{bates}", BatesPrefix = "DOC-" };

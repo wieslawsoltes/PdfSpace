@@ -21,6 +21,7 @@ internal static class PageMarkTests
         check(apply.ChangedPages == 2 && apply.EmbeddedFonts == 1, "page marks share one font across a batch");
         var marks = PdfPageMarks.Read(apply.Workspace);
         check(marks.Count == 2 && marks.All(m => m.Intact), "native page-mark ownership survives serialization");
+        PageMarkReadScopeTests.Run(apply.Workspace, settings, font, check, reject);
         check(Reader.ExtractText(apply.Workspace).Contains("Page 1 of 2"), "page numbering is searchable native PDF text");
         check(ReferenceEquals(PdfPageMarks.Apply(apply.Workspace, [0, 1], settings, font).Workspace, apply.Workspace), "identical mark updates preserve workspace identity");
         var removed = PdfPageMarks.Remove(apply.Workspace, [0, 1], PdfPageMarkKind.HeaderFooter, font);
