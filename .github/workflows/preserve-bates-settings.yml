@@ -1,0 +1,47 @@
+name: Preserve saved Bates settings
+on:
+  push:
+    branches: [build/native-page-marks-0.6]
+    paths: [.github/workflows/preserve-bates-settings.yml]
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/native-page-marks-0.6
+          fetch-depth: 0
+      - name: Apply reviewed saved-preset fix and browser regression
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = '0f5d787e249771946ab3eb20c0e67c3d80047421'
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('src/PdfSpace.Workbench/PdfWorkbench.PageMarks.cs');s=p.read_text()
+          a='        if (bates) _markSettings = _markSettings with { FooterCenter = "{bates}", BatesPrefix = "DOC-" };'
+          b='''        // A shortcut may seed a new preset, but must never silently replace
+                  // saved numbering templates or prefixes when reopening existing marks.
+                  if (bates && existing is null) _markSettings = _markSettings with { FooterCenter = "{bates}", BatesPrefix = "DOC-" };'''
+          assert s.count(a)==1;p.write_text(s.replace(a,b))
+          p=Path('tests/browser/page-marks.spec.mjs');s=p.read_text()
+          a="  await apply(page, 1); await save(page, 'bates');\n  await apply(page, 1); await expect.poll(async () => (await state(page)).status).toContain('already match');"
+          b="""  await apply(page, 1); const bytes = await save(page, 'bates');
+            // Re-enter through the same shortcut: it must not seed a new DOC- prefix.
+            await click(page, 'Bates numbering');
+            await apply(page, 1); await expect.poll(async () => (await state(page)).status).toContain('already match');
+            await open(page, bytes); await click(page, 'Bates numbering');
+            await apply(page, 0); await expect.poll(async () => (await state(page)).status).toContain('already match');"""
+          assert s.count(a)==1;p.write_text(s.replace(a,b))
+          p=Path('docs/acrobat-coverage.md');s=p.read_text().replace('[desktop help / workflow index](https://helpx.adobe.com/acrobat/desktop/edit-documents/use-headers-and-footers/modify.html)','[desktop help / workflow index](https://www.adobe.com/support/acrobat/)');p.write_text(s)
+          p=Path('docs/page-marks.md');s=p.read_text();s+='''\n## Reopening saved numbering\n\nThe Bates shortcut seeds `{bates}` and `DOC-` only when the current page has no intact managed header/footer settings. Reopening an existing header/footer set preserves every saved slot, prefix, suffix and starting number. Switching into the Bates workflow is not permission to overwrite an existing footer. Review and explicitly change its template before applying a new numbering scheme.\n''';p.write_text(s)
+          PY
+          git diff --check
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src tests docs
+          git commit -m 'fix: retain saved Bates numbering when reopening the native page mark inspector'
+          git push origin HEAD:feat/native-page-marks-0.6
