@@ -123,3 +123,7 @@ Refresh descriptors after any document mutation or undo. Never reuse a descripto
 ## PDF rendering adaptation
 
 `PdfSpace.Rendering.Skia` is an independently packable Apache-2.0 source adaptation with an isolated namespace; other original PdfSpace packages remain MIT. `PdfSpace.Skia` references it transitively. A custom consumer must retain its included upstream license/notice. See [native appearance editing](object-appearance.md) for APIs and renderer limitations.
+
+## Native page marks and placement preview
+
+`PdfSpace.Pdf.PdfPageMarks` provides `Apply`, `Remove`, `Read` and pure `Layout` APIs with immutable `PdfPageMarkSettings`. `PdfSpace.Workbench.PdfPageMarkPreview` hosts a placement-only Skia preview without PDF parsing. The host owns its typeface and commits an effective result to `EditorSession` as one transaction. The [complete API example and limitations](page-marks.md) describe numbering, font/resource sharing, ownership checks and cancellation boundaries.

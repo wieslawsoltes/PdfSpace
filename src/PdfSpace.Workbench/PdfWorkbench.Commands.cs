@@ -139,18 +139,8 @@ public sealed partial class PdfWorkbench
         if (string.IsNullOrWhiteSpace(text)) return;
         Session.AddAnnotation(new Annotation { Kind = AnnotationKind.Text, Text = text, FontSize = 20, Bounds = new(Session.Page.VisibleBox.Center.X - 50, Session.Page.VisibleBox.Center.Y, 120, 35), Color = Session.Color }); UseTool(PdfTool.Select);
     }
-    private async Task AddWatermarkAsync()
-    {
-        var text = await _dialogs.PromptAsync("Add watermark", "Add a translucent text annotation to every page. This is a visual label, not a security feature.", "DRAFT");
-        if (string.IsNullOrWhiteSpace(text)) return;
-        Session.Execute("Add watermark", d => d with { Pages = d.Pages.Select(p => p with { Annotations = [..p.Annotations, new Annotation { Kind = AnnotationKind.Text, Text = text, FontSize = 48, Color = 0x40777777, Bounds = new(p.VisibleBox.X + 50, p.VisibleBox.Center.Y - 35, p.VisibleBox.Width - 100, 100) }] }).ToArray() });
-    }
-    private async Task AddPageNumbersAsync()
-    {
-        var template = await _dialogs.PromptAsync("Add page numbers", "Use {page} and {pages} for the current page and total count.", "{page} / {pages}");
-        if (template is null) return;
-        Session.Execute("Add page numbers", d => d with { Pages = d.Pages.Select((p, i) => p with { Annotations = [..p.Annotations, new Annotation { Kind = AnnotationKind.Text, Text = template.Replace("{page}", (i + 1).ToString()).Replace("{pages}", d.Pages.Length.ToString()), FontSize = 10, Color = 0xFF777777, Bounds = new(p.VisibleBox.X + 25, p.VisibleBox.Bottom - 25, p.VisibleBox.Width - 50, 18) }] }).ToArray() });
-    }
+    private Task AddWatermarkAsync() { ShowPageMarks(PdfPageMarkKind.Watermark); return Task.CompletedTask; }
+    private Task AddPageNumbersAsync() { ShowPageMarks(PdfPageMarkKind.HeaderFooter); return Task.CompletedTask; }
     private async Task EditInfoAsync()
     {
         var title = await _dialogs.PromptAsync("Document title", "This changes the workspace title and exported PDF metadata, not the source file.", Session.Document.Title);

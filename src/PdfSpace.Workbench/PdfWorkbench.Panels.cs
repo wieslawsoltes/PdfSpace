@@ -56,6 +56,8 @@ public sealed partial class PdfWorkbench
                 _leftPanel.Add("Reset page crop", PdfIconKind.FitPage, () => Safe(() => Session.CropPage(null)));
                 _leftPanel.Add("Add watermark", PdfIconKind.Text, () => Run(AddWatermarkAsync));
                 _leftPanel.Add("Add page numbers", PdfIconKind.Pages, () => Run(AddPageNumbersAsync));
+                _leftPanel.Add("Header and footer", PdfIconKind.Text, () => Safe(() => ShowPageMarks(PdfPageMarkKind.HeaderFooter)));
+                _leftPanel.Add("Bates numbering", PdfIconKind.Pages, () => Safe(() => ShowPageMarks(PdfPageMarkKind.HeaderFooter, true)));
                 break;
             case "Convert":
                 _leftPanel.Description("Structured PDF retains native page content, annotations and supported forms. Flattened visual output remains a separate option.");
@@ -128,6 +130,7 @@ public sealed partial class PdfWorkbench
             var content = PdfTheme.Column(10); content.Margin = new Thickness(15, 5, 15, 24);
             switch (_right)
             {
+                case "Page marks": BuildPageMarks(content); break;
                 case "Recognized text": BuildOcrReview(content); break;
                 case "Objects": BuildObjects(content); break;
                 case "Comments": BuildComments(content); break;

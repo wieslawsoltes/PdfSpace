@@ -80,3 +80,7 @@ This is not an arbitrary PDF graphics editor: inline images, clipping-text mutat
 ## Object appearance and rendering (0.5.1)
 
 Per-paint alpha/blend edits support paths, image/shading placements and safe text objects; they are not whole-Form group opacity. Existing masks are retained, not authored or removed. Stroke caps/joins/miter and full odd dash arrays are editable. Dash phase authoring is integer-only because the underlying PdfPig rendering operation quantizes phase; fractional imported phases remain in native data but can differ in preview. Spatial picking still uses bounds, not exact fill/alpha/clip geometry. The source-pinned renderer is an Apache-2.0 derivative with retained attribution. See [detailed contracts](object-appearance.md).
+
+## Page marks (0.6)
+
+Native headers/footers, page/Roman/Bates templates and text watermarks have batch apply/update/remove and saved settings. Only verified PdfSpace-owned streams are managed; the checksum is not authentication. The miniature preview is placement-only, not an exact composited-document preview. Image/PDF watermarks, background authoring, cross-file numbering, automatic dates and third-party private metadata remain unsupported. Crops/rotations are materialized through the existing guarded structured writer. Reviewed OCR and later visible native additions are searchable together; this is not mixed-page regional OCR. See [page marks](page-marks.md) and the [workflow gap inventory](acrobat-coverage.md).
