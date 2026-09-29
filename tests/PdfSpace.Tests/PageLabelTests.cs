@@ -69,6 +69,25 @@ internal static class PageLabelTests
         var literal = PdfPageLabels.Apply(blank, 0, 2, new PdfPageLabel { Style = PdfPageLabelStyle.PrefixOnly, Prefix = "Cover", Number = 12 });
         check(PdfDocumentEngine.Open(PdfDocumentEngine.Save(literal, font).Bytes, "literal-labels.pdf").Pages[0].Label == literal.Pages[0].Label,
             "prefix-only numbering metadata roundtrips without changing settings");
+        var adjacentLiterals = PdfPageLabels.Apply(literal, 2, 2, new PdfPageLabel { Style = PdfPageLabelStyle.PrefixOnly, Prefix = "Cover", Number = 7 });
+        var adjacentReload = PdfDocumentEngine.Open(PdfDocumentEngine.Save(adjacentLiterals, font).Bytes, "literal-sections.pdf");
+        check(adjacentReload.Pages[0].Label!.Number == 12 && adjacentReload.Pages[2].Label!.Number == 7,
+            "prefix-only sections preserve distinct unused starting-number settings");
+        using (var implicitNative = new PdfDocument())
+        {
+            for (var i = 0; i < blank.Pages.Length; i++) implicitNative.AddPage();
+            var oldTree = new PdfDictionary(implicitNative);
+            implicitNative.Internals.Catalog.Elements["/PageLabels"] = oldTree;
+            PdfPageLabels.Write(implicitNative, blank, new Dictionary<Guid, PdfDocument>());
+            check(!implicitNative.Internals.Catalog.Elements.ContainsKey("/PageLabels"),
+                "implicit-only save removes existing labels without initializing native sources");
+            var sources = new Dictionary<Guid, PdfDocument>();
+            for (var i = 0; i < 3; i++) PdfPageLabels.Write(implicitNative, blank, sources);
+            var allocated = GC.GetAllocatedBytesForCurrentThread();
+            for (var i = 0; i < 1000; i++) PdfPageLabels.Write(implicitNative, blank, sources);
+            check(GC.GetAllocatedBytesForCurrentThread() == allocated,
+                "unlabelled native save path allocates no per-page label or tree objects");
+        }
         var bytes = PdfDocumentEngine.Save(body, font).Bytes;
         var reopened = PdfDocumentEngine.Open(bytes, "labels.pdf");
         check(new PageLabelIndex(reopened.Pages)[5] == "A-4", "native PageLabels survives save and reopen");

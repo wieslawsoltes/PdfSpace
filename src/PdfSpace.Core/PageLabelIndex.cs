@@ -8,7 +8,7 @@ public sealed class PageLabelIndex
 {
     private readonly string[] _labels;
     private readonly PdfPageLabel?[] _definitions;
-    private readonly Dictionary<string, int> _lookup = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, int> _lookup;
     public int Count => _labels.Length;
     public string this[int pageIndex] => _labels[pageIndex];
 
@@ -16,6 +16,7 @@ public sealed class PageLabelIndex
     {
         ArgumentNullException.ThrowIfNull(pages);
         if (pages.Count > 4096) throw new ArgumentException("Page-label index is limited to 4096 pages.", nameof(pages));
+        _lookup = new Dictionary<string, int>(pages.Count, StringComparer.Ordinal);
         _labels = new string[pages.Count];
         _definitions = new PdfPageLabel?[pages.Count];
         for (var i = 0; i < pages.Count; i++)

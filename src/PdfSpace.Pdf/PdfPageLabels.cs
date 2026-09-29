@@ -173,6 +173,14 @@ public static class PdfPageLabels
     /// <summary>Write maximal compatible runs. The old tree is replaced, not edited through aliased children.</summary>
     internal static void Write(PdfDocument document, PdfWorkspace workspace, IReadOnlyDictionary<Guid, PdfDocument> sources)
     {
+        // The common unlabelled/reset case needs neither temporary label records
+        // nor number-tree allocation. Uninitialized native sources still take the
+        // resolution path below, so older workspaces cannot silently lose labels.
+        var allImplicit = true;
+        foreach (var page in workspace.Pages)
+            if (page.Label is not null || (!page.LabelInitialized && page.SourceId.HasValue))
+            { allImplicit = false; break; }
+        if (allImplicit) { document.Internals.Catalog.Elements.Remove("/PageLabels"); return; }
         var sourceLabels = new Dictionary<Guid, PdfPageLabel?[]>();
         var hasExplicitLabels = false;
         PdfPageLabel Effective(int i)
@@ -191,7 +199,8 @@ public static class PdfPageLabels
         {
             var current = Effective(i); current.Validate();
             if (previous is null || previous.Style != current.Style || previous.Prefix != current.Prefix ||
-                (current.Style != PdfPageLabelStyle.PrefixOnly && (long)previous.Number + 1 != current.Number)) runs.Add((i, current));
+                (current.Style == PdfPageLabelStyle.PrefixOnly ? previous.Number != current.Number :
+                    (long)previous.Number + 1 != current.Number)) runs.Add((i, current));
             previous = current;
         }
         // Explicit physical-looking labels still belong to their page identity after
