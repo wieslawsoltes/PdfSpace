@@ -73,6 +73,7 @@ public sealed partial class PdfWorkbench
             if (_active != context)
                 return;
             _selectedObjects = indices;
+            if (indices.Length > 0) RevealObjectInList(indices[0]);
             _right = "Objects";
             RefreshRight();
             AdaptLayout();
@@ -304,8 +305,6 @@ public sealed partial class PdfWorkbench
         });
         content.Children.Add(Paragraph($"{_pageObjects.Length} native objects · {_selectedObjects.Length} selected", 11));
         AttachObjectList(content);
-        if (_pageObjects.Length > 200)
-            content.Children.Add(Paragraph("The list shows 200 objects. All indexed objects remain selectable on the canvas.", 10));
         var snap = new PdfCommandButton("Snap moving objects", action: () =>
         {
             Viewport.SnapNativeObjectMovement = !Viewport.SnapNativeObjectMovement;

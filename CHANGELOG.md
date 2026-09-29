@@ -2,6 +2,10 @@
 
 ## 0.5.4-alpha.1
 
+- Bounded 64-row object inspector with full-range navigation, exact object-number selection and slot/generation-safe rebinding.
+- Accepted-file picker phase guards prevent late cancellation or duplicate change events from abandoning a read.
+- Weak descriptor-JSON cache and periodic-only opt-in diagnostics reduce observation overhead on dense pages without changing production focus behavior.
+
 - Add independently enabled resize and Bézier-point alignment guides, constrained corner/side snapping, axis-locked point movement and one native transaction per committed gesture.
 - Retain point-handle grab offsets; stationary, returned and cancelled gestures do not rewrite source content.
 - Compact duplicate snap anchors without changing priority and remove redundant binary searches; reuse inspector object rows and avoid the intermediate rebuild during native edit commands.

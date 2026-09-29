@@ -28,7 +28,10 @@ void Check(bool condition, string name) { if (!condition) throw new Exception("F
 void Reject(Action action, string name) { try { action(); } catch { Check(true, name); return; } throw new Exception("FAILED: " + name); }
 if (args is ["--test-snap-editing"])
 {
-    ObjectSnapEditingTests.Run(Check, Reject); Console.WriteLine($"{passed} snap editing checks passed."); return;
+    ObjectSnapEditingTests.Run(Check, Reject);
+    IndexWindowTests.Run(Check, Reject);
+    ObjectDiagnosticsTests.Run(Check);
+    Console.WriteLine($"{passed} snap editing checks passed."); return;
 }
 if (args is ["--test-manipulation"])
 {
@@ -132,4 +135,6 @@ UnifiedObjectTests.Run(Check, Reject);
 SelectionTransformTests.Run(Check, Reject);
 ObjectManipulationTests.Run(Check, Reject);
 ObjectSnapEditingTests.Run(Check, Reject);
+IndexWindowTests.Run(Check, Reject);
+ObjectDiagnosticsTests.Run(Check);
 Console.WriteLine($"\n{passed} engine checks passed.");

@@ -4,6 +4,8 @@ namespace PdfSpace.Workbench;
 
 public sealed partial class PdfWorkbench
 {
+    private readonly PdfObjectDiagnostics _objectDiagnostics = new();
+
     /// <summary>Read-only opt-in diagnostics for real pointer/keyboard acceptance tests. No mutation API.</summary>
     public string GetDiagnosticsJson()
     {
@@ -23,7 +25,7 @@ public sealed partial class PdfWorkbench
             json.WriteNumber("resolved", Session.Document.Pages.Sum(page => page.Annotations.Count(annotation => annotation.Resolved)));
             json.WriteString("layout", Viewport.LayoutMode.ToString()); json.WriteBoolean("cropped", Session.Page.Crop is not null);
             json.WriteBoolean("dirty", Session.IsDirty); json.WriteBoolean("canUndo", Session.CanUndo); json.WriteBoolean("canRedo", Session.CanRedo); json.WriteBoolean("editingText", Viewport.IsEditingText); json.WriteBoolean("dialog", _dialogs.IsOpen);
-            json.WriteString("selection", Session.SelectedAnnotation?.Kind.ToString()); json.WriteString("selectedText", Session.SelectedAnnotation?.Text); json.WriteNumber("results", _searchResults.Length);
+            json.WriteString("selection", Session.SelectedAnnotation?.Kind.ToString()); json.WriteString("selectedText", Session.Document.IsSensitive ? "[protected]" : Session.SelectedAnnotation?.Text); json.WriteNumber("results", _searchResults.Length);
             if (XamlRoot is not null && FocusManager.GetFocusedElement(XamlRoot) is DependencyObject focused) json.WriteString("focusedControl", AutomationProperties.GetName(focused));
             var origin = Viewport.TransformToVisual(this).TransformPoint(new Point(0, 0)); var pageBounds = Viewport.PageScreenBounds(Session.CurrentPage);
             json.WriteStartObject("pageBounds"); json.WriteNumber("x", origin.X + pageBounds.X); json.WriteNumber("y", origin.Y + pageBounds.Y); json.WriteNumber("width", pageBounds.Width); json.WriteNumber("height", pageBounds.Height); json.WriteEndObject();
@@ -32,7 +34,7 @@ public sealed partial class PdfWorkbench
             json.WriteNumber("ocrReviewed", Session.Document.Pages.Sum(page => page.Ocr?.Words.Count(word => word.Reviewed) ?? 0));
             json.WriteString("ocrLanguage", _ocrLanguage);
             json.WriteStartArray("ocrText");
-            foreach (var text in Session.Document.Pages.SelectMany(page => page.Ocr?.Words ?? []).Take(500)) json.WriteStringValue(text.Text);
+            foreach (var text in Session.Document.Pages.SelectMany(page => page.Ocr?.Words ?? []).Take(500)) json.WriteStringValue(Session.Document.IsSensitive ? "[protected]" : text.Text);
             json.WriteEndArray();
             json.WriteNumber("nativeImages", _nativeImages.Length); json.WriteNumber("selectedImage", _imageSelection);
             if ((uint)_imageSelection < _nativeImages.Length) { var image = _nativeImages[_imageSelection]; json.WriteStartObject("imageBounds"); json.WriteNumber("x", image.Bounds.X); json.WriteNumber("y", image.Bounds.Y); json.WriteNumber("width", image.Bounds.Width); json.WriteNumber("height", image.Bounds.Height); json.WriteEndObject(); }
@@ -46,6 +48,8 @@ public sealed partial class PdfWorkbench
             json.WriteNumber("objectIndexBuilds", _objectIndexBuilds);
             json.WriteNumber("objectListBuilds", _objectListBuilds);
             json.WriteNumber("objectListRowsCreated", _objectListRowsCreated);
+            json.WriteNumber("objectListStart", _objectListWindow.Start);
+            json.WriteNumber("objectListVisible", _objectListWindow.VisibleCount);
             json.WriteBoolean("objectResizeSnapping", Viewport.SnapNativeObjectResize);
             json.WriteBoolean("objectPointSnapping", Viewport.SnapNativeObjectPoints);
             if (Viewport.NativeObjectPointPreview is { } np)
@@ -65,34 +69,9 @@ public sealed partial class PdfWorkbench
             foreach (var i in _selectedObjects)
                 json.WriteNumberValue(i);
             json.WriteEndArray();
-            json.WriteStartArray("objects");
-            foreach (var(item, i)in _pageObjects.Select((o, i) => (o, i)))
-            {
-                json.WriteStartObject();
-                json.WriteNumber("index", i);
-                json.WriteString("kind", item.Kind.ToString());
-                json.WriteString("text", Session.Document.IsSensitive ? "[protected]" : item.Text);
-                json.WriteNumber("x", item.Bounds.X);
-                json.WriteNumber("y", item.Bounds.Y);
-                json.WriteNumber("width", item.Bounds.Width);
-                json.WriteNumber("height", item.Bounds.Height);
-                json.WriteBoolean("editable", item.Editable);
-                void PaintNumber(string name, double? value) { if (value is { } n) json.WriteNumber(name, n); else json.WriteNull(name); }
-                PaintNumber("fillOpacity", item.Paint.FillOpacity);
-                PaintNumber("strokeOpacity", item.Paint.StrokeOpacity);
-                PaintNumber("strokeWidth", item.Paint.StrokeWidth);
-                PaintNumber("miterLimit", item.Paint.MiterLimit);
-                PaintNumber("dashPhase", item.Paint.Dash?.Phase);
-                json.WriteString("blend", item.Paint.BlendMode?.ToString());
-                json.WriteString("lineCap", item.Paint.LineCap?.ToString());
-                json.WriteString("lineJoin", item.Paint.LineJoin?.ToString());
-                if (item.Paint.Dash is { } dash)
-                { json.WriteStartArray("dash"); foreach (var length in dash.Lengths) json.WriteNumberValue(length); json.WriteEndArray(); }
-                else json.WriteNull("dash");
-                json.WriteEndObject();
-            }
-
-            json.WriteEndArray();
+            json.WritePropertyName("objects");
+            _objectDiagnostics.Write(json, _pageObjects, Session.Document.IsSensitive);
+            json.WriteNumber("objectDiagnosticBuilds", _objectDiagnostics.BuildCount);
             json.WriteStartArray("controls");
             void Visit(DependencyObject node, bool visible)
             {
