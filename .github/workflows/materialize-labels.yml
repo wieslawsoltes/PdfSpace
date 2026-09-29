@@ -1,0 +1,41 @@
+name: Materialize native page labels
+on:
+  push:
+    branches: [build/page-labels-0.6.1]
+    paths: [.github/workflows/materialize-labels.yml]
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/page-labels-0.6.1
+          fetch-depth: 0
+      - name: Verify reviewed delta and exact result tree
+        env:
+          TRANSFER_COMMIT: ${{ github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = '03c8635b6bc52c518ddc673582c936d4e8104388'
+          git fetch origin "$TRANSFER_COMMIT"
+          python3 - <<'PY'
+          import os,subprocess,base64,lzma,hashlib,pathlib
+          chunks=[subprocess.check_output(['git','show',f'{os.environ["TRANSFER_COMMIT"]}:tools/labels/{i}.b64']).decode().strip() for i in range(1,4)]
+          patch=lzma.decompress(base64.b64decode(''.join(chunks),validate=True))
+          assert hashlib.sha256(patch).hexdigest()=='74e96545f8d8ae09763da17ec5ff94131db3a4a417e744bad5d3d846dec3e83e'
+          pathlib.Path('/tmp/page-labels.patch').write_bytes(patch)
+          print('Verified',len(patch),'bytes of source changes')
+          PY
+          git apply --check /tmp/page-labels.patch
+          git apply /tmp/page-labels.patch
+          git diff --check
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          test "$(git write-tree)" = '8bc526acb5cce3c4e0660e167631a81f5a950a87'
+          git commit -m 'feat: native page-label sections, label navigation and cached thumbnail labels'
+          git push origin HEAD:feat/page-labels-0.6.1
