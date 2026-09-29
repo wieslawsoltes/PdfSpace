@@ -1,0 +1,40 @@
+name: Materialize snap editing
+on:
+  push:
+    branches: [build/snap-editing-0.5.4]
+    paths: [.github/workflows/materialize-snap-editing.yml]
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/snap-editing-0.5.4
+          fetch-depth: 0
+      - name: Verify complete source delta and expected tree
+        env:
+          TRANSFER_COMMIT: ${{ github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = 'a54fe856bbed5f1b70622936cdcda833701f7a10'
+          git fetch origin "$TRANSFER_COMMIT"
+          python3 - <<'PY'
+          import os,subprocess,base64,lzma,hashlib,pathlib
+          encoded=subprocess.check_output(['git','show',f'{os.environ["TRANSFER_COMMIT"]}:tools/snap054.b64'])
+          patch=lzma.decompress(base64.b64decode(encoded,validate=True))
+          assert hashlib.sha256(patch).hexdigest()=='9d561b96dce319aabb98e8ef67fc2e7b2ef605bfa8c3dd9b59d59c2264957bd4'
+          pathlib.Path('/tmp/snap.patch').write_bytes(patch)
+          PY
+          git apply --check --unidiff-zero /tmp/snap.patch
+          git apply --unidiff-zero /tmp/snap.patch
+          git diff --check
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          test "$(git write-tree)" = '9f44b51d92fae8b7b0f0cec6275f85607b017899'
+          git commit -m 'feat: constrained resize and vector-point snapping; reuse inspector rows'
+          git push origin HEAD:feat/snap-editing-0.5.4
