@@ -1,0 +1,217 @@
+diff --git a/docs/page-labels.md b/docs/page-labels.md
+index a4bf2fc..3f48ec5 100644
+--- a/docs/page-labels.md
++++ b/docs/page-labels.md
+@@ -34,7 +34,7 @@ var output = PdfDocumentEngine.Save(labels, typeface);
+ 
+ The reader validates a bounded number tree, including nested Kids/Nums, global ascending keys, a page-zero start, positive integer start values, optional Limits, cycles/reused nodes, depth and expansion limits. Unsupported or malformed native labels fail explicitly rather than being guessed. This means some malformed PDFs previously readable without interpreting labels will now be rejected by the structured engine.
+ 
+-Export coalesces consecutive compatible labels into maximal runs and replaces the catalog tree. All-physical numbering removes the redundant tree. It does not claim byte-for-byte preservation of private label dictionary keys or the original tree topology. Page streams are not rewritten by the label operation. Structured export still runs its existing annotation/form/OCR and source-safety logic; it is not a signature-preserving incremental writer. Signed/XFA and unsafe form-reassembly restrictions remain in effect.
++Export coalesces consecutive compatible labels into maximal runs and replaces the catalog tree. A fully reset, implicit physical sequence removes the tree; explicitly assigned numeric labels remain explicit. It does not claim byte-for-byte preservation of private label dictionary keys or the original tree topology. Page streams are not rewritten by the label operation. Structured export still runs its existing annotation/form/OCR and source-safety logic; it is not a signature-preserving incremental writer. Signed/XFA and unsafe form-reassembly restrictions remain in effect.
+ 
+ Older PdfSpace binaries do not understand these new workspace fields; use current versions for label-preserving round trips. General flattened visual exports intentionally discard document structure and are not label-preserving.
+ 
+@@ -43,3 +43,9 @@ Older PdfSpace binaries do not understand these new workspace fields; use curren
+ Label assignment changes metadata snapshots and shares original/preview buffers; it does not embed a font, rerender source content or write a PDF until export. `PageLabelIndex` stores bounded strings and a dictionary, not sources or workspace objects. The viewport shares one weak-snapshot-keyed index with visible thumbnails. Pan/zoom and navigation do not rebuild it. Lookup is expected constant time and avoids query-time allocations for unchanged input strings.
+ 
+ The native suite emits `artifacts/structured/labels-performance.json`: 100,000 warm exact-label queries across 4,096 pages. It records elapsed time and current-thread allocations; fixture/index construction, PDF parsing/writing, UI and GPU work are excluded. No universal speedup or timing pass threshold is claimed. Native number-tree, Unicode, invalid-input, identity/history, reassembly, exact content/pixel and browser download checks accompany the feature.
++
++## Identity and cache details
++
++Explicitly assigned decimal labels that happen to equal physical numbers remain in `/PageLabels`, so reopening and then reordering does not silently change them into implicit numbering. Resetting every page to implicit numbering removes the tree. Within a PDF that contains a label tree, every page necessarily belongs to a native range; importing resolves those ranges into per-page definitions.
++
++The navigation/thumbnail index retains strings and immutable label definitions, not page states or PDF sources. A new snapshot with unchanged label definitions reuses the index after a bounded sequence comparison; pan/zoom/navigation on the same snapshot skips even that comparison. Only changed label definitions rebuild the lookup.
+diff --git a/src/PdfSpace.Core/PageLabelIndex.cs b/src/PdfSpace.Core/PageLabelIndex.cs
+index 63f03f5..b8c2ac5 100644
+--- a/src/PdfSpace.Core/PageLabelIndex.cs
++++ b/src/PdfSpace.Core/PageLabelIndex.cs
+@@ -7,6 +7,7 @@ public enum PageLabelMatch { Found, NotFound, Ambiguous }
+ public sealed class PageLabelIndex
+ {
+     private readonly string[] _labels;
++    private readonly PdfPageLabel?[] _definitions;
+     private readonly Dictionary<string, int> _lookup = new(StringComparer.Ordinal);
+     public int Count => _labels.Length;
+     public string this[int pageIndex] => _labels[pageIndex];
+@@ -16,15 +17,27 @@ public sealed class PageLabelIndex
+         ArgumentNullException.ThrowIfNull(pages);
+         if (pages.Count > 4096) throw new ArgumentException("Page-label index is limited to 4096 pages.", nameof(pages));
+         _labels = new string[pages.Count];
++        _definitions = new PdfPageLabel?[pages.Count];
+         for (var i = 0; i < pages.Count; i++)
+         {
+             var page = pages[i] ?? throw new ArgumentException("Null page.", nameof(pages));
++            _definitions[i] = page.Label;
+             var label = page.Label?.Format() ?? (i + 1).ToString(CultureInfo.InvariantCulture);
+             _labels[i] = label;
+             if (!_lookup.TryAdd(label, i)) _lookup[label] = -1;
+         }
+     }
+ 
++    /// <summary>Reuse the index across annotation/geometry-only snapshots. Does not retain page state or source buffers.</summary>
++    public bool Matches(IReadOnlyList<PdfPageState> pages)
++    {
++        ArgumentNullException.ThrowIfNull(pages);
++        if (pages.Count != Count) return false;
++        for (var i = 0; i < pages.Count; i++)
++            if (pages[i] is not { } page || page.Label != _definitions[i]) return false;
++        return true;
++    }
++
+     /// <summary>Exact case-sensitive labels win; duplicate labels are ambiguous. #N always means physical page N.</summary>
+     public PageLabelMatch Resolve(string text, out int pageIndex)
+     {
+diff --git a/src/PdfSpace.Pdf/PdfPageLabels.cs b/src/PdfSpace.Pdf/PdfPageLabels.cs
+index 34523eb..cf9dc88 100644
+--- a/src/PdfSpace.Pdf/PdfPageLabels.cs
++++ b/src/PdfSpace.Pdf/PdfPageLabels.cs
+@@ -87,6 +87,7 @@ public static class PdfPageLabels
+     internal static PdfPageLabel?[] Read(PdfDocument document, CancellationToken cancellationToken = default)
+     {
+         cancellationToken.ThrowIfCancellationRequested();
++        if (document.PageCount is < 1 or > 4096) throw new InvalidDataException("Page labels support 1 to 4096 source pages.");
+         var result = new PdfPageLabel?[document.PageCount];
+         var item = document.Internals.Catalog.Elements["/PageLabels"];
+         if (item is null) return result;
+@@ -173,6 +174,7 @@ public static class PdfPageLabels
+     internal static void Write(PdfDocument document, PdfWorkspace workspace, IReadOnlyDictionary<Guid, PdfDocument> sources)
+     {
+         var sourceLabels = new Dictionary<Guid, PdfPageLabel?[]>();
++        var hasExplicitLabels = false;
+         PdfPageLabel Effective(int i)
+         {
+             var page = workspace.Pages[i]; var label = page.Label;
+@@ -181,19 +183,20 @@ public static class PdfPageLabels
+                 if (!sourceLabels.TryGetValue(id, out var labels)) { labels = Read(sources[id]); sourceLabels.Add(id, labels); }
+                 label = SourceLabel(labels, page.SourcePage);
+             }
++            hasExplicitLabels |= label is not null;
+             return label ?? new PdfPageLabel { Number = i + 1 };
+         }
+         var runs = new List<(int Index, PdfPageLabel Label)>(); PdfPageLabel? previous = null;
+-        var allDefault = true;
+         for (var i = 0; i < workspace.Pages.Length; i++)
+         {
+             var current = Effective(i); current.Validate();
+-            allDefault &= current.Style == PdfPageLabelStyle.Decimal && current.Prefix.Length == 0 && current.Number == i + 1;
+             if (previous is null || previous.Style != current.Style || previous.Prefix != current.Prefix ||
+                 (current.Style != PdfPageLabelStyle.PrefixOnly && (long)previous.Number + 1 != current.Number)) runs.Add((i, current));
+             previous = current;
+         }
+-        if (allDefault) { document.Internals.Catalog.Elements.Remove("/PageLabels"); return; }
++        // Explicit physical-looking labels still belong to their page identity after
++        // reopening/reordering. Only an entirely implicit/reset sequence drops the tree.
++        if (!hasExplicitLabels) { document.Internals.Catalog.Elements.Remove("/PageLabels"); return; }
+         var nums = new PdfArray(document);
+         foreach (var (index, label) in runs)
+         {
+@@ -203,7 +206,8 @@ public static class PdfPageLabels
+                 PdfPageLabelStyle.Decimal => "/D", PdfPageLabelStyle.RomanLower => "/r", PdfPageLabelStyle.RomanUpper => "/R",
+                 PdfPageLabelStyle.LettersLower => "/a", PdfPageLabelStyle.LettersUpper => "/A", _ => null
+             };
+-            if (style is not null) { rule.Elements.SetName("/S", style); if (label.Number != 1) rule.Elements.SetInteger("/St", label.Number); }
++            if (style is not null) rule.Elements.SetName("/S", style);
++            if (label.Number != 1) rule.Elements.SetInteger("/St", label.Number);
+             if (label.Prefix.Length > 0) rule.Elements["/P"] = new PdfString(label.Prefix, PdfStringEncoding.Unicode);
+             nums.Elements.Add(new PdfInteger(index)); nums.Elements.Add(rule);
+         }
+diff --git a/src/PdfSpace.Viewer/PdfViewport.PageLabels.cs b/src/PdfSpace.Viewer/PdfViewport.PageLabels.cs
+index 8db59c1..69b3395 100644
+--- a/src/PdfSpace.Viewer/PdfViewport.PageLabels.cs
++++ b/src/PdfSpace.Viewer/PdfViewport.PageLabels.cs
+@@ -13,8 +13,11 @@ public sealed partial class PdfViewport
+         {
+             if (_pageLabelIndex is null || !_pageLabelStamp.Matches(Session.Document))
+             {
+-                _pageLabelIndex = new PageLabelIndex(Session.Document.Pages);
+-                _pageLabelStamp.Remember(Session.Document); PageLabelIndexBuilds++;
++                if (_pageLabelIndex is null || !_pageLabelIndex.Matches(Session.Document.Pages))
++                {
++                    _pageLabelIndex = new PageLabelIndex(Session.Document.Pages); PageLabelIndexBuilds++;
++                }
++                _pageLabelStamp.Remember(Session.Document);
+             }
+             return _pageLabelIndex;
+         }
+diff --git a/src/PdfSpace.Workbench/PdfWorkbench.PageLabels.cs b/src/PdfSpace.Workbench/PdfWorkbench.PageLabels.cs
+index 797431e..75a5234 100644
+--- a/src/PdfSpace.Workbench/PdfWorkbench.PageLabels.cs
++++ b/src/PdfSpace.Workbench/PdfWorkbench.PageLabels.cs
+@@ -9,7 +9,7 @@ public sealed partial class PdfWorkbench
+     private void ShowPageLabels()
+     {
+         Viewport.FinishText(true); Viewport.CancelGesture();
+-        UseTool(PdfTool.Hand);
++        Session.SetTool(PdfTool.Hand); // Metadata editing stays in the thumbnail organization view.
+         _labelRange = "all"; _labelDraft = Session.Page.Label ?? new PdfPageLabel();
+         _right = "Page labels"; RefreshRight(); AdaptLayout();
+     }
+diff --git a/tests/PdfSpace.Tests/PageLabelTests.cs b/tests/PdfSpace.Tests/PageLabelTests.cs
+index 91edd0a..181000b 100644
+--- a/tests/PdfSpace.Tests/PageLabelTests.cs
++++ b/tests/PdfSpace.Tests/PageLabelTests.cs
+@@ -60,12 +60,35 @@ internal static class PageLabelTests
+         var combined = WorkspaceComposition.Append(body, body);
+         check(combined.Pages[6].Label == body.Pages[0].Label, "combining preserves incoming resolved labels");
+         using var font = SKTypeface.FromFamilyName("DejaVu Sans") ?? SKTypeface.Default;
++        Directory.CreateDirectory("artifacts/structured");
++        var unicode = PdfPageLabels.Apply(blank, 0, 6, new PdfPageLabel { Prefix = "章-Żółć-📄-" });
++        var unicodeBytes = PdfDocumentEngine.Save(unicode, font).Bytes;
++        check(PdfDocumentEngine.Open(unicodeBytes, "unicode-labels.pdf").Pages[5].Label!.Format() == "章-Żółć-📄-6",
++            "Unicode BMP and supplementary page-label prefixes survive native export");
++        File.WriteAllBytes("artifacts/structured/labels-unicode.pdf", unicodeBytes);
++        var literal = PdfPageLabels.Apply(blank, 0, 2, new PdfPageLabel { Style = PdfPageLabelStyle.PrefixOnly, Prefix = "Cover", Number = 12 });
++        check(PdfDocumentEngine.Open(PdfDocumentEngine.Save(literal, font).Bytes, "literal-labels.pdf").Pages[0].Label == literal.Pages[0].Label,
++            "prefix-only numbering metadata roundtrips without changing settings");
+         var bytes = PdfDocumentEngine.Save(body, font).Bytes;
+         var reopened = PdfDocumentEngine.Open(bytes, "labels.pdf");
+         check(new PageLabelIndex(reopened.Pages)[5] == "A-4", "native PageLabels survives save and reopen");
+         using (var native = PdfDocumentEngine.OpenNative(bytes))
+             check(PdfObjects.Array(PdfObjects.Dictionary(native.Internals.Catalog.Elements["/PageLabels"])!.Elements["/Nums"])!.Elements.Count == 4,
+                 "six page labels serialize as two maximal number-tree runs");
++        var physical = PdfPageLabels.Apply(blank, 0, 6, new PdfPageLabel());
++        var physicalReload = PdfDocumentEngine.Open(PdfDocumentEngine.Save(physical, font).Bytes, "explicit-physical-labels.pdf");
++        check(physicalReload.Pages.All(p => p.Label is not null), "explicit physical-looking labels survive native roundtrip");
++        check(new PageLabelIndex(WorkspacePages.Select(physicalReload, [5, 0]).Pages)[0] == "6",
++            "explicit numeric labels retain page identity after reopen and reordering");
++        var alteredPages = body.Pages.Select(p => p with { Bookmark = "changed" }).ToArray();
++        check(index.Matches(alteredPages), "annotation and bookmark changes can reuse the label index");
++        alteredPages[2] = alteredPages[2] with { Label = new PdfPageLabel { Prefix = "Other-" } };
++        check(!index.Matches(alteredPages), "changed label definitions invalidate the navigation index");
++        check(index[2] == "A-1", "index owns its definition sequence independently of mutable input arrays");
++        check(!index.Matches(WorkspacePages.Select(body, [5, 0, 2]).Pages), "changed page order and count invalidate label index");
++        var lastInteger = PdfPageLabels.Apply(blank, 5, 1, new PdfPageLabel { Number = int.MaxValue });
++        check(PdfDocumentEngine.Open(PdfDocumentEngine.Save(lastInteger, font).Bytes, "last-integer.pdf").Pages[5].Label!.Number == int.MaxValue,
++            "last-page maximum starting integer avoids intermediate overflow");
+         var reset = PdfPageLabels.Reset(reopened, 0, 6);
+         using (var native = PdfDocumentEngine.OpenNative(PdfDocumentEngine.Save(reset, font).Bytes))
+             check(!native.Internals.Catalog.Elements.ContainsKey("/PageLabels"), "physical numbering reset removes redundant native tree");
+@@ -100,7 +123,6 @@ internal static class PageLabelTests
+             var rule = new PdfDictionary(doc); rule.Elements.SetName("/S", style); rule.Elements.SetString("/P", prefix); rule.Elements.SetInteger("/St", number);
+             var nums = new PdfArray(doc); nums.Elements.Add(new PdfInteger(key)); nums.Elements.Add(rule);
+             var leaf = new PdfDictionary(doc); leaf.Elements["/Nums"] = nums;
+-            leaf.Elements["/Limits"] = PdfObjects.Numbers(doc, key, key);
+             // Number-tree limits, unlike geometric arrays, require integers.
+             var limits = new PdfArray(doc); limits.Elements.Add(new PdfInteger(key)); limits.Elements.Add(new PdfInteger(key)); leaf.Elements["/Limits"] = limits;
+             return leaf;
+@@ -110,6 +132,7 @@ internal static class PageLabelTests
+         kids.Elements.Add(left); kids.Elements.Add(right); root.Elements["/Kids"] = kids;
+         doc.Internals.Catalog.Elements["/PageLabels"] = root;
+         check(PdfPageLabels.Read(doc)[3]!.Format() == "章-BB", "nested native number trees resolve repeated alphabetic labels");
++        File.WriteAllBytes("artifacts/structured/labels-nested.pdf", PdfDocumentEngine.Bytes(doc));
+         var limits = right.Elements["/Limits"]!;
+         right.Elements["/Limits"] = PdfObjects.Numbers(doc, 2, 2);
+         reject(() => PdfPageLabels.Read(doc), "real-valued number-tree limits rejected"); right.Elements["/Limits"] = limits;
+diff --git a/tests/browser/page-labels.spec.mjs b/tests/browser/page-labels.spec.mjs
+index 62c5255..a5ca30f 100644
+--- a/tests/browser/page-labels.spec.mjs
++++ b/tests/browser/page-labels.spec.mjs
+@@ -26,6 +26,8 @@ test('native page labels preserve mixed sections, support navigation, undo and s
+   await set(page, 'Label page range', '3-6'); await set(page, 'Label prefix', 'Chapter-');
+   await click(page, 'Decimal labels'); await click(page, 'Apply page labels');
+   await expect.poll(async () => (await state(page)).undoCount).toBe(2);
++  fs.mkdirSync('artifacts/screenshots', { recursive: true });
++  await page.screenshot({ path: 'artifacts/screenshots/pdfspace-page-labels-sections.png' });
+   const bytes = await save(page, 'labels-browser-sections.pdf');
+   await set(page, 'Page number', 'Chapter-3'); await page.keyboard.press('Enter');
+   await expect.poll(async () => (await state(page)).page).toBe(5);
