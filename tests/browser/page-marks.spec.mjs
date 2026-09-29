@@ -71,8 +71,12 @@ test('watermark page range, angle and opacity write native text only on the sele
 test('Bates numbering preserves prefix and start, and repeated settings are a native no-op', async ({ page }) => {
   await start(page); await click(page, 'Bates numbering');
   await set(page, 'Bates prefix', 'CASE-'); await set(page, 'Mark starting number', '42');
-  await apply(page, 1); await save(page, 'bates');
+  await apply(page, 1); const bytes = await save(page, 'bates');
+  // Re-enter through the same shortcut: it must not seed a new DOC- prefix.
+  await click(page, 'Bates numbering');
   await apply(page, 1); await expect.poll(async () => (await state(page)).status).toContain('already match');
+  await open(page, bytes); await click(page, 'Bates numbering');
+  await apply(page, 0); await expect.poll(async () => (await state(page)).status).toContain('already match');
   await click(page, 'Reload saved mark settings'); await screenshot(page, 'bates');
 });
 

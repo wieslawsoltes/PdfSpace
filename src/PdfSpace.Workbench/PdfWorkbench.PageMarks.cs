@@ -13,7 +13,9 @@ public sealed partial class PdfWorkbench
         var existing = PdfPageMarks.Read(Session.Document, [Session.CurrentPage]).FirstOrDefault(m => m.PageIndex == Session.CurrentPage && m.Settings.Kind == kind && m.Intact);
         _markSettings = existing?.Settings ?? (kind == PdfPageMarkKind.HeaderFooter ? new() : new()
         { Kind = kind, WatermarkText = "DRAFT", FontSize = 48, Opacity = .2, Rotation = -35 });
-        if (bates) _markSettings = _markSettings with { FooterCenter = "{bates}", BatesPrefix = "DOC-" };
+        // A shortcut may seed a new preset, but must never silently replace
+        // saved numbering templates or prefixes when reopening existing marks.
+        if (bates && existing is null) _markSettings = _markSettings with { FooterCenter = "{bates}", BatesPrefix = "DOC-" };
         _markRange = "all";
         UseTool(PdfTool.Hand);
         if (_mode != "Edit") SetMode("Edit");

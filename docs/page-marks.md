@@ -86,3 +86,7 @@ Reviewed OCR words replace the invisible OCR layer in search while later visible
 ## Range-scoped inspection
 
 `PdfPageMarks.Read(workspace, pageIndices, cancellationToken)` inspects an ascending distinct range of at most 500 pages and opens each referenced source once. The inspector uses the current page, and Apply/Remove inspect only their requested range before materialization. Unreferenced source buffers are not parsed and pages without ownership metadata do not normalize their content arrays. Full-document `Read(workspace)` still inspects every referenced page. This is not certification of unselected content; all structured-save checks remain in force when an effective edit materializes the document.
+
+## Reopening saved numbering
+
+The Bates shortcut seeds `{bates}` and `DOC-` only when the current page has no intact managed header/footer settings. Reopening an existing header/footer set preserves every saved slot, prefix, suffix and starting number. Switching into the Bates workflow is not permission to overwrite an existing footer. Review and explicitly change its template before applying a new numbering scheme.

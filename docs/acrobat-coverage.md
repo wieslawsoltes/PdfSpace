@@ -2,7 +2,7 @@
 
 Reviewed against Adobe's desktop help on **2026-09-29**, and the PdfSpace implementation through **0.6.0-alpha.1**. This is an engineering gap inventory, not a product certification, exhaustive enumeration of every Acrobat command, API/binary compatibility claim or pixel-parity score. Adobe availability can vary by product, license, platform and version.
 
-Primary references: [Acrobat tool overview](https://helpx.adobe.com/acrobat/using/explore-acrobat-tools.html), [desktop help / workflow index](https://helpx.adobe.com/acrobat/desktop/edit-documents/use-headers-and-footers/modify.html), [watermarks](https://helpx.adobe.com/acrobat/using/add-watermarks-pdfs.html). Feature names below describe workflows, not copied Adobe assets or implementation.
+Primary references: [Acrobat tool overview](https://helpx.adobe.com/acrobat/using/explore-acrobat-tools.html), [desktop help / workflow index](https://www.adobe.com/support/acrobat/), [watermarks](https://helpx.adobe.com/acrobat/using/add-watermarks-pdfs.html). Feature names below describe workflows, not copied Adobe assets or implementation.
 
 **Implemented** means the stated bounded workflow exists; **partial** means important compatibility or interaction cases remain; **absent** means no completed equivalent engine/UI is supplied. Preservation of an unknown source object during an ordinary rewrite does not make its authoring or interpretation supported.
 
