@@ -48,6 +48,14 @@ public static class PdfDocumentEngine
         {
             if (onlySource is not null && source.Id != onlySource) { sources.Add(source); continue; }
             using var native = OpenNative(source.Bytes);
+            var labels = pages.Any(p => p.SourceId == source.Id && (importObjects || !p.LabelInitialized)) ? PdfPageLabels.Read(native) : null;
+            if (labels is not null)
+                for (var i = 0; i < pages.Length; i++)
+                    if (pages[i].SourceId == source.Id && (importObjects || !pages[i].LabelInitialized))
+                    {
+                        if ((uint)(pages[i].SourcePage - 1) >= labels.Length) throw new InvalidDataException("Missing page-label source page.");
+                        pages[i] = pages[i] with { Label = importObjects ? labels[pages[i].SourcePage - 1] : pages[i].Label ?? labels[pages[i].SourcePage - 1], LabelInitialized = true };
+                    }
             var inspection = Inspect(native);
             var resolver = new PdfDestinationResolver(native);
             var managedBookmarks = importObjects ? PdfNavigation.ReadOutlines(native).Where(entry => entry.Managed && !entry.ManagedRoot && entry.PageIndex is not null).GroupBy(entry => entry.PageIndex!.Value + 1).ToDictionary(group => group.Key, group => group.First().Title) : new Dictionary<int, string>();
@@ -191,6 +199,7 @@ public static class PdfDocumentEngine
                     else { var blank = output.AddPage(); blank.Width = PdfSharp.Drawing.XUnit.FromPoint(page.Width); blank.Height = PdfSharp.Drawing.XUnit.FromPoint(page.Height); }
                 }
             }
+            PdfPageLabels.Write(output, workspace, nativeSources);
             output.Info.Title = workspace.Title; output.Info.Author = workspace.Author;
             var ocrTexts = workspace.Pages.SelectMany(page => page.Ocr?.Words ?? []).Select(word => word.Text).ToArray();
             var ocrFont = ocrTexts.Length > 0 ? new OcrPdfFont(output, typeface, ocrTexts) : null;

@@ -15,7 +15,11 @@
 
 PdfSpace is an independent, local-first PDF application built in **C# with Uno Platform and SkiaSharp**. The browser runs a real Uno WebAssembly application with the same document, editing and rendering libraries as the desktop host. An Acrobat-inspired shell brings together document tabs, floating quick tools, comments, form preparation, original-text editing, protection, redaction and page organization.
 
-> **0.6.0-alpha.1:** functional PDF workflows, not complete or pixel-identical Adobe Acrobat compatibility. PdfSpace has original branding and icons and is not affiliated with Adobe. Review the [save and security boundaries](docs/compatibility.md) before processing important documents.
+> **0.6.1-alpha.1:** functional PDF workflows, not complete or pixel-identical Adobe Acrobat compatibility. PdfSpace has original branding and icons and is not affiliated with Adobe. Review the [save and security boundaries](docs/compatibility.md) before processing important documents.
+
+## Page labels in 0.6.1
+
+**Organize pages → Page labels** assigns Roman front matter, decimal chapters, alphabetic appendices and Unicode prefixes without printing over page content. Apply, extend or reset a contiguous range with undo; native `/PageLabels` survives PDF/workspace export and page reassembly. Labels follow page identity. The navigation field accepts an exact label or `#N` for a physical page; duplicate labels are reported as ambiguous. Cached lookup and thumbnail strings avoid native parsing while navigating. [Usage, APIs and boundaries](docs/page-labels.md).
 
 ## Native page marks in 0.6
 

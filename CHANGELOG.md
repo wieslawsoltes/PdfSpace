@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.6.1-alpha.1
+
+- Native page labels: Roman/decimal/lettered/prefix-only sections, extend/reset, label navigation and labelled thumbnails. Labels follow page identity across page operations.
+- Bounded number-tree validation and maximal-run export; older workspace initialization and native content preservation.
+- Snapshot-only label editing and a shared cached navigation index; warm lookup benchmark and native/browser regression coverage.
+
+
 ## 0.6.0-alpha.1
 
 - Native header/footer, page/Bates numbering and text watermark batches with pure placement preview and shared searchable TrueType resources.

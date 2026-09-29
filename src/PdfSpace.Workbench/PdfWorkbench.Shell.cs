@@ -73,7 +73,8 @@ public sealed partial class PdfWorkbench
         PdfTheme.Place(grid, top);
         var bottom = PdfTheme.Column(3); bottom.Margin = new Thickness(7, 0, 7, 10);
         _pageField = new("Page number") { Width = 37, TextAlignment = TextAlignment.Center, Padding = new Thickness(2), Height = 30, MinHeight = 30, FontSize = 12 };
-        _pageField.KeyDown += (_, e) => { if (e.Key == VirtualKey.Enter) { if (int.TryParse(_pageField.Text, out var page)) Viewport.Navigate(page - 1); e.Handled = true; } };
+        _pageField.KeyDown += (_, e) => { if (e.Key == VirtualKey.Enter) { Safe(NavigatePageLabel); e.Handled = true; } };
+        ToolTipService.SetToolTip(_pageField, "Exact page label or #physical-page. Duplicate labels require #N.");
         bottom.Children.Add(_pageField); _pageTotal = PdfTheme.Text("/ 6", 11, "#686868"); _pageTotal.HorizontalAlignment = HorizontalAlignment.Center; bottom.Children.Add(_pageTotal);
         bottom.Children.Add(new PdfCommandButton("Previous page", PdfIconKind.Up, () => Viewport.Navigate(Session.CurrentPage - 1), true));
         bottom.Children.Add(new PdfCommandButton("Next page", PdfIconKind.Down, () => Viewport.Navigate(Session.CurrentPage + 1), true));

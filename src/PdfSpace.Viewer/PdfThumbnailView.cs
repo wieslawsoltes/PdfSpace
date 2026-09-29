@@ -58,7 +58,12 @@ public sealed class PdfThumbnailView : UserControl
             canvas.Save(); canvas.Translate((float)x, (float)y); canvas.Scale((float)scale);
             try { _viewport.Renderer.DrawPage(canvas, _viewport.Session.Document, page); } catch { using var fill = new SKPaint { Color = SKColors.White }; canvas.DrawRect(0, 0, (float)page.DisplayWidth, (float)page.DisplayHeight, fill); }
             canvas.Restore(); canvas.DrawRect(new SKRect((float)x - 2, (float)y - 2, (float)(x + page.DisplayWidth * scale) + 2, (float)(y + page.DisplayHeight * scale) + 2), border);
-            AnnotationPainter.DrawText(canvas, (i + 1).ToString(), i % Columns * CellWidth + CellWidth / 2 - 4, y + CellHeight - 34, 11, _viewport.Renderer.Typeface, new(80, 80, 80));
+            var label = _viewport.PageLabels[i];
+            // Clip long metadata labels to this thumbnail cell, never adjacent pages.
+            canvas.Save(); canvas.ClipRect(new SKRect((float)(i % Columns * CellWidth + 12), (float)(y + CellHeight - 42),
+                (float)((i % Columns + 1) * CellWidth - 12), (float)(y + CellHeight - 22)));
+            AnnotationPainter.DrawText(canvas, label, i % Columns * CellWidth + 16, y + CellHeight - 34, 11, _viewport.Renderer.Typeface, new(80, 80, 80));
+            canvas.Restore();
         }
     }
 }

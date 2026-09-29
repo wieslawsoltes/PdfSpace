@@ -118,7 +118,7 @@ public sealed partial class PdfWorkbench : UserControl, IDisposable
     private void UpdateChrome()
     {
         if (_active is null) return;
-        if (XamlRoot is null || !ReferenceEquals(FocusManager.GetFocusedElement(XamlRoot), _pageField)) _pageField.Text = (Session.CurrentPage + 1).ToString(CultureInfo.InvariantCulture); _pageTotal.Text = "/ " + Session.Document.Pages.Length;
+        if (XamlRoot is null || !ReferenceEquals(FocusManager.GetFocusedElement(XamlRoot), _pageField)) _pageField.Text = Viewport.PageLabels[Session.CurrentPage]; _pageTotal.Text = $"{Session.CurrentPage + 1}/{Session.Document.Pages.Length}";
         _zoomLabel.Text = $"{Viewport.Zoom * 100:F0}%";
         _undo.IsEnabled = Session.CanUndo; _redo.IsEnabled = Session.CanRedo;
         foreach (var (tool, button) in _toolButtons) button.Select(Session.Tool == tool);

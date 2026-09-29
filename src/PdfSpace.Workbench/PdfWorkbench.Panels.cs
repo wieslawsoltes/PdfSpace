@@ -87,6 +87,7 @@ public sealed partial class PdfWorkbench
                 _leftPanel.Description("Signatures here are visual marks. This app does not create, validate or preserve certificate-based digital signatures, legal identity verification or audit trails.");
                 break;
             case "Organize pages":
+                _leftPanel.Add("Page labels", PdfIconKind.Pages, () => Safe(ShowPageLabels));
                 _leftPanel.Description("Select a page. Drag a thumbnail onto another position to reorder pages.");
                 _leftPanel.Add("Rotate clockwise", PdfIconKind.Rotate, () => Safe(() => Session.RotatePage()));
                 _leftPanel.Add("Rotate counterclockwise", PdfIconKind.Rotate, () => Safe(() => Session.RotatePage(-90)));
@@ -130,6 +131,7 @@ public sealed partial class PdfWorkbench
             var content = PdfTheme.Column(10); content.Margin = new Thickness(15, 5, 15, 24);
             switch (_right)
             {
+                case "Page labels": BuildPageLabels(content); break;
                 case "Page marks": BuildPageMarks(content); break;
                 case "Recognized text": BuildOcrReview(content); break;
                 case "Objects": BuildObjects(content); break;
