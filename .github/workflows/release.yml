@@ -5,22 +5,101 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: Package version, for example 0.4.1-alpha.1
+        description: Version for a dry run (tags publish; manual runs only build and upload artifacts)
         required: true
         type: string
-      publish_nuget:
-        description: Publish packages to nuget.org using NUGET_API_KEY
-        default: false
-        type: boolean
+        default: 0.5.4-alpha.1
 permissions:
-  contents: write
+  contents: read
 concurrency:
   group: release-${{ github.ref }}
   cancel-in-progress: false
+env:
+  APP_NAME: PdfSpace
+  APP_PROJECT: src/PdfSpace.App
+  DOTNET_NOLOGO: 'true'
+  DOTNET_CLI_TELEMETRY_OPTOUT: 'true'
 jobs:
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+    steps:
+      - id: v
+        name: Resolve release version
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+          REF_NAME: ${{ github.ref_name }}
+          REF_TYPE: ${{ github.ref_type }}
+        shell: bash
+        run: |
+          VERSION="$INPUT_VERSION"
+          if [ "$REF_TYPE" = tag ]; then VERSION="${REF_NAME#v}"; fi
+          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "Invalid version '$VERSION'" >&2; exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+  desktop:
+    name: Desktop (${{ matrix.rid }})
+    needs: version
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        rid: [win-x64, win-arm64, linux-x64, linux-arm64, osx-x64, osx-arm64]
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+      RID: ${{ matrix.rid }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - name: Fetch licensed application font
+        run: python3 scripts/fetch-assets.py
+      - name: Publish self-contained single-file executable
+        shell: bash
+        run: |
+          dotnet publish "$APP_PROJECT" -c Release -f net10.0-desktop -r "$RID" --self-contained true \
+            -p:PdfSpaceDesktopOnly=true \
+            -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true \
+            -p:IncludeAllContentForSelfExtract=true -p:EnableCompressionInSingleFile=true \
+            -p:DebugType=none -p:DebugSymbols=false -p:Version="$VERSION" \
+            -o "artifacts/desktop/$RID"
+      - name: Package executable
+        shell: bash
+        run: |
+          OUT="artifacts/desktop/$RID"
+          find "$OUT" -name '*.pdb' -delete
+          mkdir -p artifacts/dist
+          BASE="$APP_NAME-$VERSION-$RID"
+          if [[ "$RID" == win-* ]]; then
+            mv "$OUT/$APP_NAME.App.exe" "$OUT/$APP_NAME.exe"
+            test "$(find "$OUT" -type f | wc -l)" -eq 1
+            (cd "$OUT" && zip -q "$GITHUB_WORKSPACE/artifacts/dist/$BASE.zip" "$APP_NAME.exe")
+          else
+            mv "$OUT/$APP_NAME.App" "$OUT/$APP_NAME"
+            chmod +x "$OUT/$APP_NAME"
+            test "$(find "$OUT" -type f | wc -l)" -eq 1
+            tar -C "$OUT" -czf "artifacts/dist/$BASE.tar.gz" "$APP_NAME"
+          fi
+          ls -la artifacts/dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: desktop-${{ matrix.rid }}
+          path: artifacts/dist/*
+          if-no-files-found: error
+
   package:
+    needs: [version, desktop]
     runs-on: ubuntu-latest
     timeout-minutes: 40
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
@@ -32,7 +111,7 @@ jobs:
       - name: Resolve version
         id: version
         env:
-          INPUT_VERSION: ${{ inputs.version }}
+          INPUT_VERSION: ${{ needs.version.outputs.version }}
         shell: bash
         run: |
           VERSION="${INPUT_VERSION:-${GITHUB_REF_NAME#v}}"
@@ -59,7 +138,22 @@ jobs:
           done
           git archive --format=zip --output="artifacts/PdfSpace-$VERSION-source.zip" HEAD
           (cd artifacts/site && zip -qr "../PdfSpace-$VERSION-browser.zip" .)
-          (cd artifacts/packages && sha256sum *.nupkg > SHA256SUMS.txt)
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: desktop-*
+          path: artifacts/dist
+          merge-multiple: true
+      - name: Generate release checksums
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            (cd artifacts/packages && sha256sum *.nupkg *.snupkg)
+            (cd artifacts && sha256sum "PdfSpace-$VERSION-source.zip" "PdfSpace-$VERSION-browser.zip")
+            (cd artifacts/dist && sha256sum *)
+          } > artifacts/SHA256SUMS.txt
+          mv artifacts/SHA256SUMS.txt artifacts/packages/SHA256SUMS.txt
+          cat artifacts/packages/SHA256SUMS.txt
       - name: Publish GitHub release
         if: startsWith(github.ref, 'refs/tags/v')
         env:
@@ -67,20 +161,14 @@ jobs:
         run: |
           OPTIONS=(--verify-tag --generate-notes --title "PdfSpace $VERSION")
           if [[ "$VERSION" == *-* ]]; then OPTIONS+=(--prerelease); fi
-          gh release create "$GITHUB_REF_NAME" artifacts/packages/* "artifacts/PdfSpace-$VERSION-source.zip" "artifacts/PdfSpace-$VERSION-browser.zip" "${OPTIONS[@]}"
-      - name: Optional NuGet publication
-        if: github.event_name == 'workflow_dispatch' && inputs.publish_nuget
-        env:
-          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
-        run: |
-          if [ -z "$NUGET_API_KEY" ]; then echo 'NUGET_API_KEY is not configured.' >&2; exit 1; fi
-          dotnet nuget push 'artifacts/packages/*.nupkg' --source https://api.nuget.org/v3/index.json --api-key "$NUGET_API_KEY" --skip-duplicate
+          gh release create "$GITHUB_REF_NAME" artifacts/packages/* "artifacts/PdfSpace-$VERSION-source.zip" "artifacts/PdfSpace-$VERSION-browser.zip" artifacts/dist/* "${OPTIONS[@]}"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: PdfSpace-release-${{ steps.version.outputs.value }}
           path: |
             artifacts/packages
+            artifacts/dist
             artifacts/*-source.zip
             artifacts/*-browser.zip
             artifacts/screenshots
@@ -88,3 +176,42 @@ jobs:
             artifacts/browser-results.xml
             artifacts/browser-exports
           if-no-files-found: ignore
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nuget-packages
+          path: |
+            artifacts/packages/*.nupkg
+            artifacts/packages/*.snupkg
+          if-no-files-found: error
+
+  nuget:
+    name: Publish to NuGet.org (Trusted Publishing)
+    needs: [version, package]
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: nuget
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: nuget-packages
+          path: packages
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Check NuGet user
+        env:
+          NUGET_USER: ${{ vars.NUGET_USER || secrets.NUGET_USER }}
+        run: test -n "$NUGET_USER" || { echo 'Set the NUGET_USER variable (your nuget.org profile name) for this repository or its nuget environment.' >&2; exit 1; }
+      - name: NuGet login (OIDC → short-lived API key)
+        id: login
+        uses: NuGet/login@v1
+        with:
+          user: ${{ vars.NUGET_USER || secrets.NUGET_USER }}
+      - name: Push packages
+        env:
+          NUGET_API_KEY: ${{ steps.login.outputs.NUGET_API_KEY }}
+        run: dotnet nuget push "packages/*.nupkg" --api-key "$NUGET_API_KEY" --source https://api.nuget.org/v3/index.json --skip-duplicate

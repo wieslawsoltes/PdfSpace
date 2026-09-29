@@ -83,6 +83,20 @@ The **Bookmarks** panel separates original PDF outlines from editable workspace 
 
 Form-data files are unencrypted. Document URLs and scripts are never followed or executed. See the [form-data and navigation guide](docs/form-data-and-navigation.md) for formats, defensive limits and embedding examples.
 
+## Download
+
+Every [release](https://github.com/wieslawsoltes/PdfSpace/releases/latest) ships a self-contained, single-file desktop app — no .NET install needed:
+
+| OS | x64 | Arm64 |
+| --- | --- | --- |
+| Windows | `PdfSpace-<version>-win-x64.zip` | `PdfSpace-<version>-win-arm64.zip` |
+| macOS | `PdfSpace-<version>-osx-x64.tar.gz` | `PdfSpace-<version>-osx-arm64.tar.gz` |
+| Linux | `PdfSpace-<version>-linux-x64.tar.gz` | `PdfSpace-<version>-linux-arm64.tar.gz` |
+
+Extract and run `PdfSpace` (`PdfSpace.exe` on Windows). Builds are not code-signed yet: on macOS clear the quarantine flag with `xattr -d com.apple.quarantine PdfSpace`; on Windows choose **More info → Run anyway** in SmartScreen. Verify downloads against `SHA256SUMS.txt`.
+
+The libraries below are published to [NuGet.org](https://www.nuget.org/packages?q=PdfSpace), e.g. `dotnet add package PdfSpace.Core --prerelease`.
+
 ## Twelve reusable libraries
 
 | Package | Responsibility |
@@ -100,7 +114,7 @@ Form-data files are unencrypted. Document URLs and scripts are never followed or
 | `PdfSpace.Storage` | File, recovery, clipboard and print contracts |
 | `PdfSpace.Workbench` | Complete multi-document shell and PDF workflows |
 
-The application is a thin browser/desktop host. All twelve libraries are packable; CI produces NuGet artifacts. This does not mean they have been published to nuget.org. See [embedding examples](docs/components.md).
+The application is a thin browser/desktop host. All twelve libraries are packed with symbols and published to NuGet.org for version tags. See [embedding examples](docs/components.md).
 
 ## Toolchain
 
@@ -146,7 +160,7 @@ UI tests use real pointer, keyboard, file-picker and download/reopen interaction
 
 ## Delivery and documentation
 
-**Build** tests the native engines, publishes and tests Uno WebAssembly, independently verifies the browser-encrypted PDF, and packages the libraries. **Desktop** compiles on Windows, macOS and Linux. **Pages** deploys a successful main-branch build and validates its commit identity and public behavior. **Release** builds version tags and supports optional NuGet publication through an explicitly configured key.
+**Build** tests the native engines, publishes and tests Uno WebAssembly, independently verifies the browser-encrypted PDF, and packages the libraries. **Desktop** compiles on Windows, macOS and Linux. **Pages** deploys a successful main-branch build and validates its commit identity and public behavior. **Release** runs for `v*` tags or a supplied manual version. It reruns the engine and browser gates, publishes self-contained single-file desktop executables for Windows, macOS and Linux (x64 and arm64), packs the libraries with symbols and emits `SHA256SUMS.txt`. Tags attach all assets to a GitHub Release and publish the packages to NuGet.org with [Trusted Publishing](https://learn.microsoft.com/nuget/nuget-org/trusted-publishing) (OIDC, no stored API key) from the protected `nuget` environment. Manual runs are dry runs: they build and upload every asset as workflow artifacts but publish nothing.
 
 [Architecture](docs/architecture.md) · [Components](docs/components.md) · [Compatibility](docs/compatibility.md) · [Shortcuts](docs/shortcuts.md) · [Security](SECURITY.md) · [Contributing](CONTRIBUTING.md) · [Changelog](CHANGELOG.md) · [Third-party notices](THIRD-PARTY-NOTICES.md)
 
