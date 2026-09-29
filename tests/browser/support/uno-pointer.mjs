@@ -5,7 +5,7 @@
  */
 const fixedChrome = new Set([
   'Edit', 'Home', 'Undo', 'Redo', 'Export PDF', 'Next page',
-  'Fit page', 'Zoom in', 'Open PDF', 'Close Objects'
+  'Fit page', 'Zoom in', 'Open PDF', 'Close Objects', 'Close panel'
 ]);
 
 function valid(control) {
@@ -85,10 +85,17 @@ export async function clickUnoControl(page, name) {
     }
 
     const bottom = page.viewportSize().height - 28;
+    // Both tool panels scroll. The left panel's 57px fixed header follows the
+    // 98px global chrome; it is not part of the scrollable content. Narrow
+    // title/rail controls are never treated as left-panel content.
+    const leftPanel = !fixedChrome.has(name) && target.x >= 0 &&
+      target.x + target.width <= 256 && target.width >= 100;
     const rightPanel = !fixedChrome.has(name) && target.x > 1000;
-    if (rightPanel && (target.y < 112 || target.y + target.height > bottom)) {
-      await page.mouse.move(target.x + target.width / 2, target.y < 112 ? 260 : bottom - 120);
-      await page.mouse.wheel(0, target.y < 112 ? -260 : 260);
+    const scrollable = leftPanel || rightPanel;
+    const top = leftPanel ? 155 : 112;
+    if (scrollable && (target.y < top || target.y + target.height > bottom)) {
+      await page.mouse.move(target.x + target.width / 2, target.y < top ? 260 : bottom - 120);
+      await page.mouse.wheel(0, target.y < top ? -260 : 260);
       // Wheel completion is not scroll-animation completion. The next loop
       // rechecks visibility; on-screen controls must additionally settle.
       await page.waitForTimeout(100);
@@ -97,7 +104,7 @@ export async function clickUnoControl(page, name) {
 
     target = await settledUnoControl(page, name);
     if (!valid(target)) continue;
-    if (rightPanel && (target.y < 112 || target.y + target.height > bottom)) continue;
+    if (scrollable && (target.y < top || target.y + target.height > bottom)) continue;
     // A fresh TransformToVisual rectangle can still precede compositor/input scrolling.
     // Probe with a real pointer move and observe ButtonBase.IsPointerOver before any press.
     // Failed probes may move/re-locate the pointer, but never retry a command invocation.
