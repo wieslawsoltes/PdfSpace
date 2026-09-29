@@ -1,0 +1,51 @@
+name: Materialize native object layout
+on:
+  push:
+    branches: [build/object-layout-0.5.5]
+    paths: [.github/workflows/materialize-layout.yml]
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/object-layout-0.5.5
+          fetch-depth: 0
+      - name: Materialize the exact reviewed source tree
+        env:
+          TRANSFER_COMMIT: ${{ github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = '935d88f111880875f0c2d9d6c588ba68d6ab8d9a'
+          git fetch origin "$TRANSFER_COMMIT"
+          python3 - <<'PY'
+          import os,subprocess,base64,lzma,hashlib,pathlib
+          encoded=subprocess.check_output(['git','show',f'{os.environ["TRANSFER_COMMIT"]}:tools/layout055/source.patch.xz.b64'])
+          patch=lzma.decompress(base64.b64decode(encoded,validate=True))
+          assert hashlib.sha256(patch).hexdigest()=='486ee2ca902f6a03e6d50f0d6612e2d3b56bb01b5a9ba9da5d97f1c671c54e18'
+          pathlib.Path('/tmp/layout.patch').write_bytes(patch)
+          PY
+          git apply --check /tmp/layout.patch
+          git apply /tmp/layout.patch
+          git diff --check
+          git add -A
+          test "$(git write-tree)" = '0874b1a6b9d2ca9f164f20e336e37d32d917b75c'
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'feat: native reference and page layout with efficient validated edit batches'
+          git push origin HEAD:feat/object-layout-0.5.5
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - name: Focused native layout regression checks
+        run: dotnet run --project tests/PdfSpace.Tests -c Release -- --test-object-layout
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: PdfSpace-object-layout-validation
+          path: artifacts/structured
+          if-no-files-found: ignore
