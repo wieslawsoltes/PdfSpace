@@ -42,11 +42,14 @@ public sealed partial class App : Application
             var sample = SampleDocument.Create(_font); _workbench = new PdfWorkbench(sample, storage, _font, security, ocr); _window.Content = _workbench;
 #if __WASM__
             var diagnostics = BrowserFiles.IsTestMode();
+            var observing = false;
             void Observe()
             {
-                if (!diagnostics || _workbench.XamlRoot is null) return;
+                if (!diagnostics || observing || _workbench.XamlRoot is null) return;
+                observing = true;
                 try { BrowserFiles.PublishDiagnostics(_workbench.GetDiagnosticsJson()); }
                 catch (InvalidOperationException) { /* A just-detached visual is absent from the next snapshot. */ }
+                finally { observing = false; }
             }
             void Publish()
             {
@@ -64,7 +67,6 @@ public sealed partial class App : Application
                     }
                 }
                 BrowserFiles.SetCanvasFocus(canvasFocused);
-                Observe();
             }
             _workbench.StateChanged += Publish;
             _workbench.GotFocus += (_, _) => Publish();
@@ -72,7 +74,8 @@ public sealed partial class App : Application
             _workbench.Loaded += (_, _) => Publish();
             if (diagnostics)
             {
-                _workbench.LayoutUpdated += (_, _) => Observe();
+                // Sample at most once per timer tick; nested state/layout/focus events must
+                // not synchronously traverse and serialize the entire visual/document tree.
                 // Compositor scroll transforms can change without layout. Sample read-only geometry,
                 // not Publish(): diagnostics must not repair focus or otherwise mask production bugs.
                 // Normal sessions have no diagnostic timer and no diagnostic serialization overhead.

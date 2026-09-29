@@ -88,3 +88,31 @@ test('ahead-of-input geometry never clicks the unrelated button beneath stale co
   expect(await page.evaluate(() => globalThis.decoyClicks)).toBe(0);
   expect(await page.evaluate(() => globalThis.receivedClicks)).toBe(1);
 });
+
+
+test('fixed object-panel close header is clicked without scrolling its content', async ({ page }) => {
+  // This is the real header geometry from the dense-page regression. Its top
+  // precedes the scrollable body: trying to reveal it by scrolling cannot work.
+  await page.setContent('<button id="target" style="position:fixed;left:1342px;top:108px;width:34px;height:34px">×</button>');
+  await page.evaluate(() => {
+    const button = document.getElementById('target');
+    globalThis.receivedClicks = 0; globalThis.wheelEvents = 0;
+    let pointerOver = false; let revision = 0;
+    button.addEventListener('pointerenter', () => { pointerOver = true; });
+    button.addEventListener('pointerleave', () => { pointerOver = false; });
+    button.addEventListener('click', () => globalThis.receivedClicks++);
+    document.addEventListener('wheel', () => globalThis.wheelEvents++);
+    const publish = () => {
+      const r = button.getBoundingClientRect();
+      globalThis.pdfSpaceDiagnostics = {
+        diagnosticRevision: ++revision,
+        controls: [{ name: 'Close Objects', enabled: true, x: r.x, y: r.y,
+          width: r.width, height: r.height, pointerOver }]
+      };
+    };
+    publish(); setInterval(publish, 40);
+  });
+  await clickUnoControl(page, 'Close Objects');
+  expect(await page.evaluate(() => globalThis.wheelEvents)).toBe(0);
+  expect(await page.evaluate(() => globalThis.receivedClicks)).toBe(1);
+});

@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import fs from 'node:fs';
+import { clickUnoControl as click } from './support/uno-pointer.mjs';
 const url = process.env.PDFSPACE_URL || 'http://127.0.0.1:4173/PdfSpace/';
 const state = page => page.evaluate(() => globalThis.pdfSpaceDiagnostics);
 async function start(page) {
@@ -9,23 +10,6 @@ async function start(page) {
   await click(page, 'Edit'); await click(page, 'Edit original images'); await click(page, 'Open native object example');
   await expect.poll(async () => (await state(page)).nativeImages).toBe(2);
   await click(page, 'Fit page');
-}
-async function click(page, name) {
-  await expect.poll(async () => (await state(page)).controls.some(c => c.name === name && c.enabled && c.width > 1)).toBe(true);
-  for (let attempt = 0; attempt < 12; attempt++) {
-    const c = (await state(page)).controls.find(c => c.name === name && c.enabled && c.width > 1);
-    const bottom = page.viewportSize().height - 28;
-    const chrome = ['Edit', 'Export PDF', 'Open PDF', 'Find in document', 'Undo', 'Redo', 'Fit page', 'Next page'].includes(name);
-    if (!chrome && (c.y < 98 || c.y + c.height > bottom)) {
-      // Only panel contents scroll; global chrome remains fixed.
-      if (c.x > 900 || (c.x < 255 && c.y > 90)) {
-        await page.mouse.move(c.x + c.width / 2, c.y < 98 ? 250 : bottom - 110);
-        await page.mouse.wheel(0, c.y < 98 ? -280 : 280); await page.waitForTimeout(170); continue;
-      }
-    }
-    await page.mouse.click(c.x + c.width / 2, c.y + c.height / 2); await page.waitForTimeout(170); return;
-  }
-  throw new Error(`Cannot reveal ${name}`);
 }
 async function type(page, text) {
   await page.waitForFunction(() => document.activeElement instanceof HTMLInputElement || document.activeElement instanceof HTMLTextAreaElement);
@@ -54,7 +38,7 @@ test('native image placement moves, resizes, flips, replaces and reopens without
   await expect.poll(async () => (await state(page)).imageBounds?.x).toBeCloseTo(70, 0);
   await expect.poll(async () => (await state(page)).imageBounds?.y).toBeCloseTo(250, 0);
   await click(page, 'Undo'); await click(page, 'Select image 1');
-  expect((await state(page)).imageBounds.x).toBeCloseTo(60, 4);
+  await expect.poll(async () => (await state(page)).imageBounds?.x).toBeCloseTo(60, 4);
   await click(page, 'Redo'); await click(page, 'Select image 1');
   await click(page, 'Image width'); await type(page, '180'); await click(page, 'Apply image geometry');
   await expect.poll(async () => (await state(page)).imageBounds?.width).toBeCloseTo(180, 4);
@@ -68,10 +52,16 @@ test('native image placement moves, resizes, flips, replaces and reopens without
   fs.mkdirSync('artifacts/screenshots', { recursive: true }); await page.screenshot({ path: 'artifacts/screenshots/pdfspace-native-image-editing.png' });
   const bytes = await save(page, 'objects-browser-edited.pdf'); await open(page, bytes);
   await click(page, 'Edit original images'); await expect.poll(async () => (await state(page)).nativeImages).toBe(2);
-  await click(page, 'Select image 1'); expect((await state(page)).imageBounds.width).toBeCloseTo(180, 4);
+  await click(page, 'Select image 1');
+  await expect.poll(async () => (await state(page)).imageBounds?.width).toBeCloseTo(180, 4);
   await click(page, 'Next page'); await expect.poll(async () => (await state(page)).nativeImages).toBe(1);
   await expect.poll(async () => (await state(page)).controls.some(c => c.name === 'Select image 2')).toBe(false);
-  await click(page, 'Select image 1'); expect((await state(page)).imageBounds.width).toBeCloseTo(160, 4);
+  await click(page, 'Select image 1');
+  // Diagnostic snapshots are periodic observations, not synchronous click acknowledgements.
+  // Wait for the actual page/selection before testing its unchanged native dimensions.
+  await expect.poll(async () => { const s = await state(page); return [s.page, s.selectedImage]; }).toEqual([2, 0]);
+  await expect.poll(async () => (await state(page)).imageBounds?.width).toBeCloseTo(160, 4);
+  expect((await state(page)).undoCount).toBe(0);
 });
 
 test('replacement font writes Unicode into a selected nested text occurrence', async ({ page }) => {

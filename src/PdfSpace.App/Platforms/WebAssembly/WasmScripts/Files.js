@@ -46,19 +46,37 @@
   function pickFile(accept, sizeLimit) {
     return new Promise((resolve, reject) => {
       const input = document.createElement('input'); input.type = 'file'; input.accept = accept;
-      input.style.display = 'none'; document.body.append(input);
-      let finished = false;
-      const done = value => { if (!finished) { finished = true; input.remove(); resolve(value); } };
-      input.addEventListener('cancel', () => done(''), { once: true });
-      input.addEventListener('change', async () => {
+      input.style.display = 'none';
+      // A file selection owns the operation before any asynchronous I/O. A late
+      // cancel/change from the closed picker cannot settle or restart that read.
+      let phase = 'picking';
+      function detach() {
+        input.removeEventListener('cancel', cancel);
+        input.removeEventListener('change', change);
+        input.remove();
+      }
+      function cancel() {
+        if (phase !== 'picking') return;
+        phase = 'settled'; detach(); resolve('');
+      }
+      async function change() {
+        if (phase !== 'picking') return;
+        const file = input.files?.[0];
+        if (!file) { cancel(); return; }
+        phase = 'reading'; detach();
         try {
-          const file = input.files?.[0]; if (!file) return done('');
           const limit = sizeLimit ?? (file.name.toLowerCase().endsWith('.pdfspace') ? 128 * 1024 * 1024 : 64 * 1024 * 1024);
           if (file.size > limit) throw new Error(`File exceeds the ${limit / 1024 / 1024} MB limit.`);
-          done(JSON.stringify({ name: file.name, base64: base64(new Uint8Array(await file.arrayBuffer())) }));
-        } catch (error) { finished = true; input.remove(); reject(error); }
-      }, { once: true });
-      try { input.click(); } catch (error) { input.remove(); reject(error); }
+          const buffer = await file.arrayBuffer();
+          if (buffer.byteLength > limit) throw new Error('The selected file exceeds the input limit.');
+          const result = JSON.stringify({ name: file.name, base64: base64(new Uint8Array(buffer)) });
+          phase = 'settled'; resolve(result);
+        } catch (error) { phase = 'settled'; reject(error); }
+      }
+      input.addEventListener('cancel', cancel);
+      input.addEventListener('change', change);
+      try { document.body.append(input); input.click(); }
+      catch (error) { phase = 'settled'; detach(); reject(error); }
     });
   }
   globalThis.pdfSpaceFiles = {

@@ -13,7 +13,13 @@
 
 PdfSpace is an independent, local-first PDF application built in **C# with Uno Platform and SkiaSharp**. The browser runs a real Uno WebAssembly application with the same document, editing and rendering libraries as the desktop host. An Acrobat-inspired shell brings together document tabs, floating quick tools, comments, form preparation, original-text editing, protection, redaction and page organization.
 
-> **0.5.3-alpha.1:** functional PDF workflows, not complete or pixel-identical Adobe Acrobat compatibility. PdfSpace has original branding and icons and is not affiliated with Adobe. Review the [save and security boundaries](docs/compatibility.md) before processing important documents.
+> **0.5.4-alpha.1:** functional PDF workflows, not complete or pixel-identical Adobe Acrobat compatibility. PdfSpace has original branding and icons and is not affiliated with Adobe. Review the [save and security boundaries](docs/compatibility.md) before processing important documents.
+
+## Resize and vector-point alignment in 0.5.4
+
+**Edit → Edit objects** now offers independent **Snap resizing objects** and **Snap vector points** controls. Resize guides preserve the fixed edge/corner and Shift proportions; point guides preserve axis locks and handle grab offsets. Alt bypasses snapping. A completed gesture makes one native PDF edit; stationary, returned and cancelled gestures leave the source unchanged.
+
+The object inspector reuses a pool of at most **64 rows**, with Previous/Next ranges and **Go to object** reaching every indexed occurrence. Dense selection and range navigation do not reparse PDF objects or add history. Compacted snap anchors and allocation-free point/resize queries reduce geometry overhead. See [editing behavior](docs/object-editing.md#resize-and-vector-point-alignment-054) and [measurement scope](docs/performance.md#editing-guides-and-inspector-reuse-054).
 
 ## Precision object gestures in 0.5.2
 
