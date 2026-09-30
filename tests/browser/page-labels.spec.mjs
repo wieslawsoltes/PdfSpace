@@ -40,7 +40,9 @@ test('native page labels preserve mixed sections, support navigation, undo and s
   await (await chooser).setFiles({ name: 'native-labels.pdf', mimeType: 'application/pdf', buffer: bytes });
   await expect.poll(async () => (await state(page)).title).toBe('native-labels.pdf');
   await expect.poll(async () => (await state(page)).pageLabel).toBe('i');
-  await click(page, 'Organize pages'); await click(page, 'Page labels');
+  // Opening a document preserves the active organizer; there is no All tools entry here.
+  await expect.poll(async () => (await state(page)).mode).toBe('Organize pages');
+  await click(page, 'Page labels');
   await set(page, 'Label page range', 'all'); await click(page, 'Reset page labels');
   await expect.poll(async () => (await state(page)).pageLabel).toBe('1');
   await save(page, 'labels-browser-reset.pdf');
