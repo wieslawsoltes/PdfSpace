@@ -12,16 +12,14 @@ internal sealed class DesktopWorkspaceStorage : IWorkspaceStorage
     public Task<WorkspaceFile?> OpenImageAsync() => OpenCoreAsync([".png", ".jpg", ".jpeg"], 32 * 1024 * 1024);
     public Task<WorkspaceFile?> OpenAsync() => OpenCoreAsync([".pdf", ".pdfspace"], 128 * 1024 * 1024);
     public Task<WorkspaceFile?> OpenFormDataAsync() => OpenCoreAsync([".xfdf", ".json"], 4 * 1024 * 1024);
+    public Task<WorkspaceFile?> OpenAttachmentAsync() => OpenCoreAsync(["*"], 16 * 1024 * 1024);
     private static async Task<WorkspaceFile?> OpenCoreAsync(string[] extensions, int maximumBytes)
     {
         var picker = new FileOpenPicker { SuggestedStartLocation = PickerLocationId.DocumentsLibrary };
         foreach (var extension in extensions) picker.FileTypeFilter.Add(extension);
         var file = await picker.PickSingleFileAsync(); if (file is null) return null;
         using var input = await file.OpenStreamForReadAsync();
-        if (input.Length > maximumBytes) throw new InvalidDataException($"The file exceeds the {maximumBytes / 1024 / 1024} MB limit.");
-        using var output = new MemoryStream(); await input.CopyToAsync(output);
-        if (output.Length > maximumBytes) throw new InvalidDataException("The file grew beyond the size limit while opening.");
-        return new(file.Name, output.ToArray());
+        return new(file.Name, await WorkspaceFileReader.ReadBoundedAsync(input, maximumBytes));
     }
     public async Task SaveAsync(string name, byte[] bytes, string contentType)
     {

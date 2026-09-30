@@ -12,7 +12,7 @@ public sealed partial class PdfWorkbench
     private readonly List<(PdfTool Tool, PdfCommandButton Button)> _toolButtons = [];
     private Border _quickTools = null!, _selectionBar = null!;
     private PdfTextField _find = null!, _pageField = null!;
-    private TextBlock _pageTotal = null!, _zoomLabel = null!, _status = null!, _documentInfo = null!;
+    private TextBlock _pageTotal = null!, _zoomLabel = null!, _status = null!, _documentInfo = null!, _recoveryStatus = null!;
     private PdfCommandButton _undo = null!, _redo = null!, _menuButton = null!;
     private void BuildShell()
     {
@@ -39,9 +39,12 @@ public sealed partial class PdfWorkbench
         BuildQuickTools(); center.Children.Add(_quickTools); BuildSelectionBar(); center.Children.Add(_selectionBar);
         PdfTheme.Place(_body, center, column: 1); PdfTheme.Place(_body, _rightHost, column: 2); PdfTheme.Place(_body, BuildNavigationRail(), column: 3); PdfTheme.Place(_root, _body, row: 2);
         PdfTheme.Place(_root, _homeHost, row: 2);
-        var footer = new Grid { Background = PdfTheme.Brush("#F7F7F7"), Padding = new Thickness(14, 0, 14, 0), ColumnDefinitions = { new() { Width = new GridLength(1, GridUnitType.Star) }, new() { Width = GridLength.Auto } } };
+        var footer = new Grid { Background = PdfTheme.Brush("#F7F7F7"), Padding = new Thickness(14, 0, 14, 0), ColumnDefinitions = { new() { Width = new GridLength(1, GridUnitType.Star) }, new() { Width = GridLength.Auto }, new() { Width = GridLength.Auto } } };
         _status = PdfTheme.Text("All files stay on your device.", 11, "#686868"); _documentInfo = PdfTheme.Text("", 10, "#858585");
-        PdfTheme.Place(footer, _status); PdfTheme.Place(footer, _documentInfo, column: 1); PdfTheme.Place(_root, new Border { Child = footer, BorderBrush = PdfTheme.Brush("#DDDDDD"), BorderThickness = new Thickness(0, 1, 0, 0) }, row: 3);
+        _status.TextTrimming = TextTrimming.CharacterEllipsis;
+        _recoveryStatus = PdfTheme.Text("", 10, "#858585"); _recoveryStatus.Margin = new Thickness(10, 0, 10, 0);
+        AutomationProperties.SetName(_recoveryStatus, "Local recovery status");
+        PdfTheme.Place(footer, _status); PdfTheme.Place(footer, _recoveryStatus, column: 1); PdfTheme.Place(footer, _documentInfo, column: 2); PdfTheme.Place(_root, new Border { Child = footer, BorderBrush = PdfTheme.Brush("#DDDDDD"), BorderThickness = new Thickness(0, 1, 0, 0) }, row: 3);
         PdfTheme.Place(_root, _dialogs, rowSpan: 4);
     }
     private void BuildGlobalBar()

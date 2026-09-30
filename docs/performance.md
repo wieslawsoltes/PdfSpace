@@ -94,3 +94,11 @@ One operation builds one native TrueType font from the union of required glyphs,
 ## Encoded-source audits (0.6.2)
 
 `PdfSizeAudit` enumerates the parsed native indirect object table and classifies stream lengths without payload decoding. Shared references do not multiply the count. A bounded top-12 heap avoids retaining/sorting every stream. `PdfSizeAuditCache` holds weak source keys and at most four reports by default; warm identity hits return the same immutable report without parsing. Each tab owns and clears its cache. The inspector is explicit-run and snapshot-guarded rather than auditing on every viewport or annotation event. See [the full accounting contract](space-audit.md) and `benchmarks/PdfSpace.SizeAudit` for scope and reproducible alternating-order samples.
+
+## Catalog attachment authoring (0.6.4)
+
+Attachment changes are catalog-only. A one-source edit retains the page-state array, source ID and prior preview buffer while replacing the primary native PDF bytes. Cached visual pages need not be imported or reconstructed. The native tests exercise unchanged cached picture counts and rendered pixels; export/reopen checks independently verify actual native output. Prior preview/history buffers may still contain removed attachments; these optimizations are not erasure.
+
+`PdfAttachmentEditor.AddRange` validates the entire bounded input batch before opening a PDF, then applies one name-tree edit and one source write for up to 32 files. Serial Add performs those stages repeatedly. The focused attachment-editing test emits an alternating-order benchmark for eight small files with the scope and every sample recorded. Neither path claims to eliminate all PDF parsing, and catalog safety scanning still traverses the bounded direct/indirect object graph.
+
+Desktop picker input now uses `WorkspaceFileReader` instead of accumulating all bytes before checking an updated file length. Seekable oversized files reject before reading; growing/non-seekable files stop at the configured payload limit plus a one-byte probe. Scratch storage is pooled. The returned array and MemoryStream capacity are separate allocations, so this is not a total-memory cap.

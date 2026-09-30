@@ -46,6 +46,7 @@ public sealed partial class PdfWorkbench
                 _leftPanel.Add("Edit original text", PdfIconKind.Edit, () => Run(ShowOriginalTextAsync));
                 _leftPanel.Add("Edit original images", PdfIconKind.Image, () => Safe(ShowNativeImages));
                 _leftPanel.Add("Add image", PdfIconKind.Image, () => Run(ChooseInsertImageAsync));
+                _leftPanel.Add("Attach file", PdfIconKind.Attachment, () => Safe(ShowAttachments));
                 Tool("Add link", PdfIconKind.Share, PdfTool.Link);
                 Tool("Select annotation", PdfIconKind.Select, PdfTool.Select); Tool("Add text", PdfIconKind.Text, PdfTool.Text);
                 _leftPanel.Heading("MARK UP TEXT"); Tool("Highlight text", PdfIconKind.Highlight, PdfTool.Highlight); Tool("Underline text", PdfIconKind.Underline, PdfTool.Underline); Tool("Strikethrough text", PdfIconKind.Strikeout, PdfTool.Strikeout);

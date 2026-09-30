@@ -33,9 +33,12 @@ if (args is ["--verify-browser-size-audit", var auditDirectory]) { BrowserSizeAu
 
 if (args is ["--verify-browser-attachments", var attachmentDirectory]) { BrowserAttachmentVerification.Run(attachmentDirectory); return; }
 
+if (args is ["--verify-browser-attachment-editing", var attachmentEditingDirectory]) { BrowserAttachmentEditingVerification.Run(attachmentEditingDirectory); return; }
+
 var passed = 0;
 void Check(bool condition, string name) { if (!condition) throw new Exception("FAILED: " + name); Console.WriteLine("PASS " + name); passed++; }
 void Reject(Action action, string name) { try { action(); } catch { Check(true, name); return; } throw new Exception("FAILED: " + name); }
+if (args is ["--test-attachment-editing"]) { AttachmentEditingTests.Run(Check, Reject); WorkspaceFileReaderTests.Run(Check, Reject); Console.WriteLine($"{passed} attachment editing checks passed."); return; }
 if (args is ["--test-attachments"]) { EmbeddedFileTests.Run(Check, Reject); Console.WriteLine($"{passed} attachment checks passed."); return; }
 if (args is ["--test-size-audit"]) { SizeAuditTests.Run(Check, Reject); Console.WriteLine($"{passed} space audit checks passed."); return; }
 if (args is ["--test-page-labels"]) { PageLabelTests.Run(Check, Reject); Console.WriteLine($"{passed} page label checks passed."); return; }
@@ -162,4 +165,5 @@ PageMarkPerformanceTests.Run(Check);
 PageLabelTests.Run(Check, Reject);
 SizeAuditTests.Run(Check, Reject);
 EmbeddedFileTests.Run(Check, Reject);
+AttachmentEditingTests.Run(Check, Reject); WorkspaceFileReaderTests.Run(Check, Reject);
 Console.WriteLine($"\n{passed} engine checks passed.");

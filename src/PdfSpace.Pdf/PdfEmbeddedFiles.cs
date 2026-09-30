@@ -13,7 +13,7 @@ public static class PdfEmbeddedFiles
 {
     public const int MaximumFiles = 512;
     public const int MaximumExtractedBytes = 16 * 1024 * 1024;
-    private sealed record Entry(PdfEmbeddedFileInfo Info, PdfDictionary? Stream);
+    internal sealed record Entry(PdfEmbeddedFileInfo Info, PdfDictionary? Stream, PdfDictionary Specification, PdfString KeyToken);
 
     /// <summary>Inspect a bounded EmbeddedFiles name tree without decoding attachment payloads.</summary>
     public static IReadOnlyList<PdfEmbeddedFileInfo> Read(byte[] bytes, CancellationToken cancellationToken = default)
@@ -84,7 +84,7 @@ public static class PdfEmbeddedFiles
         return result;
     }
 
-    private static List<Entry> ReadEntries(PdfDocument document, string fingerprint, CancellationToken cancellationToken)
+    internal static List<Entry> ReadEntries(PdfDocument document, string fingerprint, CancellationToken cancellationToken)
     {
         if (document.Internals.GetAllObjects().Length > PdfSizeAudit.MaximumObjects)
             throw new InvalidDataException("Attachment inspection exceeds 200,000 indirect objects.");
@@ -133,7 +133,7 @@ public static class PdfEmbeddedFiles
                     };
                     var reason = Unsupported(spec, stream, size);
                     result.Add(new(new(fingerprint, key, name, DownloadFileName(name), DisplayText(description),
-                        DisplayText(mime), stream?.Stream?.Length ?? 0, size, reason), stream));
+                        DisplayText(mime), stream?.Stream?.Length ?? 0, size, reason), stream, spec, (PdfString)PdfObjects.Resolve(values.Elements[i])!));
                 }
             }
             else
