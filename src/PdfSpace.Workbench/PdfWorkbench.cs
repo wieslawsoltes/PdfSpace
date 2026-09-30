@@ -5,7 +5,7 @@ namespace PdfSpace.Workbench;
 public sealed partial class PdfWorkbench : UserControl, IDisposable
 {
     private sealed record DocumentContext(EditorSession Session, PdfViewport Viewport, PdfDocumentTab Tab)
-    { public PdfSearchIndex Search { get; } = new(); public PdfSizeAuditCache SizeAudit { get; } = new(); public PdfEmbeddedFileCache Attachments { get; } = new(); }
+    { public PdfSearchIndex Search { get; } = new(); public PdfSizeAuditCache SizeAudit { get; } = new(); public PdfEmbeddedFileCache Attachments { get; } = new(); public string Recovery { get; set; } = "ready"; public string? RecoveryError { get; set; } }
     private readonly List<DocumentContext> _documents = [];
     private DocumentContext _active = null!;
     private readonly IWorkspaceStorage _storage;
@@ -41,7 +41,7 @@ public sealed partial class PdfWorkbench : UserControl, IDisposable
                 if (e.DataView.Contains(Windows.ApplicationModel.DataTransfer.StandardDataFormats.StorageItems))
                     foreach (var item in await e.DataView.GetStorageItemsAsync())
                         if (item is Windows.Storage.StorageFile file && (file.FileType.Equals(".pdf", StringComparison.OrdinalIgnoreCase) || file.FileType.Equals(".pdfspace", StringComparison.OrdinalIgnoreCase)))
-                        { using var stream = await file.OpenStreamForReadAsync(); if (stream.Length > WorkspaceJson.MaximumSourceBytes * 2L) throw new InvalidDataException("This file is too large."); using var bytes = new MemoryStream(); await stream.CopyToAsync(bytes); await OpenFileAsync(new(file.Name, bytes.ToArray())); }
+                        { using var stream = await file.OpenStreamForReadAsync(); var bytes = await WorkspaceFileReader.ReadBoundedAsync(stream, WorkspaceJson.MaximumSourceBytes * 2); await OpenFileAsync(new(file.Name, bytes)); }
             }
             catch (Exception ex) { ShowStatus(ex.Message, true); }
         };
@@ -53,7 +53,7 @@ public sealed partial class PdfWorkbench : UserControl, IDisposable
         var tab = new PdfDocumentTab(document.Title); var context = new DocumentContext(session, viewport, tab);
         _documents.Add(context); _tabs.Children.Add(tab);
         tab.Activated += () => Activate(context); tab.CloseRequested += () => Run(() => CloseAsync(context));
-        session.Changed += (_, _) => { if (_active == context) { RefreshData(); _autosave.Stop(); if (!context.Session.Document.IsSensitive) _autosave.Start(); } UpdateTabs(); };
+        session.Changed += (_, _) => { context.Recovery = "pending"; context.RecoveryError = null; if (_active == context) { RefreshData(); _autosave.Stop(); if (!context.Session.Document.IsSensitive) _autosave.Start(); } UpdateTabs(); };
         session.ViewChanged += (_, _) => { if (_active == context) { var prior = _imagePageId; RefreshNativeImages(); if (_right == "Original images" && prior != _imagePageId) RefreshRight(); UpdateChrome(); } };
         viewport.ViewChanged += () =>
         {
@@ -118,6 +118,7 @@ public sealed partial class PdfWorkbench : UserControl, IDisposable
     private void UpdateChrome()
     {
         if (_active is null) return;
+        UpdateRecoveryStatus();
         if (XamlRoot is null || !ReferenceEquals(FocusManager.GetFocusedElement(XamlRoot), _pageField)) _pageField.Text = Viewport.PageLabels[Session.CurrentPage]; _pageTotal.Text = $"{Session.CurrentPage + 1}/{Session.Document.Pages.Length}";
         _zoomLabel.Text = $"{Viewport.Zoom * 100:F0}%";
         _undo.IsEnabled = Session.CanUndo; _redo.IsEnabled = Session.CanRedo;
@@ -152,25 +153,6 @@ public sealed partial class PdfWorkbench : UserControl, IDisposable
     { try { await action(); } catch (Exception ex) { ShowStatus(ex.Message, true); } }
     private void Safe(Action action)
     { try { action(); } catch (Exception ex) { ShowStatus(ex.Message, true); } }
-    private async Task SaveRecoveryAsync()
-    {
-        if (_disposed || Session.Document.IsSensitive) return;
-        if (_savingRecovery) { _saveAgain = true; return; }
-        _savingRecovery = true;
-        try
-        {
-            do
-            {
-                _saveAgain = false; var document = Session.Document;
-                if (document.IsSensitive) return;
-                await _storage.WriteRecoveryAsync(WorkspaceJson.Save(document));
-                if (ReferenceEquals(document, Session.Document)) ShowStatus("Recovery copy saved on this device. Export a workspace for a permanent copy.");
-                else _saveAgain = true;
-            } while (_saveAgain && !_disposed);
-        }
-        catch (Exception ex) { ShowStatus("Recovery could not be saved: " + ex.Message + ". Export your workspace now.", true); }
-        finally { _savingRecovery = false; }
-    }
     public async Task OfferRecoveryAsync()
     {
         try
