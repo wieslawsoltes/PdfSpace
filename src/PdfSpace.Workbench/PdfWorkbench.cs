@@ -5,7 +5,7 @@ namespace PdfSpace.Workbench;
 public sealed partial class PdfWorkbench : UserControl, IDisposable
 {
     private sealed record DocumentContext(EditorSession Session, PdfViewport Viewport, PdfDocumentTab Tab)
-    { public PdfSearchIndex Search { get; } = new(); public PdfSizeAuditCache SizeAudit { get; } = new(); }
+    { public PdfSearchIndex Search { get; } = new(); public PdfSizeAuditCache SizeAudit { get; } = new(); public PdfEmbeddedFileCache Attachments { get; } = new(); }
     private readonly List<DocumentContext> _documents = [];
     private DocumentContext _active = null!;
     private readonly IWorkspaceStorage _storage;
@@ -101,7 +101,7 @@ public sealed partial class PdfWorkbench : UserControl, IDisposable
         if (context.Session.IsDirty && !await _dialogs.ConfirmAsync("Close document?", "Unsaved workspace changes will be closed. Export an editable .pdfspace workspace to keep them permanently.", "Close document")) return;
         if (_ocrContext == context) _ocrCancellation?.Cancel();
         if (_pendingImageContext == context) { _pendingImage = null; _pendingImageContext = null; }
-        context.Search.Clear(); context.SizeAudit.Clear(); context.Viewport.Dispose(); _documents.Remove(context); _tabs.Children.Remove(context.Tab);
+        context.Search.Clear(); context.SizeAudit.Clear(); context.Attachments.Clear(); context.Viewport.Dispose(); _documents.Remove(context); _tabs.Children.Remove(context.Tab);
         if (_documents.Count == 0) AddDocument(new PdfWorkspace());
         else if (_active == context) Activate(_documents[^1]);
         if (_home) ShowHome();
@@ -180,5 +180,5 @@ public sealed partial class PdfWorkbench : UserControl, IDisposable
         }
         catch (Exception ex) { ShowStatus("Recovery is unavailable: " + ex.Message, true); }
     }
-    public void Dispose() { if (_disposed) return; _disposed = true; ClearObjectList(); _objectClipboard = null; _pageObjects = []; _selectedObjects = []; _objectStamp.Clear(); _ocrCancellation?.Cancel(); _autosave.Stop(); foreach (var d in _documents) { d.Search.Clear(); d.SizeAudit.Clear(); d.Viewport.Dispose(); } _documents.Clear(); }
+    public void Dispose() { if (_disposed) return; _disposed = true; ClearObjectList(); _objectClipboard = null; _pageObjects = []; _selectedObjects = []; _objectStamp.Clear(); _ocrCancellation?.Cancel(); _autosave.Stop(); foreach (var d in _documents) { d.Search.Clear(); d.SizeAudit.Clear(); d.Attachments.Clear(); d.Viewport.Dispose(); } _documents.Clear(); }
 }

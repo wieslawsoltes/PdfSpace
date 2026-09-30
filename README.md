@@ -1,7 +1,11 @@
 <div align="center">
 
 # PdfSpace
-### Source space audit in 0.6.2
+### Attachment browsing in 0.6.3
+
+**Convert → Browse attachments → Inspect attachments** lists catalog EmbeddedFiles in retained source PDFs. Download original files through an explicit confirmation, with safe filename handling and bounded unfiltered/Flate decoding. No embedded action or external file reference is executed. The inspector pages through 32 rows and caches immutable metadata without holding source buffers alive. [Attachment APIs, safety and coverage](docs/attachments.md).
+
+## Source space audit in 0.6.2
 
 **Convert → Audit PDF space** inventories encoded image, font, page-content, Form, attachment and metadata streams, with bounded largest-object details and JSON export. Repeated audits reuse weak-reference source caches; metadata-only edits preserve those cache entries. The report does not rewrite a PDF or decode its content payloads. Stream shares are **not** percentages of the entire file, and retained sources are not the next export. [Accounting, APIs and performance boundaries](docs/space-audit.md).
 
@@ -19,7 +23,7 @@
 
 PdfSpace is an independent, local-first PDF application built in **C# with Uno Platform and SkiaSharp**. The browser runs a real Uno WebAssembly application with the same document, editing and rendering libraries as the desktop host. An Acrobat-inspired shell brings together document tabs, floating quick tools, comments, form preparation, original-text editing, protection, redaction and page organization.
 
-> **0.6.2-alpha.1:** functional PDF workflows, not complete or pixel-identical Adobe Acrobat compatibility. PdfSpace has original branding and icons and is not affiliated with Adobe. Review the [save and security boundaries](docs/compatibility.md) before processing important documents.
+> **0.6.3-alpha.1:** functional PDF workflows, not complete or pixel-identical Adobe Acrobat compatibility. PdfSpace has original branding and icons and is not affiliated with Adobe. Review the [save and security boundaries](docs/compatibility.md) before processing important documents.
 
 ## Page labels in 0.6.1
 
