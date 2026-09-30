@@ -1,6 +1,12 @@
 <div align="center">
 
 # PdfSpace
+### Native attachment authoring in 0.6.4
+
+**Convert → Browse attachments → Add attachment** embeds a chosen file with a Unicode description. Inspect existing entries to edit descriptions, replace their payloads or remove individual catalog entries. Each effective edit is undoable, and ordinary PDF export/reopen retains the result. Blank documents and one original source in original page order are supported; signed/XFA/Portfolio and assembled catalogs are guarded.
+
+Catalog-only changes retain page-state and renderer-preview identities. `PdfAttachmentEditor.AddRange` embeds up to 32 files in a single native parse/write; the desktop picker now bounds reads before accumulating oversized blocks. Existing entries sharing a file specification are copy-on-write. **Removing a catalog entry is not secure erasure**, and embedded files are never executed. [Attachment authoring, APIs and limits](docs/attachments.md#native-authoring-064).
+
 ### Attachment browsing in 0.6.3
 
 **Convert → Browse attachments → Inspect attachments** lists catalog EmbeddedFiles in retained source PDFs. Download original files through an explicit confirmation, with safe filename handling and bounded unfiltered/Flate decoding. No embedded action or external file reference is executed. The inspector pages through 32 rows and caches immutable metadata without holding source buffers alive. [Attachment APIs, safety and coverage](docs/attachments.md).
@@ -23,7 +29,7 @@
 
 PdfSpace is an independent, local-first PDF application built in **C# with Uno Platform and SkiaSharp**. The browser runs a real Uno WebAssembly application with the same document, editing and rendering libraries as the desktop host. An Acrobat-inspired shell brings together document tabs, floating quick tools, comments, form preparation, original-text editing, protection, redaction and page organization.
 
-> **0.6.3-alpha.1:** functional PDF workflows, not complete or pixel-identical Adobe Acrobat compatibility. PdfSpace has original branding and icons and is not affiliated with Adobe. Review the [save and security boundaries](docs/compatibility.md) before processing important documents.
+> **0.6.4-alpha.1:** functional PDF workflows, not complete or pixel-identical Adobe Acrobat compatibility. PdfSpace has original branding and icons and is not affiliated with Adobe. Review the [save and security boundaries](docs/compatibility.md) before processing important documents.
 
 ## Page labels in 0.6.1
 

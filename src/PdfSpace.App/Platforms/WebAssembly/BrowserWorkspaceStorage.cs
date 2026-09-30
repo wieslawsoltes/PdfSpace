@@ -8,6 +8,7 @@ internal sealed class BrowserWorkspaceStorage : IWorkspaceStorage
     public async Task<WorkspaceFile?> OpenImageAsync() => Decode(await BrowserFiles.OpenImage());
     public async Task<WorkspaceFile?> OpenAsync() => Decode(await BrowserFiles.Open());
     public async Task<WorkspaceFile?> OpenFormDataAsync() => Decode(await BrowserFiles.OpenFormData());
+    public async Task<WorkspaceFile?> OpenAttachmentAsync() => Decode(await BrowserFiles.OpenAttachment());
     private static WorkspaceFile? Decode(string result)
     {
         if (string.IsNullOrEmpty(result)) return null;
@@ -23,6 +24,7 @@ internal sealed class BrowserWorkspaceStorage : IWorkspaceStorage
 }
 internal static partial class BrowserFiles
 {
+    [JSImport("globalThis.pdfSpaceFiles.openAttachment")][return: JSMarshalAs<JSType.Promise<JSType.String>>] internal static partial Task<string> OpenAttachment();
     [JSImport("globalThis.pdfSpaceFiles.openImage")][return: JSMarshalAs<JSType.Promise<JSType.String>>] internal static partial Task<string> OpenImage();
     [JSImport("globalThis.pdfSpaceFiles.open")][return: JSMarshalAs<JSType.Promise<JSType.String>>] internal static partial Task<string> Open();
     [JSImport("globalThis.pdfSpaceFiles.openFormData")][return: JSMarshalAs<JSType.Promise<JSType.String>>] internal static partial Task<string> OpenFormData();

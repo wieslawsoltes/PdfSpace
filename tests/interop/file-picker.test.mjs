@@ -82,3 +82,19 @@ test('sequential selections of the same filename use independent inputs', async 
   }
   assert.equal(inputs.filter(input => input.connected).length, 0);
 });
+
+test('attachment picker accepts arbitrary binary data without executing or transforming it', async () => {
+  const { bridge, inputs } = harness(); const pending = bridge.openAttachment();
+  assert.equal(inputs[0].accept, '');
+  const payload = Uint8Array.from([0, 255, 1, 13, 10]);
+  inputs[0].files = [file('payload.exe', payload)]; fire(inputs[0], 'change');
+  assert.deepEqual(JSON.parse(await pending), { name: 'payload.exe', base64: Buffer.from(payload).toString('base64') });
+  assert.equal(inputs[0].connected, false);
+});
+
+test('attachment picker enforces its 16 MiB limit before reading', async () => {
+  const { bridge, inputs } = harness(); const pending = bridge.openAttachment(); let reads = 0;
+  inputs[0].files = [{ name: 'too-large.bin', size: 16 * 1024 * 1024 + 1, arrayBuffer: async () => { reads++; } }];
+  fire(inputs[0], 'change'); await assert.rejects(pending, /16 MB limit/);
+  assert.equal(reads, 0); assert.equal(inputs[0].connected, false);
+});

@@ -131,3 +131,7 @@ Refresh descriptors after any document mutation or undo. Never reuse a descripto
 ## Source-size inspection
 
 `PdfSpace.Pdf` exposes `PdfSizeAudit`, `PdfSizeAuditCache` and versioned `PdfWorkspaceSizeReport.ToJson()`. The cache is weak-reference, bounded and single-thread-affine. Reports contain immutable counts and native identifiers, not live PDF documents or source bytes. [API example, byte-accounting limits and performance details](space-audit.md).
+
+## Catalog attachment editing
+
+`PdfSpace.Pdf.PdfAttachmentEditor` supplies `Add`, atomic `AddRange`, `SetDescription`, `Replace` and `Remove` for a single original catalog or blank workspace. Use fresh `PdfEmbeddedFileInfo` descriptors after source changes. Call through `EditorSession.Execute` to participate in undo. Host binary pickers implement `IWorkspaceStorage.OpenAttachmentAsync`; `WorkspaceFileReader.ReadBoundedAsync` supplies input-budget enforcement without closing the host stream. See [attachment integration and restrictions](attachments.md#native-authoring-064).

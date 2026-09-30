@@ -80,6 +80,7 @@
     });
   }
   globalThis.pdfSpaceFiles = {
+    openAttachment: () => pickFile('', 16 * 1024 * 1024),
     openImage: () => pickFile('.png,.jpg,.jpeg,image/png,image/jpeg', 32 * 1024 * 1024),
     open: () => pickFile('.pdf,.pdfspace,application/pdf'),
     openFormData: () => pickFile('.xfdf,.json,application/vnd.adobe.xfdf,application/json', 4 * 1024 * 1024),

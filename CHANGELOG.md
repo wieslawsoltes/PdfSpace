@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.6.4-alpha.1
+
+- Add native catalog attachments, edit Unicode descriptions, replace payloads and remove individual entries through confirmed, undoable workbench commands.
+- Reusable atomic `PdfAttachmentEditor.AddRange` batches up to 32 files / 32 MiB. Existing shared specifications and catalog name dictionaries are detached; original name-key encodings and unrelated name trees are preserved.
+- Catalog-only edits retain page/preview/source identities instead of reparsing visible content. Empty batches and validated identical descriptions preserve the exact workspace.
+- Source-hash and descriptor checks, signature/XFA/Portfolio/original-sequence guards, explicit cancellation and per-file/output limits reject unsafe/stale operations.
+- Add `IWorkspaceStorage.OpenAttachmentAsync` with a backward-compatible unsupported default, browser binary picker and bounded desktop `WorkspaceFileReader` that stops growing/non-seekable inputs at the byte budget.
+- Native round-trip/undo/resource-isolation tests, three browser authoring workflows, independent PDF verification and an alternating-order batch benchmark. Release fixtures include attachment text inputs; publishing policies are unchanged.
+
 ## 0.6.3-alpha.1
 
 - Add bounded catalog attachment browsing and confirmed download, including Unicode names, nested name trees and unfiltered/Flate streams.

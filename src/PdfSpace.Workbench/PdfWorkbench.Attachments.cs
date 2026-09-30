@@ -18,25 +18,8 @@ public sealed partial class PdfWorkbench
     {
         content.Children.Add(Paragraph("RETAINED SOURCE ATTACHMENTS", 10));
         content.Children.Add(Paragraph("Browse EmbeddedFiles entries in the retained source PDFs. Files are never opened automatically. This list is not a preview of a combined PDF export."));
-        content.Children.Add(new PdfCommandButton("Inspect attachments", PdfIconKind.Search, () => Safe(() =>
-        {
-            var snapshot = Session.Document;
-            var rows = new List<AttachmentRow>();
-            var seen = new HashSet<byte[]>(ReferenceEqualityComparer.Instance);
-            var sourceNumber = 0;
-            foreach (var source in snapshot.Sources)
-            {
-                if (!seen.Add(source.Bytes)) continue;
-                sourceNumber++;
-                foreach (var file in _active.Attachments.Read(source.Bytes))
-                {
-                    if (rows.Count == 1024) throw new InvalidDataException("Attachment browsing is limited to 1,024 entries across all sources.");
-                    rows.Add(new(source.Id, sourceNumber, file));
-                }
-            }
-            _attachments = rows.ToArray(); _attachmentOffset = 0; _attachmentStamp.Remember(snapshot);
-            RefreshRight(); ShowStatus($"Found {_attachments.Length} source attachments. No PDF was changed.");
-        })));
+        content.Children.Add(new PdfCommandButton("Add attachment", PdfIconKind.Plus, () => Run(AddAttachmentAsync)));
+        content.Children.Add(new PdfCommandButton("Inspect attachments", PdfIconKind.Search, () => Safe(InspectAttachments)));
         if (!_attachmentStamp.Matches(Session.Document))
         {
             _attachments = []; _attachmentOffset = 0;
@@ -67,6 +50,34 @@ public sealed partial class PdfWorkbench
             if (row.File.Description.Length > 0) content.Children.Add(Paragraph(row.File.Description, 10));
             if (row.File.MediaType.Length > 0) content.Children.Add(Paragraph("Declared type: " + row.File.MediaType, 10));
             if (!row.File.CanExtract) content.Children.Add(Paragraph(row.File.UnavailableReason!, 10));
+            void ValidateSelection()
+            {
+                if (_active != context || !_attachmentStamp.Matches(Session.Document) || !_attachments.Contains(row))
+                    throw new InvalidOperationException("The attachment selection changed. Inspect the document again.");
+            }
+            void Commit(string label, Func<PdfWorkspace, PdfWorkspace> edit)
+            {
+                ValidateSelection(); Session.Execute(label, edit); InspectAttachments(); ShowStatus(label + ". Undo restores the prior PDF; removal is not secure erasure.");
+            }
+            content.Children.Add(new PdfCommandButton($"Edit attachment description {number}", PdfIconKind.Edit, () => Run(async () =>
+            {
+                ValidateSelection();
+                var description = await _dialogs.PromptAsync("Attachment description", "Change the description of this catalog entry only.", row.File.Description, multiline: true, acceptLabel: "Save description");
+                if (description is not null) Commit("Edit attachment description", document => PdfAttachmentEditor.SetDescription(document, row.File, description));
+            })) { Label = "Edit description" });
+            content.Children.Add(new PdfCommandButton($"Replace attachment {number}", PdfIconKind.Folder, () => Run(async () =>
+            {
+                ValidateSelection(); var file = await _storage.OpenAttachmentAsync(); if (file is null) return;
+                ValidateSelection();
+                if (!await _dialogs.ConfirmAsync("Replace attachment?", $"Use the contents of {file.Name} for {row.File.DownloadName}? The existing attachment name and description remain. Other references may retain the old file.", "Replace attachment")) return;
+                Commit("Replace attachment", document => PdfAttachmentEditor.Replace(document, row.File, file.Bytes));
+            })) { Label = "Replace file" });
+            content.Children.Add(new PdfCommandButton($"Remove attachment {number}", PdfIconKind.Trash, () => Run(async () =>
+            {
+                ValidateSelection();
+                if (!await _dialogs.ConfirmAsync("Remove catalog attachment?", $"Remove {row.File.DownloadName} from the catalog list? Other references, previews and undo history may still contain it. This is not secure erasure.", "Remove attachment")) return;
+                Commit("Remove attachment", document => PdfAttachmentEditor.Remove(document, row.File));
+            })) { Label = "Remove from catalog" });
             content.Children.Add(new PdfCommandButton($"Download attachment {number}", PdfIconKind.Export, () => Run(async () =>
             {
                 void Validate()
@@ -83,6 +94,6 @@ public sealed partial class PdfWorkbench
                 ShowStatus("Attachment saved without opening it. The PDF and undo history are unchanged.");
             })) { IsEnabled = row.File.CanExtract });
         }
-        content.Children.Add(Paragraph("Downloads support unfiltered or FlateDecode payloads up to 16 MiB. Known executable/web extensions receive .download. This is not a malware guarantee. Annotation-only attachments, associated-file arrays, portfolios and attachment authoring are not included.", 10));
+        content.Children.Add(Paragraph("Downloads support unfiltered or FlateDecode payloads up to 16 MiB. Known executable/web extensions receive .download. This is not a malware guarantee. Authoring requires a blank document or one original source in original page order. Annotation/associated-file references are not edited. Portfolios are not supported.", 10));
     }
 }

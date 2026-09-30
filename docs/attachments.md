@@ -1,4 +1,4 @@
-# Source attachment explorer
+# Native PDF attachments
 
 ## Workflow
 
@@ -41,6 +41,55 @@ Native parsing is synchronous and the object limit is a post-parse guard, not a 
 
 ## Coverage boundary
 
-This increment does **not** add/remove files or edit descriptions; it does not enumerate attachment-only annotations, `/AF` arrays or portfolio/collection semantics. It does not interpret launch/GoToE actions, attachments inside attachments, platform-specific embedded-file alternatives or all PDF stream filters. All ordinary structured-save, signing, XFA and form-assembly restrictions remain unchanged.
+Catalog authoring is available in 0.6.4 within the restrictions below. The explorer does not enumerate attachment-only annotations, `/AF` arrays or portfolio/collection semantics. It does not interpret launch/GoToE actions, attachments inside attachments, platform-specific embedded-file alternatives or all PDF stream filters. All ordinary structured-save, signing, XFA and form-assembly restrictions remain unchanged.
 
 Native tests generate unfiltered, compressed, Unicode, active-name, nested-tree and 65/512-file fixtures. They verify raw payload equality, invalid descriptors, checksum/truncation and expansion limits, immutable results, weak lifetimes and zero-allocation warmed metadata lookups. Real Uno browser tests use file pickers, pointer interaction, confirmation dialogs and actual downloads; a native verifier independently checks those downloaded bytes against the original fixture data.
+
+## Native authoring (0.6.4)
+
+**Add attachment** opens a binary file picker and then a description/confirmation dialog. **Edit → Attach file** opens the same inspector. Existing rows have **Edit description**, **Replace file** and **Remove from catalog** commands. Replacement retains the catalog filename and description; removal affects only the selected key. Save the changed document using ordinary **Export PDF** or the editable workspace format. Every effective command is one undo transaction. Cancelling a picker/dialog changes nothing, except an already active text editor can finish through its existing focus-loss behavior; Add explicitly finishes it before capturing its own snapshot.
+
+The engine supports a blank workspace or exactly one retained PDF with its complete original page sequence. Combined, inserted/deleted/reordered-source catalogs require explicit export/reopen first; their unknown catalog preservation is not guaranteed. Catalog `/Collection`, `/Perms`, XFA, any discovered signature field/signature dictionary/ByteRange, and pending redaction marks reject authoring. A signature-aware incremental writer is not implemented. Attachment changes rewrite native PDF bytes; they are not file-in-place or incremental edits.
+
+```csharp
+// Caller keeps payload arrays immutable for the synchronous operation.
+var file = new PdfAttachmentInput("report.txt", data,
+    Description: "Reviewed source data", MediaType: "text/plain");
+var added = PdfAttachmentEditor.Add(workspace, file, cancellationToken);
+var selection = PdfEmbeddedFiles.Read(added.Sources.Single().Bytes, cancellationToken).Single();
+var described = PdfAttachmentEditor.SetDescription(added, selection,
+    "Approved data", cancellationToken);
+
+// A new source requires a fresh descriptor, including its new SHA-256 identity.
+var current = PdfEmbeddedFiles.Read(described.Sources.Single().Bytes, cancellationToken).Single();
+var replaced = PdfAttachmentEditor.Replace(described, current,
+    replacementBytes, "text/plain", cancellationToken);
+var removed = PdfAttachmentEditor.Remove(replaced,
+    PdfEmbeddedFiles.Read(replaced.Sources.Single().Bytes, cancellationToken).Single(), cancellationToken);
+
+// One parse/native write for the entire batch, not one per attachment.
+var batch = PdfAttachmentEditor.AddRange(workspace, new[] { file, secondFile }, cancellationToken);
+```
+
+Per-file input is limited to **16 MiB**, each batch to **32 files / 32 MiB**, and catalogs to **512 entries**. Output sources must fit the existing **64 MiB** source budget. New filenames are Unicode leaf names (at most 120 UTF-16 units), not filesystem paths; hidden/control/bidi-format characters and invalid Windows punctuation are rejected. Descriptions are validated Unicode with at most 4,096 units; newline/tab are allowed. Declared media types are ASCII type/subtype tokens without parameters. Browser/desktop UI authoring defaults to `application/octet-stream` rather than trusting a filename as a content validator.
+
+The writer preserves existing name-key tokens and sorts the rebuilt flat leaf by encoded key bytes. Shared file specifications are detached before changing one catalog entry. A shared `/AF` or annotation reference can still refer to the old file specification; unrelated catalog name trees are retained. Replacement does not interpret or execute external references and does not follow attachment-in-attachment content. It replaces only the embedded payload of the chosen catalog entry. Payloads are compressed with zlib in bounded blocks only when the compressed result is smaller; incompressible data remains unfiltered. Decompression/launching is not part of authoring.
+
+**Removal is not secure deletion.** Other PDF references, old indirect objects, original preview buffers, editable workspaces and undo history can retain the removed/replaced bytes. The writer does not sanitize hidden content, prune arbitrary unreachable object graphs, or certify the resulting document as free of confidential data or malware. Reusing a preview is safe for catalog-only visual changes, but intentionally retains the old preview buffer.
+
+For one-source edits the page array, annotations, form/OCR state, labels, crop/rotation and source identity are retained. `PreviewBytes` retains the old visual source identity; the primary `Bytes` contains the changed catalog. This avoids PdfPig import, preview reconstruction and invalidating unchanged Skia pictures. Ordinary native export uses the edited primary source and applies pending workspace state through the existing writer. Empty batches and validated identical descriptions return the original workspace reference. No-op description checks still parse and validate the source, and replacement does not currently detect equal payloads as a no-op.
+
+Native parsing/writing remains synchronous; cancellation is checked at graph/chunk/stage boundaries, not inside each native call. Dictionary graph bounds are post-parse defenses, not a parser-memory sandbox. `WorkspaceFileReader.ReadBoundedAsync` provides pooled 32 KiB reads for host pickers, including non-seekable and growing files; it reads at most one byte over the payload budget, rejects before appending it, clears the rented buffer, and leaves the caller's stream open. The limit is not a bound on all temporary or process allocations. Existing third-party storage implementations remain source-compatible: the new default `OpenAttachmentAsync` reports unsupported unless implemented.
+
+## Reproduce authoring verification
+
+```bash
+dotnet run --project tests/PdfSpace.Tests -c Release -- --test-attachment-editing
+python3 scripts/verify-attachment-editing.py artifacts/structured
+# After publishing/serving the Uno app and copying all engine fixtures:
+npx playwright test tests/browser/attachment-editing.spec.mjs
+dotnet run --project tests/PdfSpace.Tests -c Release -- --verify-browser-attachment-editing artifacts/browser-exports
+python3 scripts/verify-attachment-editing.py artifacts/structured --browser artifacts/browser-exports
+```
+
+The independent script needs `pypdf` and `PyMuPDF`. It checks actual payloads, Unicode metadata, unchanged decoded page streams and rendered pixels. It is intentionally separate from the native engine. The focused native run also writes `artifacts/engine/attachment-authoring-performance.json`: eight tiny files, three warmups, seven alternating-order samples of batch versus serial Add. Timing includes parsing, guards, compression and writing, but excludes rendering, UI, input IO and native/GPU memory. Result verification is outside timing. This measures batching, not a whole-application speed multiplier.

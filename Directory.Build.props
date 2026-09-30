@@ -3,7 +3,7 @@
     <LangVersion>14.0</LangVersion>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <Version>0.6.3-alpha.1</Version>
+    <Version>0.6.4-alpha.1</Version>
     <Authors>Wiesław Šoltés</Authors>
     <Company>Wiesław Šoltés</Company>
     <Copyright>Copyright © 2026 Wiesław Šoltés</Copyright>
