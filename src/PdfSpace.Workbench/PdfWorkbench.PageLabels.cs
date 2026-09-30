@@ -20,7 +20,7 @@ public sealed partial class PdfWorkbench
         if (result == PageLabelMatch.Found) Viewport.Navigate(index);
         else ShowStatus(result == PageLabelMatch.Ambiguous
             ? "This label occurs on several pages. Enter # followed by its physical page number."
-            : "Page label not found. Use its exact case, or # followed by a physical page number.", true);
+            : "Page label not found. Use its exact case, #N for a physical page, or =text for a literal label.", true);
     }
 
     private void BuildPageLabels(StackPanel content)
@@ -89,7 +89,7 @@ public sealed partial class PdfWorkbench
         content.Children.Add(new PdfCommandButton("Apply page labels", action: () => Commit("Set page labels", (d, first, count) => PdfPageLabels.Apply(d, first, count, Value()))));
         content.Children.Add(new PdfCommandButton("Extend previous labels", action: () => Commit("Extend page labels", (d, first, count) => PdfPageLabels.Extend(d, first, count))));
         content.Children.Add(new PdfCommandButton("Reset page labels", action: () => Commit("Reset page labels", (d, first, count) => PdfPageLabels.Reset(d, first, count))));
-        content.Children.Add(Paragraph("Labels follow the page when moved or extracted. Duplicate labels are allowed; #N always navigates to physical page N. Only the selected range changes. Alphabetic sequences are A…Z, AA…ZZ, AAA… per PDF rules.", 10));
+        content.Children.Add(Paragraph("Labels follow the page when moved or extracted. Duplicate labels are allowed; #N always navigates to physical page N. Use =text for a literal label (for example =#2 or ==Cover). Only the selected range changes. Alphabetic sequences are A…Z, AA…ZZ, AAA… per PDF rules.", 10));
         Preview();
     }
 }

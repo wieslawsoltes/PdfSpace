@@ -70,3 +70,27 @@ test('page-label ambiguity, invalid ranges and repeated labels are explicit and 
   await expect.poll(async () => (await state(page)).status).toContain('positive');
   expect((await state(page)).undoCount).toBe(1);
 });
+
+
+test('native labels with hash or equals prefixes have exact literal navigation', async ({ page }) => {
+  await start(page);
+  await set(page, 'Label prefix', '#Part-'); await click(page, 'Apply page labels');
+  await expect.poll(async () => (await state(page)).undoCount).toBe(1);
+  await set(page, 'Page number', '#Part-5'); await page.keyboard.press('Enter');
+  await expect.poll(async () => (await state(page)).page).toBe(5);
+  await set(page, 'Label page range', '3'); await set(page, 'Label prefix', '#2');
+  await click(page, 'Prefix only labels'); await click(page, 'Apply page labels');
+  await expect.poll(async () => (await state(page)).undoCount).toBe(2);
+  await set(page, 'Page number', '#2'); await page.keyboard.press('Enter');
+  await expect.poll(async () => (await state(page)).page).toBe(2);
+  await set(page, 'Page number', '=#2'); await page.keyboard.press('Enter');
+  await expect.poll(async () => (await state(page)).page).toBe(3);
+  await set(page, 'Label page range', '6'); await set(page, 'Label prefix', '=Appendix');
+  await click(page, 'Apply page labels');
+  await expect.poll(async () => (await state(page)).undoCount).toBe(3);
+  await set(page, 'Page number', '==Appendix'); await page.keyboard.press('Enter');
+  await expect.poll(async () => (await state(page)).page).toBe(6);
+  await expect.poll(async () => (await state(page)).pageLabel).toBe('=Appendix');
+  expect((await state(page)).undoCount).toBe(3);
+  await save(page, 'labels-browser-literal.pdf');
+});

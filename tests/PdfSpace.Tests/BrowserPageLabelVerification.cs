@@ -13,6 +13,16 @@ internal static class BrowserPageLabelVerification
         Check(PdfSpace.Documents.PdfReader.ExtractText(sections).Contains("Good ideas"), "navigation labels retain searchable source content");
         using var renderer = new PdfSpace.Skia.PdfRenderer();
         Check(renderer.ExportPng(sections, 0, 1).SequenceEqual(renderer.ExportPng(reset, 0, 1)), "label reset changes no rendered source pixels");
-        Console.WriteLine("4 browser page-label verification checks passed.");
+        var special = Read("labels-browser-literal.pdf"); var exact = new PageLabelIndex(special.Pages);
+        Check(Enumerable.Range(0, 6).Select(i => exact[i]).SequenceEqual(new[] { "#Part-1", "#Part-2", "#2", "#Part-4", "#Part-5", "=Appendix" }),
+            "browser preserves hash and equals prefixes in native labels");
+        Check(exact.Resolve("#2", out var physical) == PageLabelMatch.Found && physical == 1 &&
+            exact.Resolve("=#2", out var literal) == PageLabelMatch.Found && literal == 2,
+            "native reopen retains distinct physical and literal hash navigation");
+        Check(exact.Resolve("==Appendix", out var appendix) == PageLabelMatch.Found && appendix == 5,
+            "native reopen retains literal equals navigation");
+        Check(renderer.ExportPng(sections, 0, 1).SequenceEqual(renderer.ExportPng(special, 0, 1)),
+            "command-looking labels do not change rendered source content");
+        Console.WriteLine("8 browser page-label verification checks passed.");
     }
 }

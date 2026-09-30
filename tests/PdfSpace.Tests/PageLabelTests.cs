@@ -131,6 +131,7 @@ internal static class PageLabelTests
         File.WriteAllBytes("artifacts/structured/labels-native.pdf", labelledBytes);
         File.WriteAllBytes("artifacts/structured/labels-sections.pdf", bytes);
         File.WriteAllBytes("artifacts/structured/labels-reordered.pdf", PdfDocumentEngine.Save(reordered, font).Bytes);
+        PageLabelFormattingTests.Run(check, reject);
         Benchmark(check);
     }
 

@@ -10,7 +10,7 @@ PDF alphabetic numbering repeats the same letter: A…Z, AA…ZZ, AAA…ZZZ. It 
 
 ## Navigation and page identity
 
-The page field accepts an exact, case-sensitive label. `#N` always selects physical page N, even if numeric labels conflict with physical positions. A duplicate label is explicitly ambiguous rather than selecting an arbitrary occurrence. A number that is not an existing label can resolve to a physical position. The physical position and total remain displayed separately. Long labels are clipped to their thumbnail cell, and the full value is editable in the navigation field and inspector.
+The page field accepts an exact, case-sensitive label. `#N` always selects physical page N, even if numeric labels conflict with physical positions. Nonnumeric hash-prefixed labels such as `#Appendix` resolve normally. `=text` requests literal label lookup without command-prefix or physical fallback: `=#2` selects the native label `#2`, `==Cover` selects `=Cover`, and `=` selects a unique empty label. Duplicate literal labels are still ambiguous. These are PdfSpace navigation shortcuts, not modifications to the native label string. A duplicate label is explicitly ambiguous rather than selecting an arbitrary occurrence. A number that is not an existing label can resolve to a physical position. The physical position and total remain displayed separately. Long labels are clipped to their thumbnail cell, and the full value is editable in the navigation field and inspector.
 
 Resolved labels follow stable page identities through extraction, reordering and combination. Duplicating a page duplicates its label; it does not silently renumber other sections. An implicit label remains the page's current physical number. Explicit decimal labels retain their resolved number when moved. Reapply or extend a range to intentionally renumber it.
 
@@ -51,3 +51,11 @@ Explicitly assigned decimal labels that happen to equal physical numbers remain 
 The navigation/thumbnail index retains strings and immutable label definitions, not page states or PDF sources. A new snapshot with unchanged label definitions reuses the index after a bounded sequence comparison; pan/zoom/navigation on the same snapshot skips even that comparison. Only changed label definitions rebuild the lookup.
 
 Adjacent prefix-only sections retain distinct saved starting-number settings even when their displayed strings match. Export only coalesces records whose relevant settings are equivalent. The native writer also fast-paths an entirely implicit/reset label sequence without temporary per-page label records; uninitialized source-backed pages still resolve their native tree before that decision. The exact-label dictionary is sized once for its page count.
+
+## Direct formatting and literal lookup
+
+`PdfPageLabel.Format` measures the exact expansion before allocation and writes the prefix and suffix directly into a single result string. Roman symbol tables are shared, and casing affects only the Roman suffix. Prefix-only labels reuse the existing immutable prefix. Exact 1,024-code-unit Roman/alphabetic expansions are accepted; larger ones are rejected before allocating the expanded string.
+
+`PageLabelIndex.ResolveLabel` is the command-free lookup for embedders. `Resolve` accepts the UI shortcuts described above and uses an alternate span lookup, so `=text` does not allocate a substring. The immutable index does not retain source buffers or workspace objects. A literal query never silently falls back to a physical page.
+
+The reproducible `benchmarks/PdfSpace.PageLabels` harness compares the previous formatter with the direct implementation over identical valid inputs. It includes all result-string allocations, unlike the warmed lookup benchmark, and excludes index construction, native PDF/UI/rendering and GPU work. The fixture is not an application-wide performance claim.
