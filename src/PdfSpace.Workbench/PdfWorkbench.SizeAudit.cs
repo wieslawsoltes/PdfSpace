@@ -7,7 +7,20 @@ public sealed partial class PdfWorkbench
     private readonly WorkspaceSnapshotStamp _sizeAuditStamp = new();
     private PdfWorkspaceSizeReport? _sizeAuditReport;
 
-    private void ShowSizeAudit() { _home = false; OpenRight("Space usage"); UpdateModeVisibility(); }
+    private void ShowSizeAudit()
+    {
+        // This is a tool activation command, not the rail's toggle command.
+        // A tab switch preserves the inspector; activating the audit again
+        // must not hide the current document's Run action.
+        _home = false;
+        if (_right != "Space usage")
+        {
+            _right = "Space usage";
+            RefreshRight();
+            AdaptLayout();
+        }
+        UpdateModeVisibility();
+    }
 
     private void BuildSizeAudit(StackPanel content)
     {

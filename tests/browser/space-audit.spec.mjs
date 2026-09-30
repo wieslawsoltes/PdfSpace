@@ -43,6 +43,9 @@ test('space audit reports native stream sizes, reuses sources through label edit
   await click(page, 'Label prefix'); await page.keyboard.insertText('Audit-'); await click(page, 'Apply page labels');
   await expect.poll(async () => (await state(page)).undoCount).toBe(1);
   await click(page, 'Convert'); await click(page, 'Audit PDF space');
+  // Repeating a tool activation must keep the panel open, not invoke the rail toggle.
+  await click(page, 'Audit PDF space');
+  await expect.poll(async () => (await state(page)).controls.some(c => c.name === 'Run space audit' && c.enabled)).toBe(true);
   await expect.poll(async () => (await state(page)).auditCurrent).toBe(false);
   expect((await state(page)).controls.some(c => c.name === 'Export space audit JSON')).toBe(false);
   await click(page, 'Run space audit');
@@ -56,6 +59,9 @@ test('space audit cannot export a previous document report from a new empty work
   await expect.poll(async () => (await state(page)).auditCurrent).toBe(true);
   await click(page, 'Home'); await click(page, 'Create a PDF');
   await click(page, 'Convert'); await click(page, 'Audit PDF space');
+  // Repeating a tool activation must keep the panel open, not invoke the rail toggle.
+  await click(page, 'Audit PDF space');
+  await expect.poll(async () => (await state(page)).controls.some(c => c.name === 'Run space audit' && c.enabled)).toBe(true);
   await expect.poll(async () => (await state(page)).auditCurrent).toBe(false);
   expect((await state(page)).controls.some(c => c.name === 'Export space audit JSON')).toBe(false);
   await click(page, 'Run space audit');
@@ -65,4 +71,7 @@ test('space audit cannot export a previous document report from a new empty work
   expect(empty.uniqueSourceBuffers).toBe(0); expect(empty.sources).toEqual([]);
   expect(empty.categories.every(c => c.encodedBytes === 0 && c.percentOfStreamBytes === 0)).toBe(true);
   expect((await state(page)).undoCount).toBe(0); expect((await state(page)).dirty).toBe(false);
+  await click(page, 'Audit PDF space');
+  await expect.poll(async () => (await state(page)).auditCurrent).toBe(true);
+  expect((await state(page)).controls.some(c => c.name === 'Export space audit JSON')).toBe(true);
 });
