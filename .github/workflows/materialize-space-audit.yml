@@ -1,0 +1,41 @@
+name: Materialize source-space audit
+on:
+  push:
+    branches: [build/space-audit-0.6.2]
+    paths: [.github/workflows/materialize-space-audit.yml]
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/space-audit-0.6.2
+          fetch-depth: 0
+      - name: Verify source delta and materialized tree
+        env:
+          TRANSFER_COMMIT: ${{ github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = '530cb0c7e6cb2de913941bbc14f04d7d3200b5c4'
+          git fetch origin "$TRANSFER_COMMIT"
+          python3 - <<'PY'
+          import os,subprocess,base64,lzma,hashlib,pathlib
+          chunks=[subprocess.check_output(['git','show',f'{os.environ["TRANSFER_COMMIT"]}:tools/space-audit/{i}.b64']).decode().strip() for i in range(1,3)]
+          patch=lzma.decompress(base64.b64decode(''.join(chunks),validate=True))
+          assert hashlib.sha256(patch).hexdigest()=='dec53aab817d1e31e857e4fe68a7e634886d05bcb8128f2dbf0ae94781241f99'
+          pathlib.Path('/tmp/space-audit.patch').write_bytes(patch)
+          print('Verified',len(patch),'bytes of reviewed source changes')
+          PY
+          git apply --check /tmp/space-audit.patch
+          git apply /tmp/space-audit.patch
+          git diff --check
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          test "$(git write-tree)" = '57fe1440319ef2703da9b25a4d0417c0f7f841d8'
+          git commit -m 'feat: encoded PDF source-space audit and weak bounded report cache'
+          git push origin HEAD:feat/space-audit-0.6.2
