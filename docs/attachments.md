@@ -93,3 +93,9 @@ python3 scripts/verify-attachment-editing.py artifacts/structured --browser arti
 ```
 
 The independent script needs `pypdf` and `PyMuPDF`. It checks actual payloads, Unicode metadata, unchanged decoded page streams and rendered pixels. It is intentionally separate from the native engine. The focused native run also writes `artifacts/engine/attachment-authoring-performance.json`: eight tiny files, three warmups, seven alternating-order samples of batch versus serial Add. Timing includes parsing, guards, compression and writing, but excludes rendering, UI, input IO and native/GPU memory. Result verification is outside timing. This measures batching, not a whole-application speed multiplier.
+
+## Recovery feedback and file ownership
+
+Automatic recovery has a separate per-tab footer state (`ready`, `pending`, `saving`, `saved`, `failed`, or `disabled`). Its asynchronous completion cannot overwrite a newer command's result. A failed save is shown as a red **Recovery failed — export workspace** badge with the failure detail in its tooltip; it does not mark the document saved or replace editing feedback. A completed write for an old tab updates only that tab and does not implicitly save a newly opened tab. The backing recovery slot still holds the last saved workspace, not a multi-document archive.
+
+The bounded desktop stream reader is also used by PDF/workspace drag-and-drop. All caller-owned input streams stay open until their host disposes them.
