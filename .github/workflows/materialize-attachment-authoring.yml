@@ -1,0 +1,41 @@
+name: Materialize attachment authoring
+on:
+  push:
+    branches: [build/attachment-authoring-0.6.4]
+    paths: [.github/workflows/materialize-attachment-authoring.yml]
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/attachment-authoring-0.6.4
+          fetch-depth: 0
+      - name: Apply exact tested source and verify its tree
+        env:
+          TRANSFER_COMMIT: ${{ github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = '751e538080c7a9178874d4dd77cdf51922c3c65b'
+          git fetch origin "$TRANSFER_COMMIT"
+          python3 - <<'PY'
+          import os,subprocess,base64,lzma,hashlib,pathlib
+          chunks=[subprocess.check_output(['git','show',f'{os.environ["TRANSFER_COMMIT"]}:tools/attachments064/{i}.b64']).decode().strip() for i in (1,2)]
+          patch=lzma.decompress(base64.b64decode(''.join(chunks),validate=True))
+          assert hashlib.sha256(patch).hexdigest()=='74dcf8dc4e247fc1ac145b239cbf0513be5c9c7cd26f0c8a725f4825cdacf37b'
+          pathlib.Path('/tmp/attachments.patch').write_bytes(patch)
+          print('Verified',len(patch),'bytes of tested source changes')
+          PY
+          git apply --check --unidiff-zero /tmp/attachments.patch
+          git apply --unidiff-zero /tmp/attachments.patch
+          git diff --check
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          test "$(git write-tree)" = 'c16546d283c3fe81476469b61e2b7337adf153a6'
+          git commit -m 'feat: native attachment authoring, batched catalog edits and bounded file input'
+          git push origin HEAD:feat/attachment-authoring-0.6.4
