@@ -74,6 +74,7 @@ internal static class SizeAuditTests
         check(!Encoding.UTF8.GetString(json).Contains("private-title"), "audit report omits file names and document text");
         reject(() => ((IList<PdfStreamUsage>)aggregate.Categories)[0] = aggregate.Categories[1], "audit result categories cannot be externally mutated");
         reject(() => ((IList<PdfStreamObjectUsage>)a.LargestStreams)[0] = a.LargestStreams[1], "cached audit largest-stream entries are immutable");
+        SizeAuditBoundaryTests.Run(check, reject);
         var clock = Stopwatch.GetTimestamp();
         for (var i = 0; i < 100_000; i++) cache.Read(changed);
         var elapsed = Stopwatch.GetElapsedTime(clock).TotalMilliseconds;

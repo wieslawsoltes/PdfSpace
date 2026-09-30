@@ -1,6 +1,8 @@
 # Source space audit
 
-Open **Convert → Audit PDF space → Run space audit**, or use the entry under All tools. The result inventories the original PDF buffers retained by the active workspace. It does not write a PDF, add history, clear dirty state, decode image/font/attachment payloads or initiate a remote service.
+Open **Convert → Audit PDF space → Run space audit**, or use the entry under All tools. The result inventories the original PDF buffers retained by the active workspace. The audit itself does not write a PDF, add history, clear dirty state, decode image/font/attachment payloads or initiate a remote service.
+
+Opening a tool follows the existing editor focus rules: leaving an active text/form editor may commit that edit. The audit does not force an editor commit; uncommitted overlay text is outside its source-buffer scope.
 
 ## What is measured
 

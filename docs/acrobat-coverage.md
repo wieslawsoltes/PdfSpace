@@ -1,6 +1,6 @@
 # Acrobat workflow coverage and remaining gaps
 
-Reviewed against Adobe's desktop help on **2026-09-29**, and the PdfSpace implementation through **0.6.2-alpha.1**. This is an engineering gap inventory, not a product certification, exhaustive enumeration of every Acrobat command, API/binary compatibility claim or pixel-parity score. Adobe availability can vary by product, license, platform and version.
+Reviewed against Adobe's desktop help on **2026-09-30**, and the PdfSpace implementation through **0.6.2-alpha.1**. This is an engineering gap inventory, not a product certification, exhaustive enumeration of every Acrobat command, API/binary compatibility claim or pixel-parity score. Adobe availability can vary by product, license, platform and version.
 
 Primary references: [Acrobat tool overview](https://helpx.adobe.com/acrobat/using/explore-acrobat-tools.html), [desktop help / workflow index](https://www.adobe.com/support/acrobat/), [watermarks](https://helpx.adobe.com/acrobat/using/add-watermarks-pdfs.html). Feature names below describe workflows, not copied Adobe assets or implementation.
 

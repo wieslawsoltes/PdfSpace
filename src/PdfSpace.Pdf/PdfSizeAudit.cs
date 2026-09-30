@@ -35,9 +35,13 @@ public static class PdfSizeAudit
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (item is not PdfDictionary dictionary) continue;
-            if (dictionary.Elements.GetName("/Type") == "/FontDescriptor")
+            // Descriptors may be direct dictionaries inside an indirect font object.
+            // Their font streams are still indirect and must not fall into Other.
+            var descriptor = dictionary.Elements.GetName("/Type") == "/FontDescriptor" ? dictionary :
+                dictionary.Elements.GetName("/Type") == "/Font" ? PdfObjects.Dictionary(dictionary.Elements["/FontDescriptor"]) : null;
+            if (descriptor is not null)
                 foreach (var key in FontKeys)
-                    if (PdfObjects.Dictionary(dictionary.Elements[key]) is { } program) fonts.Add(program);
+                    if (PdfObjects.Dictionary(descriptor.Elements[key]) is { } program) fonts.Add(program);
             if (dictionary.Elements.GetName("/Type") != "/Page") continue;
             var value = PdfObjects.Resolve(dictionary.Elements["/Contents"]);
             if (value is PdfDictionary stream) contents.Add(stream);

@@ -15,7 +15,7 @@ public sealed partial class PdfWorkbench
         content.Children.Add(Paragraph("Inspect encoded images, fonts and content streams without decoding their payloads. This does not optimize or modify your document."));
         content.Children.Add(new PdfCommandButton("Run space audit", PdfIconKind.Search, () => Safe(() =>
         {
-            Viewport.FinishText(true);
+            // Audit retained source bytes only; do not commit an active text editor.
             var snapshot = Session.Document;
             var result = _active.SizeAudit.Analyze(snapshot);
             _sizeAuditReport = result; _sizeAuditStamp.Remember(snapshot);
