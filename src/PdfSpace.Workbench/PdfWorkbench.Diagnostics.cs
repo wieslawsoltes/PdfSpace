@@ -14,6 +14,8 @@ public sealed partial class PdfWorkbench
         {
             json.WriteStartObject(); json.WriteBoolean("ready", true); json.WriteString("title", Session.Document.Title); json.WriteString("tool", Session.Tool.ToString());
             json.WriteString("mode", _mode); json.WriteString("rightPanel", _right); json.WriteString("status", Status); json.WriteNumber("pages", Session.Document.Pages.Length); json.WriteNumber("page", Session.CurrentPage + 1);
+            json.WriteNumber("pageLabelIndexBuilds", Viewport.PageLabelIndexBuilds);
+            json.WriteString("pageLabel", Session.Document.IsSensitive ? "[protected]" : Viewport.PageLabels[Session.CurrentPage]);
             json.WriteNumber("fields", Session.Document.FieldCount); json.WriteBoolean("sensitive", Session.Document.IsSensitive); json.WriteString("selectedField", Session.SelectedField?.Name);
             json.WriteNumber("redactions", Session.Document.Pages.Sum(page => page.Annotations.Count(annotation => annotation.Kind == AnnotationKind.RedactionMark)));
             json.WriteStartArray("formValues"); foreach (var field in Session.Document.Pages.SelectMany(page => page.Fields)) { json.WriteStartObject(); json.WriteString("name", field.Name); json.WriteString("value", Session.Document.IsSensitive ? "[protected]" : field.Value);

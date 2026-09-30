@@ -19,6 +19,9 @@ public sealed record PdfPageState
     public int Rotation { get; init; }
     public RectD? Crop { get; init; }
     public string Bookmark { get; init; } = "";
+    public PdfPageLabel? Label { get; init; }
+    // Distinguishes explicit physical numbering from a pre-label-version workspace awaiting import.
+    public bool LabelInitialized { get; init; }
     public Annotation[] Annotations { get; init; } = [];
     public PdfFormFieldState[] Fields { get; init; } = [];
     public PdfOcrLayer? Ocr { get; init; }

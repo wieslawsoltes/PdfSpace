@@ -1,6 +1,6 @@
 # Acrobat workflow coverage and remaining gaps
 
-Reviewed against Adobe's desktop help on **2026-09-29**, and the PdfSpace implementation through **0.6.0-alpha.1**. This is an engineering gap inventory, not a product certification, exhaustive enumeration of every Acrobat command, API/binary compatibility claim or pixel-parity score. Adobe availability can vary by product, license, platform and version.
+Reviewed against Adobe's desktop help on **2026-09-29**, and the PdfSpace implementation through **0.6.1-alpha.1**. This is an engineering gap inventory, not a product certification, exhaustive enumeration of every Acrobat command, API/binary compatibility claim or pixel-parity score. Adobe availability can vary by product, license, platform and version.
 
 Primary references: [Acrobat tool overview](https://helpx.adobe.com/acrobat/using/explore-acrobat-tools.html), [desktop help / workflow index](https://www.adobe.com/support/acrobat/), [watermarks](https://helpx.adobe.com/acrobat/using/add-watermarks-pdfs.html). Feature names below describe workflows, not copied Adobe assets or implementation.
 
@@ -8,11 +8,11 @@ Primary references: [Acrobat tool overview](https://helpx.adobe.com/acrobat/usin
 
 | Workflow area | PdfSpace coverage | Material remaining work |
 |---|---|---|
-| Reading and navigation | Partial: multiple tabs, search/copy, zoom/pan, continuous/single/two-page, virtualized thumbnails, outlines, bookmarks, named/local destinations. | Reflow/read mode, complete screen-reader page semantics, page-label UI, richer text selection, corpus-level renderer fidelity. |
+| Reading and navigation | Partial: multiple tabs, search/copy, zoom/pan, continuous/single/two-page, virtualized thumbnails, outlines, bookmarks, named/local destinations; native page labels, section editing and exact-label navigation. | Reflow/read mode, complete screen-reader page semantics, richer text selection, corpus-level renderer fidelity. |
 | Original text editing | Partial: guarded text-showing operands and nested occurrences; explicit Unicode replacement; bounded new block wrapping. | Reconstruct original paragraphs/lists, complex shaping/bidi, fallback/legacy font coverage, text autoflow, spell-check. |
 | Native objects | Partial: images, paths, text objects, Form/shading placements, transforms, geometry, appearance, stacking, grouping and internal clipboard. | Inline images, arbitrary interleaved clips/masks, transparency-group authoring, contour picking, full external editor integration. |
 | Precision layout | Implemented within bounded native selections: rotation, axis/aspect modifiers, move/resize/point snapping, reference/page alignment, size matching and equal gaps. | Equal-gap live guides, contour anchors, affine frame handles, live native-content drag rendering, hierarchy/layer selection UI. |
-| Headers/footers and numbers | New bounded native workflow: six slots, ranges, margins, date/page/Bates templates, Roman styles, update/remove, placement preview. | Source-content shrink-to-fit, saved presets, cross-file sequence/renaming, `/PageLabels`, arbitrary third-party mark identification. |
+| Headers/footers and numbers | New bounded native workflow: six slots, ranges, margins, date/page/Bates templates, Roman styles, update/remove, placement preview. | Source-content shrink-to-fit, saved presets, cross-file sequence/renaming, arbitrary third-party mark identification. |
 | Watermarks/backgrounds | Partial: native text watermark, opacity/rotation/front/behind, range/update/remove. | Image/PDF watermark, arbitrary backgrounds, visibility policies, repeat patterns, preset persistence. |
 | Organize/combine | Partial: crop, reorder, duplicate, delete, insert blank/PDF, combine, split/extract. | General existing-form/catalog preservation on assembly, portfolios, collections, arbitrary page replacement semantics. |
 | Comments/review | Partial: native notes/replies, markup, drawings, links, visual stamps, resolution and undo. | Full FDF/XFDF comment interchange, attachments/callouts/dynamic stamps, review status workflows and remote review. |
@@ -32,10 +32,14 @@ Primary references: [Acrobat tool overview](https://helpx.adobe.com/acrobat/usin
 
 ## Implementation priorities
 
-Prioritize tasks that can be validated by actual native-file round trips and independent readers. The current increment closes bounded page-mark workflows and an OCR/native-search interaction. Candidate next increments are document comparison, attachment/OCG inspection, optimization reports and a text-layout/shaping architecture. These are priorities, not promises that the features already exist or will be delivered automatically.
+Prioritize tasks that can be validated by actual native-file round trips and independent readers. The current increment adds native page-label sections, preservation through page assembly and cached label navigation; the previous increment closed bounded page-mark workflows and an OCR/native-search interaction. Candidate next increments are document comparison, attachment/OCG inspection, optimization reports and a text-layout/shaping architecture. These are priorities, not promises that the features already exist or will be delivered automatically.
 
 Treat incremental writing, certificates, conformance and native sanitization as distinct correctness/security contracts with dedicated fixtures and external validation. A visual imitation, a retained unknown dictionary, or an export that merely opens is insufficient evidence of parity.
 
 ## Performance contracts
 
 Track native source parse counts, resource reuse, immutable cache invalidation, pointer preview allocations, bounded UI row counts, time-to-interaction, large-document memory and actual output size separately. Geometry benchmarks cannot establish overall frame rate. Two browser acceptance workers test correctness, not physical GPU speed. Each increment must preserve prior round-trip/independent-reader regressions and state explicitly where CPU-affine native parsing can still block the UI.
+
+## Current gap review (2026-09-29)
+
+Checked [Adobe desktop help](https://www.adobe.com/support/acrobat/), [page-label sections](https://helpx.adobe.com/acrobat/desktop/edit-documents/organize-pages/renumber-pages.html), [Compare Files](https://www.adobe.com/acrobat/features/compare-pdfs.html) and [background authoring](https://helpx.adobe.com/ca/acrobat/desktop/edit-documents/add-backgrounds-and-watermarks/add-background.html). Page labels are now a native implemented workflow with [explicit limits](page-labels.md); comparison, background/image-watermark authoring and the other absent areas above are still gaps. No UI placeholder or source-dictionary preservation is counted as feature completion. AI/PDF Spaces, e-sign service delivery and collaborative review require separate service/data-consent designs; none are simulated or implicitly uploaded.

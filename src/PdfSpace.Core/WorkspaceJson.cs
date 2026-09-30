@@ -46,6 +46,7 @@ public static class WorkspaceJson
             if (page.Rotation is not (0 or 90 or 180 or 270)) throw new InvalidDataException("Invalid page rotation.");
             if (page.SourceId is { } id && !sourceIds.Contains(id)) throw new InvalidDataException("Missing source document.");
             if (page.SourcePage is < 1 or > 4096) throw new InvalidDataException("Invalid source page number.");
+            page.Label?.Validate();
             if (page.Bookmark is null || page.Bookmark.Length > 4096) throw new InvalidDataException("Invalid bookmark.");
             if (page.Crop is { } crop && (!crop.IsFinite || crop.Width < 1 || crop.Height < 1 || crop.X < 0 || crop.Y < 0 || crop.Right > page.Width + .01 || crop.Bottom > page.Height + .01)) throw new InvalidDataException("Invalid page crop.");
             if (page.Fields is null || page.Fields.Length > 10000) throw new InvalidDataException("Invalid form-field collection.");
