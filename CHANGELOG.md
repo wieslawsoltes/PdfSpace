@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.6.2-alpha.1
+
+- Add native retained-source stream audit, category shares, bounded largest-object details and source-generated JSON report export.
+- Count repeated indirect stream references and reference-identical source aliases once; never expand image/font/attachment payloads for the audit.
+- Reuse bounded weak source-identity caches across metadata-only changes without retaining old PDF buffers; expose counters and guard stale UI exports.
+- Add native, browser and independent report checks plus an alternating-order cache benchmark. Preserve existing PDF security and save boundaries.
+
+
 ## 0.6.1-alpha.1
 
 - Native page labels: Roman/decimal/lettered/prefix-only sections, extend/reset, label navigation and labelled thumbnails. Labels follow page identity across page operations.

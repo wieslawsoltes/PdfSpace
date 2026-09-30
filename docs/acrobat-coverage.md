@@ -1,6 +1,6 @@
 # Acrobat workflow coverage and remaining gaps
 
-Reviewed against Adobe's desktop help on **2026-09-29**, and the PdfSpace implementation through **0.6.1-alpha.1**. This is an engineering gap inventory, not a product certification, exhaustive enumeration of every Acrobat command, API/binary compatibility claim or pixel-parity score. Adobe availability can vary by product, license, platform and version.
+Reviewed against Adobe's desktop help on **2026-09-29**, and the PdfSpace implementation through **0.6.2-alpha.1**. This is an engineering gap inventory, not a product certification, exhaustive enumeration of every Acrobat command, API/binary compatibility claim or pixel-parity score. Adobe availability can vary by product, license, platform and version.
 
 Primary references: [Acrobat tool overview](https://helpx.adobe.com/acrobat/using/explore-acrobat-tools.html), [desktop help / workflow index](https://www.adobe.com/support/acrobat/), [watermarks](https://helpx.adobe.com/acrobat/using/add-watermarks-pdfs.html). Feature names below describe workflows, not copied Adobe assets or implementation.
 
@@ -18,7 +18,7 @@ Primary references: [Acrobat tool overview](https://helpx.adobe.com/acrobat/usin
 | Comments/review | Partial: native notes/replies, markup, drawings, links, visual stamps, resolution and undo. | Full FDF/XFDF comment interchange, attachments/callouts/dynamic stamps, review status workflows and remote review. |
 | Forms | Partial: AcroForm text/buttons/single choices, authoring/property edits, native persistence, shared widgets, XFDF/JSON values and required checks. | XFA, script/calculation engine, barcodes, automatic field detection, complete tab-order/accessibility editing, advanced multiselect. |
 | Scan/OCR | Partial: local English/Polish/German, ranges/resolution/cancel, confidence review/correction and invisible Unicode export. | Deskew/orientation detection, regional mixed-page OCR, camera/scanner acquisition, dewarping/background cleanup, broader models. |
-| PDF optimization | Partial: eligible JPEG passthrough, row-wise RGB/alpha compression, shared resources, bounded caches/history and batched operations. | Object-size audit, safe image resampling/recompression presets, full-font subsetting, deduplication across sources, linearization, optimization report. |
+| PDF optimization | Partial: retained-source encoded-stream audit with JSON export; eligible JPEG passthrough, row-wise RGB/alpha compression, shared resources, bounded caches/history and batched operations. | Exact whole-file element accounting, safe image resampling/recompression presets, full-font subsetting, deduplication across sources, linearization, optimization report. |
 | Comparison | Absent document-comparison workflow. | Page pairing, text/geometry/raster changes, synchronized navigation, exclusions and exportable reports. |
 | Attachments/portfolios/layers | Absent authoring/management equivalence. | Embedded-file tree and safety UX, PDF collections, OCG visibility/configuration and optional-content-aware editing. |
 | Password security | Partial: local AES-256 R6, explicit owner authentication and sensitive-copy recovery rules. | Certificate encryption, policy servers, trust-management UX and broader encryption interoperability. |
@@ -43,3 +43,7 @@ Track native source parse counts, resource reuse, immutable cache invalidation, 
 ## Current gap review (2026-09-29)
 
 Checked [Adobe desktop help](https://www.adobe.com/support/acrobat/), [page-label sections](https://helpx.adobe.com/acrobat/desktop/edit-documents/organize-pages/renumber-pages.html), [Compare Files](https://www.adobe.com/acrobat/features/compare-pdfs.html) and [background authoring](https://helpx.adobe.com/ca/acrobat/desktop/edit-documents/add-backgrounds-and-watermarks/add-background.html). Page labels are now a native implemented workflow with [explicit limits](page-labels.md); comparison, background/image-watermark authoring and the other absent areas above are still gaps. No UI placeholder or source-dictionary preservation is counted as feature completion. AI/PDF Spaces, e-sign service delivery and collaborative review require separate service/data-consent designs; none are simulated or implicitly uploaded.
+
+## Optimization inspection (2026-09-30)
+
+[Adobe Audit space usage](https://helpx.adobe.com/uk/acrobat/desktop/create-documents/optimize-pdfs/audit-space.html) was checked for this increment. PdfSpace now has [encoded-source-stream accounting](space-audit.md), not an exact whole-file byte partition or optimizer. Page labels are merged; document comparison, image/PDF backgrounds/watermarks, attachments/OCG authoring, source paragraph shaping, certificates and conformance remain open as described above.
