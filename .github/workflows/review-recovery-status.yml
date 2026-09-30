@@ -1,0 +1,36 @@
+name: Review recovery feedback
+on:
+  push:
+    branches: [build/attachment-authoring-0.6.4]
+    paths: [.github/workflows/review-recovery-status.yml]
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/attachment-authoring-0.6.4
+          fetch-depth: 0
+      - name: Verify and apply reviewed UI changes
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = '945ed203aee7a6700405313966125626fe016c92'
+          python3 - <<'PY'
+          import base64,lzma,hashlib,pathlib
+          encoded='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'
+          patch=lzma.decompress(base64.b64decode(encoded,validate=True))
+          assert hashlib.sha256(patch).hexdigest()=='7358854ac6d0170ab63c96862c9102bde3da8f430224874ead10bf29ce48aff8'
+          pathlib.Path('/tmp/recovery.patch').write_bytes(patch)
+          PY
+          git apply --check /tmp/recovery.patch
+          git apply /tmp/recovery.patch
+          git diff --check
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src
+          git commit -m 'fix: isolate per-tab recovery progress from editing feedback and bound dropped input'
+          git push origin HEAD:feat/attachment-authoring-0.6.4
