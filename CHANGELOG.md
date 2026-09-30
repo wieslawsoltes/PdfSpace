@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.6.3-alpha.1
+
+- Add bounded catalog attachment browsing and confirmed download, including Unicode names, nested name trees and unfiltered/Flate streams.
+- Verify stale source/selection, decoded sizes and zlib checksums. Reject cyclic/ambiguous catalogs, external streams and unsupported codecs without launching files.
+- Use weak, bounded source-identity metadata caching and 32-row attachment paging. Native and real-browser regression suites verify exact payload bytes and unchanged history.
+- Attachment authoring, annotation-only/associated-file attachments and portfolio semantics remain outside this increment; this is not malware scanning.
+
+
 ## 0.6.2-alpha.1
 
 - Add native retained-source stream audit, category shares, bounded largest-object details and source-generated JSON report export.

@@ -1,6 +1,6 @@
 # Acrobat workflow coverage and remaining gaps
 
-Reviewed against Adobe's desktop help on **2026-09-30**, and the PdfSpace implementation through **0.6.2-alpha.1**. This is an engineering gap inventory, not a product certification, exhaustive enumeration of every Acrobat command, API/binary compatibility claim or pixel-parity score. Adobe availability can vary by product, license, platform and version.
+Reviewed against Adobe's desktop help on **2026-09-30**, and the PdfSpace implementation through **0.6.3-alpha.1**. This is an engineering gap inventory, not a product certification, exhaustive enumeration of every Acrobat command, API/binary compatibility claim or pixel-parity score. Adobe availability can vary by product, license, platform and version.
 
 Primary references: [Acrobat tool overview](https://helpx.adobe.com/acrobat/using/explore-acrobat-tools.html), [desktop help / workflow index](https://www.adobe.com/support/acrobat/), [watermarks](https://helpx.adobe.com/acrobat/using/add-watermarks-pdfs.html). Feature names below describe workflows, not copied Adobe assets or implementation.
 
@@ -20,7 +20,7 @@ Primary references: [Acrobat tool overview](https://helpx.adobe.com/acrobat/usin
 | Scan/OCR | Partial: local English/Polish/German, ranges/resolution/cancel, confidence review/correction and invisible Unicode export. | Deskew/orientation detection, regional mixed-page OCR, camera/scanner acquisition, dewarping/background cleanup, broader models. |
 | PDF optimization | Partial: retained-source encoded-stream audit with JSON export; eligible JPEG passthrough, row-wise RGB/alpha compression, shared resources, bounded caches/history and batched operations. | Exact whole-file element accounting, safe image resampling/recompression presets, full-font subsetting, deduplication across sources, linearization, optimization report. |
 | Comparison | Absent document-comparison workflow. | Page pairing, text/geometry/raster changes, synchronized navigation, exclusions and exportable reports. |
-| Attachments/portfolios/layers | Absent authoring/management equivalence. | Embedded-file tree and safety UX, PDF collections, OCG visibility/configuration and optional-content-aware editing. |
+| Attachments/portfolios/layers | Partial: bounded catalog EmbeddedFiles inspection and confirmed original-byte downloads; paged source-scoped UI and metadata caching. | Add/remove/description editing, annotation-only and AF arrays, portfolios/collections, additional codecs and OCG visibility/configuration/authoring. |
 | Password security | Partial: local AES-256 R6, explicit owner authentication and sensitive-copy recovery rules. | Certificate encryption, policy servers, trust-management UX and broader encryption interoperability. |
 | Signatures | Partial visual signatures only; signed-document editing is guarded. | Cryptographic signing, CMS/PAdES, certification permissions, timestamps, chain/revocation validation, long-term validation and incremental updates. |
 | Redaction/sanitization | Partial: explicit fresh image-only reconstruction with burned pixels. | Native vector/text selective redaction, code sets, search/redact review, comprehensive nonvisual-data audit. |
@@ -47,3 +47,7 @@ Checked [Adobe desktop help](https://www.adobe.com/support/acrobat/), [page-labe
 ## Optimization inspection (2026-09-30)
 
 [Adobe Audit space usage](https://helpx.adobe.com/uk/acrobat/desktop/create-documents/optimize-pdfs/audit-space.html) was checked for this increment. PdfSpace now has [encoded-source-stream accounting](space-audit.md), not an exact whole-file byte partition or optimizer. Page labels are merged; document comparison, image/PDF backgrounds/watermarks, attachments/OCG authoring, source paragraph shaping, certificates and conformance remain open as described above.
+
+## Attachment inspection (2026-09-30)
+
+Adobe's [attachment workflow](https://helpx.adobe.com/acrobat/desktop/edit-documents/use-links-and-attachments/add-attachment.html) includes adding files and editing descriptions. This increment implements only catalog browsing and confirmed extraction, as specified in [attachments.md](attachments.md). It does not claim those authoring operations or portfolio equivalence.

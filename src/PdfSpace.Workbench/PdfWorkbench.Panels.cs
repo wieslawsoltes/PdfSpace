@@ -32,6 +32,7 @@ public sealed partial class PdfWorkbench
                 _leftPanel.Add("Save editable workspace", PdfIconKind.Save, () => Run(SaveWorkspaceAsync));
                 _leftPanel.Add("Find in document", PdfIconKind.Search, () => OpenRight("Find"));
                 _leftPanel.Heading("ADVANCED TOOLS");
+                _leftPanel.Add("Browse attachments", PdfIconKind.Attachment, () => Safe(ShowAttachments));
                 _leftPanel.Add("Audit PDF space", PdfIconKind.Info, () => Safe(ShowSizeAudit));
                 _leftPanel.Add("Protect a PDF", PdfIconKind.Lock, () => SetMode("Protect a PDF"), 0xFF52768E);
                 _leftPanel.Add("Redact a PDF", PdfIconKind.Redact, () => SetMode("Redact a PDF"), 0xFFBA2B35);
@@ -61,6 +62,7 @@ public sealed partial class PdfWorkbench
                 _leftPanel.Add("Bates numbering", PdfIconKind.Pages, () => Safe(() => ShowPageMarks(PdfPageMarkKind.HeaderFooter, true)));
                 break;
             case "Convert":
+                _leftPanel.Add("Browse attachments", PdfIconKind.Attachment, () => Safe(ShowAttachments));
                 _leftPanel.Add("Audit PDF space", PdfIconKind.Info, () => Safe(ShowSizeAudit));
                 _leftPanel.Description("Structured PDF retains native page content, annotations and supported forms. Flattened visual output remains a separate option.");
                 _leftPanel.Add("Flattened visual PDF", PdfIconKind.Image, () => Run(ExportFlattenedAsync));
@@ -133,6 +135,7 @@ public sealed partial class PdfWorkbench
             var content = PdfTheme.Column(10); content.Margin = new Thickness(15, 5, 15, 24);
             switch (_right)
             {
+                case "Attachments": BuildAttachments(content); break;
                 case "Space usage": BuildSizeAudit(content); break;
                 case "Page labels": BuildPageLabels(content); break;
                 case "Page marks": BuildPageMarks(content); break;

@@ -6,6 +6,6 @@ cd "$ROOT"
 DIRECTORY="${1:-artifacts/browser-exports}"
 test -d "$DIRECTORY"
 dotnet build tests/PdfSpace.Tests -c Release
-for mode in security ocr objects photos mixed paint gestures manipulation snap-editing layout page-marks labels size-audit; do
+for mode in security ocr objects photos mixed paint gestures manipulation snap-editing layout page-marks labels size-audit attachments; do
   dotnet run --project tests/PdfSpace.Tests -c Release --no-build -- "--verify-browser-$mode" "$DIRECTORY"
 done
