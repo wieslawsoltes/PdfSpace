@@ -127,3 +127,7 @@ Refresh descriptors after any document mutation or undo. Never reuse a descripto
 ## Native page marks and placement preview
 
 `PdfSpace.Pdf.PdfPageMarks` provides `Apply`, `Remove`, `Read` and pure `Layout` APIs with immutable `PdfPageMarkSettings`. `PdfSpace.Workbench.PdfPageMarkPreview` hosts a placement-only Skia preview without PDF parsing. The host owns its typeface and commits an effective result to `EditorSession` as one transaction. The [complete API example and limitations](page-marks.md) describe numbering, font/resource sharing, ownership checks and cancellation boundaries.
+
+## Source-size inspection
+
+`PdfSpace.Pdf` exposes `PdfSizeAudit`, `PdfSizeAuditCache` and versioned `PdfWorkspaceSizeReport.ToJson()`. The cache is weak-reference, bounded and single-thread-affine. Reports contain immutable counts and native identifiers, not live PDF documents or source bytes. [API example, byte-accounting limits and performance details](space-audit.md).

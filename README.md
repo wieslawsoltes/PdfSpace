@@ -1,7 +1,11 @@
 <div align="center">
 
 # PdfSpace
-### Read, edit and review PDFs — on your device.
+### Source space audit in 0.6.2
+
+**Convert → Audit PDF space** inventories encoded image, font, page-content, Form, attachment and metadata streams, with bounded largest-object details and JSON export. Repeated audits reuse weak-reference source caches; metadata-only edits preserve those cache entries. The report does not rewrite a PDF or decode its content payloads. Stream shares are **not** percentages of the entire file, and retained sources are not the next export. [Accounting, APIs and performance boundaries](docs/space-audit.md).
+
+## Read, edit and review PDFs — on your device.
 
 [![Build](https://github.com/wieslawsoltes/PdfSpace/actions/workflows/build.yml/badge.svg)](https://github.com/wieslawsoltes/PdfSpace/actions/workflows/build.yml)
 [![Desktop](https://github.com/wieslawsoltes/PdfSpace/actions/workflows/desktop.yml/badge.svg)](https://github.com/wieslawsoltes/PdfSpace/actions/workflows/desktop.yml)
@@ -15,7 +19,7 @@
 
 PdfSpace is an independent, local-first PDF application built in **C# with Uno Platform and SkiaSharp**. The browser runs a real Uno WebAssembly application with the same document, editing and rendering libraries as the desktop host. An Acrobat-inspired shell brings together document tabs, floating quick tools, comments, form preparation, original-text editing, protection, redaction and page organization.
 
-> **0.6.1-alpha.1:** functional PDF workflows, not complete or pixel-identical Adobe Acrobat compatibility. PdfSpace has original branding and icons and is not affiliated with Adobe. Review the [save and security boundaries](docs/compatibility.md) before processing important documents.
+> **0.6.2-alpha.1:** functional PDF workflows, not complete or pixel-identical Adobe Acrobat compatibility. PdfSpace has original branding and icons and is not affiliated with Adobe. Review the [save and security boundaries](docs/compatibility.md) before processing important documents.
 
 ## Page labels in 0.6.1
 

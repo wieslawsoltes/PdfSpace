@@ -29,9 +29,12 @@ if (args is ["--verify-browser-page-marks", var marksDirectory]) { BrowserPageMa
 
 if (args is ["--verify-browser-labels", var labelsDirectory]) { BrowserPageLabelVerification.Run(labelsDirectory); return; }
 
+if (args is ["--verify-browser-size-audit", var auditDirectory]) { BrowserSizeAuditVerification.Run(auditDirectory); return; }
+
 var passed = 0;
 void Check(bool condition, string name) { if (!condition) throw new Exception("FAILED: " + name); Console.WriteLine("PASS " + name); passed++; }
 void Reject(Action action, string name) { try { action(); } catch { Check(true, name); return; } throw new Exception("FAILED: " + name); }
+if (args is ["--test-size-audit"]) { SizeAuditTests.Run(Check, Reject); Console.WriteLine($"{passed} space audit checks passed."); return; }
 if (args is ["--test-page-labels"]) { PageLabelTests.Run(Check, Reject); Console.WriteLine($"{passed} page label checks passed."); return; }
 if (args is ["--benchmark-page-marks"]) { PageMarkPerformanceTests.Run(Check); Console.WriteLine($"{passed} page-mark benchmark checks passed."); return; }
 if (args is ["--test-page-marks"]) { PageMarkTests.Run(Check, Reject); Console.WriteLine($"{passed} page-mark checks passed."); return; }
@@ -154,4 +157,5 @@ ObjectLayoutTests.Run(Check, Reject);
 PageMarkTests.Run(Check, Reject);
 PageMarkPerformanceTests.Run(Check);
 PageLabelTests.Run(Check, Reject);
+SizeAuditTests.Run(Check, Reject);
 Console.WriteLine($"\n{passed} engine checks passed.");
